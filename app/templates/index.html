@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ヘアスタイルタイトルジェネレーター</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+<header class="app-header">
+    <div class="logo">
+        <i class="fas fa-cut"></i>
+    </div>
+    <h1>ヘアスタイルタイトルジェネレーター</h1>
+</header>
+
+<main class="app-main">
+    <section class="guide">
+        <div class="guide-header">
+            <i class="fas fa-info-circle"></i>
+            <h2>使い方</h2>
+        </div>
+        <ol>
+            <li><i class="fas fa-keyboard"></i> 検索したいキーワードを入力してください（複数可）。</li>
+            <li><i class="fas fa-search"></i> 「生成」ボタンを押すと、HotPepper Beautyから関連タイトルを取得し、新しいテンプレート案を生成します。</li>
+            <li><i class="fas fa-clipboard"></i> 結果が表示されたら、内容を編集したり、コピーやファイル出力ができます。</li>
+        </ol>
+    </section>
+
+    <section class="search-section">
+        <div class="gender-selection">
+            <label class="gender-option">
+                <input type="radio" name="gender" value="ladies" checked>
+                <span class="radio-label"><i class="fas fa-female"></i> レディース</span>
+            </label>
+            <label class="gender-option">
+                <input type="radio" name="gender" value="mens">
+                <span class="radio-label"><i class="fas fa-male"></i> メンズ</span>
+            </label>
+        </div>
+        <div class="search-box">
+            <div class="input-wrapper">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="keyword" placeholder="例：髪質改善 グレージュ" maxlength="50">
+            </div>
+            <button id="generate-button" class="primary-button">
+                <i class="fas fa-magic"></i> 生成
+            </button>
+        </div>
+    </section>
+
+    <div class="loading hidden">
+        <div class="spinner"></div>
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <div class="progress-status">
+                <span class="progress-step">スクレイピング中...</span>
+                <span class="progress-percent">0%</span>
+            </div>
+        </div>
+        <p class="loading-message">テンプレートを生成中...</p>
+    </div>
+
+    <section class="error-message hidden">
+        <i class="fas fa-exclamation-circle"></i>
+        <span class="error-text"></span>
+    </section>
+
+    <section class="results-section hidden">
+        <h2 class="results-header"><i class="fas fa-lightbulb"></i> 生成結果</h2>
+        <div class="template-container"></div>
+        
+        <div class="export-buttons">
+            <button id="exportCsv" class="secondary-button">
+                <i class="fas fa-file-csv"></i> CSV形式でエクスポート
+            </button>
+            <button id="exportTxt" class="secondary-button">
+                <i class="fas fa-file-alt"></i> TXT形式でエクスポート
+            </button>
+        </div>
+    </section>
+</main>
+
+<footer class="app-footer">
+    <p>© 2025 ヘアスタイルタイトルジェネレーター</p>
+</footer>
+
+<template id="template-card">
+    <div class="template-card">
+        <div class="card-header">
+            <i class="fas fa-bookmark"></i>
+            <span>テンプレート</span>
+        </div>
+        <div class="card-content">
+            <div class="field">
+                <label>
+                    <i class="fas fa-heading"></i> タイトル <span class="field-info">（30文字以内）</span><span class="char-count title-count">0/30</span>
+                </label>
+                <textarea class="title" maxlength="30" rows="2" placeholder="タイトルを入力してください"></textarea>
+            </div>
+            <div class="field">
+                <label>
+                    <i class="fas fa-list"></i> メニュー <span class="field-info">（50文字以内）</span><span class="char-count menu-count">0/50</span>
+                </label>
+                <textarea class="menu" maxlength="50" rows="2" placeholder="メニュー内容を入力してください"></textarea>
+            </div>
+            <div class="field">
+                <label>
+                    <i class="fas fa-comment"></i> コメント <span class="field-info">（120文字以内）</span><span class="char-count comment-count">0/120</span>
+                </label>
+                <textarea class="comment" maxlength="120" rows="3" placeholder="コメントを入力してください"></textarea>
+            </div>
+            <div class="field">
+                <label>
+                    <i class="fas fa-hashtag"></i> ハッシュタグ <span class="field-info">（各20文字以内、カンマ区切り）</span><span class="char-count hashtag-count">0</span>
+                </label>
+                <textarea class="hashtag" rows="2" placeholder="ハッシュタグをカンマ区切りで入力してください"></textarea>
+            </div>
+        </div>
+        <div class="card-actions">
+            <button class="copy-btn">
+                <i class="fas fa-copy"></i> コピー
+            </button>
+        </div>
+    </div>
+</template>
+</body>
+</html>
+{% endblock %} 
