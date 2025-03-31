@@ -108,4 +108,48 @@ pytest tests/
 
 ## 貢献
 バグ報告や機能改善の提案は、GitHubのIssueを通じてお願いします。
-プルリクエストも歓迎します。 
+プルリクエストも歓迎します。
+
+## クラウドデプロイ手順
+
+### Renderへのデプロイ
+
+本アプリケーションはRenderを使用して簡単にデプロイできます。
+
+#### 前提条件
+- GitHubアカウント
+- Renderアカウント ([Render公式サイト](https://render.com)で無料登録可能)
+- Google GeminiのAPIキー
+
+#### デプロイ手順
+
+1. GitHubリポジトリの準備
+   - このリポジトリをフォークするか、自分のGitHubアカウントに新しくリポジトリを作成してコードをプッシュします
+
+2. Renderダッシュボードでのデプロイ
+   - Renderにログインして「New」→「Web Service」を選択
+   - GitHubリポジトリと連携し、デプロイしたいリポジトリを選択
+   - 以下の設定を入力します：
+     - **Name**: template-generator（任意の名前）
+     - **Environment**: Python
+     - **Build Command**: `pip install -r requirements.txt`
+     - **Start Command**: `gunicorn run:app`
+
+3. 環境変数の設定
+   - 「Environment」タブを開き、以下の環境変数を設定します：
+     - **GEMINI_API_KEY**: Gemini APIキー（必須）
+     - **FLASK_SECRET_KEY**: セキュアなランダム文字列（renderが自動生成）
+     - **FLASK_DEBUG**: `False`（本番環境では推奨）
+     - その他必要な環境変数（render.yamlで設定済み）
+
+4. デプロイを開始
+   - 「Create Web Service」をクリックしてデプロイを開始します
+   - デプロイが完了すると、Renderが提供するURLでアプリにアクセスできます（例：https://template-generator.onrender.com）
+
+5. カスタムドメインの設定（オプション）
+   - 「Settings」タブの「Custom Domain」セクションからカスタムドメインを設定できます
+
+#### 注意点
+- 無料プランでは、一定時間使用がないとサービスがスリープ状態になります
+- 初回のデプロイには数分かかることがあります
+- APIキーなどの機密情報は必ず環境変数を通じて設定し、Gitリポジトリにはコミットしないでください 

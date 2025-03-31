@@ -30,6 +30,6 @@ CHAR_LIMITS = {
 class Config:
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev')
     DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    HOST = os.getenv('FLASK_HOST', '127.0.0.1')
-    PORT = int(os.getenv('FLASK_PORT', 8080))
+    HOST = os.getenv('FLASK_HOST', '0.0.0.0')  # Renderでのデプロイ用に変更
+    PORT = int(os.getenv('PORT', os.getenv('FLASK_PORT', 8080)))  # RenderのPORT環境変数を優先
     SERVER_NAME = None 
