@@ -76,5 +76,5 @@ class TestTemplateGeneratorIntegration:
     def test_api_error_handling(self, generator):
         """APIエラー時の処理をテスト"""
         # 無効な入力を使用してエラーを発生させる
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             generator.generate_templates([], "")  # 空のタイトルリストと空のキーワード 

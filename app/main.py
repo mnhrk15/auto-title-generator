@@ -1,7 +1,7 @@
 import os
 import logging
 from logging.handlers import RotatingFileHandler
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
 from .scraping import HotPepperScraper
 from .generator import TemplateGenerator
@@ -33,7 +33,6 @@ def setup_logging(app):
     
     # 他のモジュールのロガー設定
     logging.getLogger('werkzeug').addHandler(file_handler)
-    logging.getLogger('selenium').addHandler(file_handler)
 
 app = Flask(__name__)
 app.config['GEMINI_API_KEY'] = GEMINI_API_KEY
@@ -46,6 +45,7 @@ setup_logging(app)
 def internal_error(error):
     app.logger.error(f'サーバーエラー: {str(error)}')
     return jsonify({
+        'success': False,
         'error': 'サーバー内部でエラーが発生しました。しばらく時間をおいて再度お試しください。',
         'status': 500
     }), 500
@@ -54,71 +54,138 @@ def internal_error(error):
 def not_found_error(error):
     app.logger.info(f'ページが見つかりません: {request.url}')
     return jsonify({
+        'success': False,
         'error': 'リクエストされたページが見つかりません。',
         'status': 404
     }), 404
 
-# faviconのルート
-@app.route('/favicon.ico')
-def favicon():
-    return app.send_static_file('favicon.ico')
+@app.errorhandler(400)
+def bad_request_error(error):
+    app.logger.warning(f'不正なリクエスト: {str(error)}')
+    return jsonify({
+        'success': False,
+        'error': f'Invalid JSON: {str(error)}',
+        'status': 400
+    }), 400
 
-@app.route('/')
+def favicon():
+    """faviconのルート"""
+    return current_app.send_static_file('favicon.ico')
+
 def index():
-    app.logger.info('トップページにアクセスがありました')
+    """トップページのルート"""
+    current_app.logger.info('トップページにアクセスがありました')
     return render_template('index.html')
 
-@app.route('/generate', methods=['POST'])
 def generate():
+    """テンプレート生成のAPIエンドポイント"""
     try:
+        # 不正なJSONリクエストの場合は400エラーを返す
+        if request.is_json is False and request.data:
+            current_app.logger.warning('不正なJSONリクエストを受信しました')
+            return jsonify({
+                'success': False,
+                'error': 'Invalid JSON: The request payload is not valid JSON',
+                'status': 400
+            }), 400
+            
         data = request.get_json()
+        if not data:
+            current_app.logger.warning('リクエストデータがありません')
+            return jsonify({
+                'success': False,
+                'error': 'リクエストデータが不正です。キーワードを入力してください。',
+                'status': 400
+            }), 400
+        
         keyword = data.get('keyword')
         gender = data.get('gender', 'ladies')
         num_templates = int(data.get('num_templates', 5))
         
-        app.logger.info(f'テンプレート生成リクエスト - キーワード: {keyword}, 性別: {gender}, テンプレート数: {num_templates}')
+        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", テンプレート数: {num_templates}')
         
         if not keyword:
             return jsonify({
-                'error': 'キーワードは必須です。',
+                'success': False,
+                'error': 'キーワードを入力してください。',
                 'status': 400
             }), 400
             
         if gender not in ['ladies', 'mens']:
             return jsonify({
+                'success': False,
                 'error': '無効な性別が指定されました。',
                 'status': 400
             }), 400
             
+        current_app.logger.info(f'スクレイピング開始: キーワード: "{keyword}", 性別: "{gender}"')
         with HotPepperScraper() as scraper:
             titles = scraper.scrape_titles(keyword, gender)
             
+        current_app.logger.info(f'スクレイピング結果: {len(titles)} 件のタイトルを取得')
+        
+        # スクレイピング結果をログに記録
+        if titles:
+            current_app.logger.info(f'スクレイピング結果のタイトル例 (最大10件):')
+            for i, title in enumerate(titles[:10]):
+                current_app.logger.info(f'  {i+1}: {title}')
+            
+            if len(titles) > 10:
+                current_app.logger.info(f'  ... 他 {len(titles) - 10} 件')
+        
         if not titles:
+            current_app.logger.warning(f'キーワード "{keyword}" に一致するヘアスタイルが見つかりませんでした')
             return jsonify({
-                'error': 'スタイルが見つかりませんでした。別のキーワードをお試しください。',
+                'success': False,
+                'error': '一致するヘアスタイルが見つかりませんでした。別のキーワードをお試しください。',
                 'status': 404
             }), 404
             
-        generator = TemplateGenerator(GEMINI_API_KEY)
-        templates = generator.generate_templates(titles, num_templates)
+        current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}')
+        generator = TemplateGenerator()
+        templates = generator.generate_templates(titles, keyword)
         
-        app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
+        current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
+        
+        # 生成されたテンプレートをログに記録
+        for i, template in enumerate(templates):
+            current_app.logger.info(f'生成テンプレート {i+1}:')
+            current_app.logger.info(f'  タイトル: {template.get("title", "不明")}')
+            current_app.logger.info(f'  メニュー: {template.get("menu", "不明")}')
+            current_app.logger.info(f'  ハッシュタグ: {template.get("hashtag", "不明")}')
+            
+            # キーワードチェック
+            if keyword.lower() in template.get("title", "").lower():
+                current_app.logger.info(f'  ✅ タイトルにキーワード "{keyword}" が含まれています')
+            else:
+                current_app.logger.warning(f'  ❌ タイトルにキーワード "{keyword}" が含まれていません: "{template.get("title", "")}"')
         
         return jsonify({
+            'success': True,
             'templates': templates,
             'status': 200
         })
         
-    except ValueError as e:
-        app.logger.warning(f'不正なリクエスト: {str(e)}')
+    except BadRequest as e:
+        current_app.logger.warning(f'不正なJSONリクエスト: {str(e)}')
         return jsonify({
+            'success': False,
+            'error': f'Invalid JSON: {str(e)}',
+            'status': 400
+        }), 400
+        
+    except ValueError as e:
+        current_app.logger.warning(f'不正なリクエスト: {str(e)}')
+        return jsonify({
+            'success': False,
             'error': str(e),
             'status': 400
         }), 400
         
     except Exception as e:
-        app.logger.error(f'テンプレート生成中にエラー: {str(e)}')
+        current_app.logger.error(f'テンプレート生成中にエラー: {str(e)}')
         return jsonify({
+            'success': False,
             'error': 'テンプレート生成中にエラーが発生しました。',
             'status': 500
         }), 500

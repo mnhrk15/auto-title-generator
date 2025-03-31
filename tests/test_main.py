@@ -17,36 +17,21 @@ def test_index_route(client):
     assert b'<!DOCTYPE html>' in response.data
 
 def test_generate_templates_route_success(client):
-    """テンプレート生成エンドポイントの正常系テスト"""
-    mock_templates = [
-        {
-            "title": "★髪質改善×透明感カラー◎艶髪ストレート",
-            "menu": "カット+カラー+髪質改善トリートメント",
-            "comment": "髪質改善トリートメントで、まとまりのある艶やかな髪へ。",
-            "hashtag": "髪質改善,透明感カラー,艶髪"
-        }
-    ]
+    """正常系: テンプレート生成が成功するケース"""
+    mock_titles = ["★髪質改善トリートメントで艶髪ストレート"]
+    mock_templates = [{"title": "★新テンプレート", "menu": "カット+トリートメント", "comment": "サンプルコメント", "hashtag": "#髪質改善"}]
     
-    with patch('app.scraping.HotPepperScraper.scrape_titles') as mock_scrape:
-        with patch('app.generator.TemplateGenerator.generate_templates') as mock_generate:
-            # スクレイピングとテンプレート生成のモック
-            mock_scrape.return_value = ["★髪質改善トリートメントで艶髪ストレート"]
-            mock_generate.return_value = mock_templates
-            
-            # APIリクエスト
-            response = client.post('/generate', json={
-                'keyword': '髪質改善'
-            })
-            
-            # レスポンスの検証
-            assert response.status_code == 200
-            data = json.loads(response.data)
-            assert data['success'] is True
-            assert 'templates' in data
-            assert len(data['templates']) == 1
-            template = data['templates'][0]
-            assert all(key in template for key in ['title', 'menu', 'comment', 'hashtag'])
-            assert '髪質改善' in template['title']
+    with patch('app.scraping.HotPepperScraper.scrape_titles') as mock_scrape, \
+         patch('app.generator.TemplateGenerator.generate_templates') as mock_generate:
+        
+        mock_scrape.return_value = mock_titles
+        mock_generate.return_value = mock_templates
+        
+        response = client.post('/generate', json={'keyword': '髪質改善'})
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['success'] is True
+        assert data['templates'] == mock_templates
 
 def test_generate_templates_route_no_keyword(client):
     """キーワードが指定されていない場合のテスト"""

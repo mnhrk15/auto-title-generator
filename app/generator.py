@@ -1,7 +1,11 @@
 import google.generativeai as genai
 from typing import List, Dict
 import json
+import logging
 from . import config
+
+# ロガーの設定
+logger = logging.getLogger(__name__)
 
 class TemplateGenerator:
     def __init__(self):
@@ -9,6 +13,7 @@ class TemplateGenerator:
             raise ValueError("GEMINI_API_KEY is not set")
         genai.configure(api_key=config.GEMINI_API_KEY)
         self.model = genai.GenerativeModel('gemini-2.0-flash')
+        logger.info("TemplateGeneratorが初期化されました")
         
     def _create_prompt(self, titles: List[str], keyword: str) -> str:
         """プロンプトテンプレートの作成"""
@@ -84,64 +89,108 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
 ]
 
 必ず上記のJSON形式を守り、文字数制限内で生成してください。
+
+また、必ずキーワード「{keyword}」をすべてのタイトルに含めることを最優先してください。タイトルにキーワードが含まれていない場合、そのテンプレートは使用できません。
 """
+        logger.debug(f"プロンプト作成: 入力タイトル数: {len(titles)}, キーワード: '{keyword}'")
         return prompt
         
-    def _validate_template(self, template: Dict[str, str]) -> bool:
-        """テンプレートの文字数制限チェック"""
+    def _validate_template(self, template: Dict[str, str], keyword: str) -> bool:
+        """テンプレートの文字数制限チェックとキーワード含有チェック"""
         try:
+            # 文字数制限チェック
             if len(template['title']) > config.CHAR_LIMITS['title']:
+                logger.warning(f"タイトルが文字数制限を超えています: {len(template['title'])} > {config.CHAR_LIMITS['title']}")
                 return False
             if len(template['menu']) > config.CHAR_LIMITS['menu']:
+                logger.warning(f"メニューが文字数制限を超えています: {len(template['menu'])} > {config.CHAR_LIMITS['menu']}")
                 return False
             if len(template['comment']) > config.CHAR_LIMITS['comment']:
+                logger.warning(f"コメントが文字数制限を超えています: {len(template['comment'])} > {config.CHAR_LIMITS['comment']}")
                 return False
+            
+            # ハッシュタグの各要素の文字数チェック
             for tag in template['hashtag'].split(','):
                 if len(tag.strip()) > config.CHAR_LIMITS['hashtag']:
+                    logger.warning(f"ハッシュタグが文字数制限を超えています: '{tag.strip()}' ({len(tag.strip())} > {config.CHAR_LIMITS['hashtag']})")
                     return False
+            
+            # キーワードがタイトルに含まれているかチェック
+            if keyword.lower() not in template['title'].lower():
+                logger.warning(f"タイトルにキーワード '{keyword}' が含まれていません: '{template['title']}'")
+                return False
+                
+            logger.debug(f"テンプレート検証成功: '{template['title']}'")
             return True
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError) as e:
+            logger.error(f"テンプレート検証エラー: {str(e)}")
             return False
         
     def generate_templates(self, titles: List[str], keyword: str) -> List[Dict[str, str]]:
         """テンプレートの生成"""
+        # 入力検証を追加
+        if not titles:
+            logger.error("タイトルリストが空です")
+            raise ValueError("タイトルリストが空です")
+        if not keyword:
+            logger.error("キーワードが指定されていません")
+            raise ValueError("キーワードが指定されていません")
+            
+        logger.info(f"テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}'")
         prompt = self._create_prompt(titles, keyword)
         
         try:
+            logger.info("Gemini APIリクエスト送信中...")
             response = self.model.generate_content(prompt)
             response_text = response.text
+            logger.debug(f"Gemini APIレスポンス受信: 文字数 {len(response_text)}")
             
             # JSON文字列の抽出（レスポンスにマークダウンなどが含まれている可能性があるため）
             try:
                 start = response_text.find('[')
                 if start == -1:
+                    logger.error("Gemini APIレスポンスから開始ブラケット '[' が見つかりません")
                     raise ValueError("Invalid JSON response from Gemini API: Missing opening bracket")
                     
                 end = response_text.rfind(']')
                 if end == -1:
+                    logger.error("Gemini APIレスポンスから終了ブラケット ']' が見つかりません")
                     raise ValueError("Invalid JSON response from Gemini API: Missing closing bracket")
                     
                 json_str = response_text[start:end + 1]
                 templates = json.loads(json_str)
                 
                 if not isinstance(templates, list):
+                    logger.error(f"無効なJSONレスポンス: リスト形式ではありません (型: {type(templates)})")
                     raise ValueError("Invalid JSON response from Gemini API: Not a list")
                     
+                logger.info(f"APIから {len(templates)} 件のテンプレートを受信")
+                
             except (ValueError, json.JSONDecodeError) as e:
+                logger.error(f"JSONパースエラー: {str(e)}")
+                # エラーが発生した場合はレスポンスの一部をログに出力
+                logger.debug(f"エラーが発生したレスポンスの一部: {response_text[:200]}...")
                 raise ValueError(f"Invalid JSON response from Gemini API: {str(e)}")
             
             # バリデーション
-            valid_templates = [
-                template for template in templates
-                if self._validate_template(template)
-            ]
+            valid_templates = []
+            for i, template in enumerate(templates):
+                logger.debug(f"テンプレート {i+1} の検証: {template.get('title', '不明')}")
+                if self._validate_template(template, keyword):
+                    valid_templates.append(template)
+                else:
+                    logger.warning(f"テンプレート {i+1} は検証に失敗しました")
             
             if not valid_templates:
+                logger.error("有効なテンプレートがありません")
                 raise ValueError("No valid templates generated")
                 
+            logger.info(f"テンプレート生成完了: {len(valid_templates)} 件の有効なテンプレート")
             return valid_templates[:config.MAX_TEMPLATES]
             
         except Exception as e:
             if isinstance(e, ValueError):
+                logger.error(f"テンプレート生成エラー (ValueError): {str(e)}")
                 raise e
+            logger.error(f"テンプレート生成エラー: {str(e)}")
             raise Exception(f"Template generation failed: {str(e)}") 

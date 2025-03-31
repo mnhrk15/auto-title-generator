@@ -11,6 +11,11 @@ import platform
 import os
 from app import app
 
+# テスト環境でUI実行するかどうかのフラグ
+# 環境変数 RUN_UI_TESTS=1 の場合のみUIテストを実行
+SKIP_UI_TESTS = os.environ.get('RUN_UI_TESTS') != '1'
+skip_reason = "UIテストはRUN_UI_TESTS=1の場合のみ実行されます。"
+
 @pytest.fixture
 def app_instance():
     app.config['TESTING'] = True
@@ -22,6 +27,9 @@ def client(app_instance):
 
 @pytest.fixture
 def chrome_driver():
+    if SKIP_UI_TESTS:
+        pytest.skip(skip_reason)
+        
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
@@ -44,11 +52,13 @@ def flask_server(app_instance):
     with app_instance.test_client() as client:
         yield client
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_page_title(chrome_driver, flask_server):
     """ページタイトルのテスト"""
     chrome_driver.get('http://localhost:5000')
     assert "ヘアスタイルタイトルジェネレーター" in chrome_driver.title
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_form_elements(chrome_driver, flask_server):
     """フォーム要素の存在確認テスト"""
     chrome_driver.get('http://localhost:5000')
@@ -56,6 +66,7 @@ def test_form_elements(chrome_driver, flask_server):
     assert chrome_driver.find_element(By.NAME, 'gender').is_displayed()
     assert chrome_driver.find_element(By.ID, 'generate-btn').is_displayed()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_loading_indicator(chrome_driver, flask_server):
     """ローディングインジケータのテスト"""
     chrome_driver.get('http://localhost:5000')
@@ -68,6 +79,7 @@ def test_loading_indicator(chrome_driver, flask_server):
     )
     assert loading.is_displayed()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_template_display(chrome_driver, flask_server):
     """テンプレート表示のテスト"""
     chrome_driver.get('http://localhost:5000')
@@ -83,6 +95,7 @@ def test_template_display(chrome_driver, flask_server):
     )
     assert template.is_displayed()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_keyword_input_validation(chrome_driver, flask_server):
     """キーワード入力のバリデーションテスト"""
     chrome_driver.get('http://localhost:5000')
@@ -95,6 +108,7 @@ def test_keyword_input_validation(chrome_driver, flask_server):
     )
     assert error.is_displayed()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_template_generation_success(chrome_driver, flask_server):
     """テンプレート生成成功のテスト"""
     chrome_driver.get('http://localhost:5000')
@@ -110,6 +124,7 @@ def test_template_generation_success(chrome_driver, flask_server):
     )
     assert success.is_displayed()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_error_display(chrome_driver, flask_server):
     """エラー表示のテスト"""
     chrome_driver.get('http://localhost:5000')
@@ -125,6 +140,7 @@ def test_error_display(chrome_driver, flask_server):
     )
     assert error.is_displayed()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_responsive_design(chrome_driver, flask_server):
     """レスポンシブデザインのテスト"""
     chrome_driver.get('http://localhost:5000')
@@ -136,6 +152,7 @@ def test_responsive_design(chrome_driver, flask_server):
     assert chrome_driver.find_element(By.ID, 'keyword').is_displayed()
     assert chrome_driver.find_element(By.ID, 'generate-btn').is_displayed()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_multiple_templates_display(chrome_driver, flask_server):
     """複数テンプレート表示のテスト"""
     chrome_driver.get('http://localhost:5000')
@@ -151,18 +168,21 @@ def test_multiple_templates_display(chrome_driver, flask_server):
     )
     assert len(templates) > 1
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_export_csv(chrome_driver, flask_server):
     """CSVエクスポートのテスト"""
     chrome_driver.get('http://localhost:5000')
     export_btn = chrome_driver.find_element(By.ID, 'export-csv')
     assert export_btn.is_enabled()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_export_txt(chrome_driver, flask_server):
     """テキストエクスポートのテスト"""
     chrome_driver.get('http://localhost:5000')
     export_btn = chrome_driver.find_element(By.ID, 'export-txt')
     assert export_btn.is_enabled()
 
+@pytest.mark.skipif(SKIP_UI_TESTS, reason=skip_reason)
 def test_copy_functionality(chrome_driver, flask_server):
     """コピー機能のテスト"""
     chrome_driver.get('http://localhost:5000')

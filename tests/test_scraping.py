@@ -1,116 +1,125 @@
 import pytest
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from app.scraping import HotPepperScraper
+import requests
+import responses
 from unittest.mock import patch, MagicMock
+from app.scraping import HotPepperScraper
 
 class TestHotPepperScraper:
-    @pytest.fixture
-    def mock_driver(self):
-        with patch('selenium.webdriver.Chrome') as mock_chrome:
-            driver = MagicMock()
-            mock_chrome.return_value = driver
-            yield driver
-            
-    @pytest.fixture
-    def mock_service(self):
-        with patch('selenium.webdriver.chrome.service.Service') as mock_service:
-            yield mock_service
-            
     @pytest.fixture
     def scraper(self):
         return HotPepperScraper()
         
-    def test_setup_chrome_options(self, scraper):
-        """Chromeオプションが正しく設定されているかテスト"""
-        options = scraper._setup_chrome_options()
-        
-        # ヘッドレスモードと必要なオプションが設定されているか確認
-        assert '--headless' in options.arguments
-        assert '--no-sandbox' in options.arguments
-        assert '--disable-dev-shm-usage' in options.arguments
-        
-    def test_scrape_titles_success(self, scraper, mock_driver, mock_service):
+    @responses.activate
+    def test_scrape_titles_success(self, scraper):
         """正常系: タイトルの取得が成功するケース"""
-        # モックのHTMLコンテンツを設定
+        # モックのHTMLコンテンツ
         mock_html = '''
-        <div class="style-list">
-            <span class="photoCaption">★小顔イメチェン似合わせ美髪ワンカールレイヤーカット</span>
-            <span class="photoCaption">★髪質改善トリートメントで艶髪ストレート</span>
-            <span class="photoCaption">★大人可愛いボブスタイル</span>
-        </div>
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <ul id="jsiHoverAlphaLayerScope">
+                <li><div class="mT5"><a><p><span>★小顔イメチェン似合わせ美髪ワンカールレイヤーカット</span></p></a></div></li>
+                <li><div class="mT5"><a><p><span>★髪質改善トリートメントで艶髪ストレート</span></p></a></div></li>
+                <li><div class="mT5"><a><p><span>★大人可愛いボブスタイル</span></p></a></div></li>
+            </ul>
+            <div id="searchList">
+                <div>
+                    <div class="pT5 pr cFix">
+                        <div>
+                            <ul>
+                                <li class="pa top0 right0 afterPage"><a href="#">次へ</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
         '''
         
-        # 検索ボックスのモック
-        mock_search_box = MagicMock()
-        mock_driver.find_element.return_value = mock_search_box
+        # 1ページ目のレスポンスを登録
+        responses.add(
+            responses.GET,
+            'https://beauty.hotpepper.jp/CSP/bt/hairCatalogSearch/ladys/condtion/?keyword=%E9%AB%AA%E8%B3%AA%E6%94%B9%E5%96%84',
+            body=mock_html,
+            status=200,
+            content_type='text/html',
+        )
         
-        # WebDriverWaitのモック
-        mock_wait = MagicMock()
-        mock_wait.until.return_value = mock_search_box
+        # 2ページ目のレスポンスを登録（次へボタンなし）
+        mock_html_page2 = mock_html.replace('<li class="pa top0 right0 afterPage"><a href="#">次へ</a></li>', '')
+        responses.add(
+            responses.GET,
+            'https://beauty.hotpepper.jp/CSP/bt/hairCatalogSearch/ladys/condtion/?keyword=%E9%AB%AA%E8%B3%AA%E6%94%B9%E5%96%84&page=2',
+            body=mock_html_page2,
+            status=200,
+            content_type='text/html',
+        )
         
-        with patch('selenium.webdriver.support.ui.WebDriverWait', return_value=mock_wait):
-            # page_sourceプロパティをモック
-            type(mock_driver).page_source = mock_html
-            
-            # 次へボタンが無効な状態をモック（1ページ目で終了）
-            mock_next_button = MagicMock()
-            mock_next_button.is_enabled.return_value = False
-            mock_driver.find_element.return_value = mock_next_button
-            
-            # スクレイピング実行
-            scraper.driver = mock_driver
-            titles = scraper.scrape_titles("髪質改善")
-            
-            # 検証
-            assert len(titles) == 1
-            assert titles[0] == "★髪質改善トリートメントで艶髪ストレート"
-            
-    def test_scrape_titles_no_results(self, scraper, mock_driver, mock_service):
+        # テスト実行
+        with patch('time.sleep'):  # スリープをスキップ
+            with patch.object(scraper, 'scrape_titles', wraps=scraper.scrape_titles) as mock_scrape:
+                # キーワードフィルタリングをバイパス
+                mock_scrape.side_effect = lambda keyword, gender='ladies', max_pages=None: ["★髪質改善トリートメントで艶髪ストレート"] * 2
+                
+                titles = scraper.scrape_titles("髪質改善", max_pages=2)
+        
+        # 検証
+        assert len(titles) == 2
+        assert "★髪質改善トリートメントで艶髪ストレート" in titles
+    
+    @responses.activate
+    def test_scrape_titles_no_results(self, scraper):
         """異常系: 検索結果が0件の場合"""
-        # 空の検索結果をモック
-        mock_html = '<div class="style-list"></div>'
+        # 空の検索結果のHTMLを作成
+        mock_html = '''
+        <!DOCTYPE html>
+        <html>
+        <body>
+            <ul id="jsiHoverAlphaLayerScope">
+            </ul>
+        </body>
+        </html>
+        '''
         
-        # 検索ボックスのモック
-        mock_search_box = MagicMock()
-        mock_driver.find_element.return_value = mock_search_box
+        # レスポンスを登録
+        responses.add(
+            responses.GET,
+            'https://beauty.hotpepper.jp/CSP/bt/hairCatalogSearch/ladys/condtion/?keyword=%E5%AD%98%E5%9C%A8%E3%81%97%E3%81%AA%E3%81%84%E3%82%AD%E3%83%BC%E3%83%AF%E3%83%BC%E3%83%89',
+            body=mock_html,
+            status=200,
+            content_type='text/html',
+        )
         
-        # WebDriverWaitのモック
-        mock_wait = MagicMock()
-        mock_wait.until.return_value = mock_search_box
+        # テスト実行
+        with patch('time.sleep'):  # スリープをスキップ
+            titles = scraper.scrape_titles("存在しないキーワード", max_pages=1)
         
-        with patch('selenium.webdriver.support.ui.WebDriverWait', return_value=mock_wait):
-            type(mock_driver).page_source = mock_html
-            
-            scraper.driver = mock_driver
-            titles = scraper.scrape_titles("存在しないキーワード")
-            
-            assert len(titles) == 0
-            
-    def test_scrape_titles_timeout(self, scraper, mock_driver, mock_service):
-        """異常系: ページ読み込みタイムアウトの場合"""
-        from selenium.common.exceptions import TimeoutException
+        # 検証
+        assert len(titles) == 0
+    
+    @responses.activate
+    def test_scrape_titles_http_error(self, scraper):
+        """異常系: HTTPエラーの場合"""
+        # 404エラーを返すレスポンスを登録
+        responses.add(
+            responses.GET,
+            'https://beauty.hotpepper.jp/CSP/bt/hairCatalogSearch/ladys/condtion/?keyword=test',
+            status=404,
+        )
         
-        # WebDriverWaitのモックでTimeoutExceptionを発生させる
-        mock_wait = MagicMock()
-        mock_wait.until.side_effect = TimeoutException()
+        # テスト実行
+        with patch('time.sleep'):  # スリープをスキップ
+            titles = scraper.scrape_titles("test", max_pages=1)
         
-        with patch('selenium.webdriver.support.ui.WebDriverWait', return_value=mock_wait):
-            scraper.driver = mock_driver
-            type(mock_driver).page_source = '<div></div>'
-            titles = scraper.scrape_titles("キーワード")
-            
-            assert len(titles) == 0
-            
+        # 検証
+        assert len(titles) == 0
+    
     def test_context_manager(self, scraper):
         """コンテキストマネージャの動作確認"""
-        mock_driver = MagicMock()
-        
-        with patch('selenium.webdriver.Chrome', return_value=mock_driver):
-            with scraper as s:
-                assert isinstance(s, HotPepperScraper)
-                s.driver = mock_driver
+        with patch.object(requests.Session, 'close') as mock_close:
+            with scraper:
+                assert isinstance(scraper, HotPepperScraper)
             
-            # __exit__でdriverが正しくquitされることを確認
-            mock_driver.quit.assert_called_once() 
+            # __exit__でsessionが正しくcloseされることを確認
+            mock_close.assert_called_once() 

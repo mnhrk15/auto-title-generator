@@ -1,6 +1,8 @@
 import pytest
 import os
 import sys
+from flask import Flask
+from app import create_app
 
 # テスト対象のモジュールをインポートできるようにする
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -15,4 +17,15 @@ def setup_test_env():
     yield
     # テスト後にクリーンアップ
     for key in ['GEMINI_API_KEY', 'SCRAPING_DELAY_MIN', 'SCRAPING_DELAY_MAX', 'MAX_PAGES']:
-        os.environ.pop(key, None) 
+        os.environ.pop(key, None)
+        
+@pytest.fixture
+def client():
+    """テスト用クライアントを作成"""
+    app = create_app()
+    app.config.update({
+        'TESTING': True,
+    })
+    
+    with app.test_client() as client:
+        yield client 
