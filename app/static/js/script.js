@@ -1,17 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
     const generateBtn = document.getElementById('generate-button');
     const keywordInput = document.getElementById('keyword');
-    const loadingSpinner = document.querySelector('.loading');
-    const progressFill = document.querySelector('.progress-fill');
-    const progressStep = document.querySelector('.progress-step');
-    const progressPercent = document.querySelector('.progress-percent');
+    const loadingSpinner = document.getElementById('loading');
+    const progressFill = document.getElementById('progress-fill');
+    const progressStep = document.getElementById('progress-step');
+    const progressPercent = document.getElementById('progress-percent');
     const loadingMessage = document.querySelector('.loading-message');
     const errorMessage = document.querySelector('.error-message');
     const errorText = document.querySelector('.error-text');
-    const resultsSection = document.querySelector('.results-section');
-    const templateContainer = document.querySelector('.template-container');
-    const exportCsvBtn = document.getElementById('exportCsv');
-    const exportTxtBtn = document.getElementById('exportTxt');
+    const resultsSection = document.getElementById('results');
+    const templateContainer = document.getElementById('template-container');
+    const exportAllBtn = document.getElementById('export-all');
+    const copyAllBtn = document.getElementById('copy-all');
     
     // プログレスバーの状態
     let progressState = {
@@ -80,8 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (data.success) {
                 displayTemplates(data.templates);
+                showResults();
                 // 成功時のフィードバック
                 showSuccessToast('テンプレートを生成しました');
+                // 結果表示領域までスクロール
+                resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
                 showError(data.error);
             }
@@ -170,24 +173,34 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 成功トースト表示
     function showSuccessToast(message) {
+        // 既存のトーストを削除
+        const existingToast = document.querySelector('.toast');
+        if (existingToast) {
+            document.body.removeChild(existingToast);
+        }
+        
+        // 新しいトースト作成
         const toast = document.createElement('div');
         toast.className = 'toast success-toast';
         toast.innerHTML = `
             <i class="fas fa-check-circle"></i>
             <span>${message}</span>
         `;
+        
         document.body.appendChild(toast);
         
-        // アニメーション
+        // アニメーションのために少し待つ
         setTimeout(() => {
             toast.classList.add('show');
-        }, 100);
+        }, 10);
         
-        // 3秒後に消える
+        // 数秒後に消す
         setTimeout(() => {
             toast.classList.remove('show');
             setTimeout(() => {
-                toast.remove();
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
             }, 300);
         }, 3000);
     }
@@ -244,83 +257,105 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // テンプレートカードの作成
     function createTemplateCard(template) {
-        const templateContent = document.getElementById('template-card').content.cloneNode(true);
-        const card = templateContent.querySelector('.template-card');
+        const templateCardElement = document.querySelector('#template-card').content.cloneNode(true);
+        const card = templateCardElement.querySelector('.template-card');
         
-        // 各フィールドに値を設定
-        const titleInput = card.querySelector('.title');
-        const menuInput = card.querySelector('.menu');
-        const commentInput = card.querySelector('.comment');
-        const hashtagInput = card.querySelector('.hashtag');
+        const titleTextarea = card.querySelector('.title');
+        const menuTextarea = card.querySelector('.menu');
+        const commentTextarea = card.querySelector('.comment');
+        const hashtagTextarea = card.querySelector('.hashtag');
         
-        titleInput.value = template.title;
-        menuInput.value = template.menu;
-        commentInput.value = template.comment;
-        hashtagInput.value = template.hashtag;
+        const titleCounter = card.querySelector('.title-count');
+        const menuCounter = card.querySelector('.menu-count');
+        const commentCounter = card.querySelector('.comment-count');
+        const hashtagCounter = card.querySelector('.hashtag-count');
         
-        // テキストコンテンツを適切に表示
-        ensureTextVisibility(titleInput);
-        ensureTextVisibility(menuInput);
-        ensureTextVisibility(commentInput);
-        ensureTextVisibility(hashtagInput);
+        // テンプレートのデータをセット
+        titleTextarea.value = template.title;
+        menuTextarea.value = template.menu;
+        commentTextarea.value = template.comment;
+        hashtagTextarea.value = template.hashtag;
         
-        // 文字数カウントの初期設定
-        updateCharCount(titleInput, card.querySelector('.title-count'), 30);
-        updateCharCount(menuInput, card.querySelector('.menu-count'), 50);
-        updateCharCount(commentInput, card.querySelector('.comment-count'), 120);
-        updateHashtagCount(hashtagInput, card.querySelector('.hashtag-count'));
+        // 文字数カウンターの更新
+        updateCharCount(titleTextarea, titleCounter, 30);
+        updateCharCount(menuTextarea, menuCounter, 50);
+        updateCharCount(commentTextarea, commentCounter, 100);
+        updateCharCount(hashtagTextarea, hashtagCounter, 50);
         
-        // 文字数カウントのイベントリスナー
-        titleInput.addEventListener('input', () => {
-            updateCharCount(titleInput, card.querySelector('.title-count'), 30);
-            autoResizeTextarea(titleInput);
+        // テキストエリアのサイズ調整
+        autoResizeTextarea(titleTextarea);
+        autoResizeTextarea(menuTextarea);
+        autoResizeTextarea(commentTextarea);
+        autoResizeTextarea(hashtagTextarea);
+        
+        // アニメーション効果の追加 - カードごとに表示タイミングを少しずらす
+        card.style.animationDelay = `${Math.random() * 0.3}s`;
+        card.style.animationDuration = '0.5s';
+        card.style.animationName = 'scaleIn';
+        card.style.animationFillMode = 'backwards';
+        
+        // テキスト入力イベント設定
+        titleTextarea.addEventListener('input', () => {
+            updateCharCount(titleTextarea, titleCounter, 30);
+            autoResizeTextarea(titleTextarea);
         });
         
-        menuInput.addEventListener('input', () => {
-            updateCharCount(menuInput, card.querySelector('.menu-count'), 50);
-            autoResizeTextarea(menuInput);
+        menuTextarea.addEventListener('input', () => {
+            updateCharCount(menuTextarea, menuCounter, 50);
+            autoResizeTextarea(menuTextarea);
         });
         
-        commentInput.addEventListener('input', () => {
-            updateCharCount(commentInput, card.querySelector('.comment-count'), 120);
-            autoResizeTextarea(commentInput);
+        commentTextarea.addEventListener('input', () => {
+            updateCharCount(commentTextarea, commentCounter, 100);
+            autoResizeTextarea(commentTextarea);
         });
         
-        hashtagInput.addEventListener('input', () => {
-            updateHashtagCount(hashtagInput, card.querySelector('.hashtag-count'));
-            autoResizeTextarea(hashtagInput);
+        hashtagTextarea.addEventListener('input', () => {
+            updateCharCount(hashtagTextarea, hashtagCounter, 50);
+            autoResizeTextarea(hashtagTextarea);
         });
         
-        // 自動リサイズ
-        autoResizeTextarea(titleInput);
-        autoResizeTextarea(menuInput);
-        autoResizeTextarea(commentInput);
-        autoResizeTextarea(hashtagInput);
+        // フォーカス時の効果
+        const textareas = card.querySelectorAll('textarea');
+        textareas.forEach(textarea => {
+            textarea.addEventListener('focus', () => {
+                textarea.closest('.textarea-container').style.boxShadow = '0 0 0 4px rgba(67, 97, 238, 0.1)';
+            });
+            
+            textarea.addEventListener('blur', () => {
+                textarea.closest('.textarea-container').style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.02)';
+            });
+        });
         
-        // コピーボタンの設定
+        // クリップボードコピー機能
         const copyBtn = card.querySelector('.copy-btn');
         copyBtn.addEventListener('click', () => {
-            const content = [
-                titleInput.value,
-                menuInput.value,
-                commentInput.value,
-                hashtagInput.value
-            ].join('\n\n');
+            const text = `【タイトル】
+${titleTextarea.value}
+
+【メニュー】
+${menuTextarea.value}
+
+【コメント】
+${commentTextarea.value}
+
+【ハッシュタグ】
+${hashtagTextarea.value}`;
             
-            navigator.clipboard.writeText(content).then(() => {
-                const originalText = copyBtn.textContent;
-                copyBtn.innerHTML = '<i class="fas fa-check"></i> コピー完了！';
-                copyBtn.disabled = true;
+            navigator.clipboard.writeText(text).then(() => {
+                // コピー成功表示
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> コピー完了';
                 copyBtn.classList.add('copied');
                 
                 setTimeout(() => {
                     copyBtn.innerHTML = '<i class="fas fa-copy"></i> コピー';
-                    copyBtn.disabled = false;
                     copyBtn.classList.remove('copied');
                 }, 2000);
+                
+                showSuccessToast('テキストをクリップボードにコピーしました');
             }).catch(err => {
-                console.error('コピーに失敗しました:', err);
-                showError('テキストのコピーに失敗しました。');
+                showError('コピーに失敗しました');
+                console.error('コピーに失敗:', err);
             });
         });
         
@@ -354,51 +389,205 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // CSVエクスポート
-    exportCsvBtn.addEventListener('click', () => {
+    exportAllBtn.addEventListener('click', () => {
         const templates = getTemplatesFromCards();
         if (templates.length === 0) {
-            showError('エクスポートするテンプレートがありません。');
+            showError('エクスポートするテンプレートがありません');
             return;
         }
         
-        const csv = [
-            ['category', 'title', 'menu', 'comment', 'hashtag'].join(','),
-            ...templates.map(t => [
-                'Generated',
-                `"${t.title.replace(/"/g, '""')}"`,
-                `"${t.menu.replace(/"/g, '""')}"`,
-                `"${t.comment.replace(/"/g, '""')}"`,
-                `"${t.hashtag.replace(/"/g, '""')}"`
-            ].join(','))
-        ].join('\n');
+        // エクスポート選択ダイアログのスタイルを追加
+        const exportDialog = document.createElement('div');
+        exportDialog.className = 'export-dialog';
+        exportDialog.innerHTML = `
+            <div class="export-dialog-content">
+                <div class="export-dialog-header">
+                    <h3>エクスポート形式を選択</h3>
+                    <button class="close-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="export-dialog-body">
+                    <button class="export-option" data-format="csv">
+                        <i class="fas fa-file-csv"></i>
+                        <span>CSV形式</span>
+                    </button>
+                    <button class="export-option" data-format="txt">
+                        <i class="fas fa-file-alt"></i>
+                        <span>テキスト形式</span>
+                    </button>
+                </div>
+            </div>
+        `;
         
-        downloadFile(csv, 'templates.csv', 'text/csv');
-        showSuccessToast('CSVファイルをダウンロードしました');
+        document.body.appendChild(exportDialog);
+        
+        // ダイアログスタイル追加
+        const style = document.createElement('style');
+        style.textContent = `
+            .export-dialog {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+                animation: fadeIn 0.3s;
+            }
+            
+            .export-dialog-content {
+                background-color: white;
+                border-radius: var(--border-radius-lg);
+                max-width: 400px;
+                width: 90%;
+                box-shadow: var(--shadow-lg);
+                overflow: hidden;
+                animation: scaleIn 0.3s;
+            }
+            
+            .export-dialog-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: var(--spacing-md) var(--spacing-lg);
+                background: var(--primary-gradient);
+                color: white;
+            }
+            
+            .export-dialog-header h3 {
+                margin: 0;
+                font-size: 1.1rem;
+            }
+            
+            .close-btn {
+                background: transparent;
+                border: none;
+                color: white;
+                cursor: pointer;
+                font-size: 1.1rem;
+                padding: 5px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .export-dialog-body {
+                padding: var(--spacing-lg);
+                display: flex;
+                gap: var(--spacing-md);
+            }
+            
+            .export-option {
+                flex: 1;
+                background-color: white;
+                border: 2px solid var(--border-color);
+                border-radius: var(--border-radius-md);
+                padding: var(--spacing-lg);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: var(--spacing-sm);
+                cursor: pointer;
+                transition: all 0.3s var(--transition-ease);
+            }
+            
+            .export-option:hover {
+                border-color: var(--primary-color);
+                background-color: rgba(67, 97, 238, 0.05);
+                transform: translateY(-5px);
+            }
+            
+            .export-option i {
+                font-size: 2rem;
+                color: var(--primary-color);
+                margin-bottom: var(--spacing-xs);
+            }
+            
+            @media (max-width: 768px) {
+                .export-dialog-body {
+                    flex-direction: column;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // CSV形式でエクスポート
+        exportDialog.querySelector('[data-format="csv"]').addEventListener('click', () => {
+            const csv = [
+                ['タイトル', 'メニュー', 'コメント', 'ハッシュタグ'].join(','),
+                ...templates.map(template => [
+                    `"${template.title.replace(/"/g, '""')}"`,
+                    `"${template.menu.replace(/"/g, '""')}"`,
+                    `"${template.comment.replace(/"/g, '""')}"`,
+                    `"${template.hashtag.replace(/"/g, '""')}"`,
+                ].join(','))
+            ].join('\n');
+            
+            downloadFile(csv, 'hair_templates.csv', 'text/csv');
+            showSuccessToast('CSVファイルをダウンロードしました');
+            document.body.removeChild(exportDialog);
+        });
+        
+        // テキスト形式でエクスポート
+        exportDialog.querySelector('[data-format="txt"]').addEventListener('click', () => {
+            const txt = templates.map((template, index) => [
+                `■ テンプレート ${index + 1}`,
+                `【タイトル】\n${template.title}`,
+                `【メニュー】\n${template.menu}`,
+                `【コメント】\n${template.comment}`,
+                `【ハッシュタグ】\n${template.hashtag}`,
+                '='.repeat(40) + '\n'
+            ].join('\n'));
+            
+            downloadFile(txt, 'hair_templates.txt', 'text/plain');
+            showSuccessToast('テキストファイルをダウンロードしました');
+            document.body.removeChild(exportDialog);
+        });
+        
+        // ダイアログを閉じる
+        exportDialog.querySelector('.close-btn').addEventListener('click', () => {
+            document.body.removeChild(exportDialog);
+        });
+        
+        // 背景クリックでも閉じる
+        exportDialog.addEventListener('click', (e) => {
+            if (e.target === exportDialog) {
+                document.body.removeChild(exportDialog);
+            }
+        });
     });
     
-    // TXTエクスポート
-    exportTxtBtn.addEventListener('click', () => {
+    // 全テンプレートをコピー
+    copyAllBtn.addEventListener('click', () => {
         const templates = getTemplatesFromCards();
         if (templates.length === 0) {
-            showError('エクスポートするテンプレートがありません。');
+            showError('コピーするテンプレートがありません');
             return;
         }
         
-        const txt = templates.map(t => 
-            `【タイトル】\n${t.title}\n\n` +
-            `【メニュー】\n${t.menu}\n\n` +
-            `【コメント】\n${t.comment}\n\n` +
-            `【ハッシュタグ】\n${t.hashtag}\n\n` +
-            '='.repeat(40) + '\n'
-        ).join('\n');
+        const text = templates.map((template, index) => [
+            `■ テンプレート ${index + 1}`,
+            `【タイトル】\n${template.title}`,
+            `【メニュー】\n${template.menu}`,
+            `【コメント】\n${template.comment}`,
+            `【ハッシュタグ】\n${template.hashtag}`,
+            '='.repeat(40)
+        ].join('\n\n'));
         
-        downloadFile(txt, 'templates.txt', 'text/plain');
-        showSuccessToast('テキストファイルをダウンロードしました');
+        navigator.clipboard.writeText(text).then(() => {
+            showSuccessToast('全テンプレートをクリップボードにコピーしました');
+        }).catch(error => {
+            showError('コピーに失敗しました');
+            console.error('コピーエラー:', error);
+        });
     });
     
     // 表示中のカードからテンプレート情報を取得
     function getTemplatesFromCards() {
         const cards = templateContainer.querySelectorAll('.template-card');
+        
         return Array.from(cards).map(card => ({
             title: card.querySelector('.title').value,
             menu: card.querySelector('.menu').value,
@@ -421,6 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ユーティリティ関数
     function showLoading() {
         loadingSpinner.classList.remove('hidden');
+        // スムーズスクロール
+        loadingSpinner.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     
     function hideLoading() {
@@ -501,15 +692,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 padding: 12px 20px;
                 background-color: white;
                 color: var(--text-color);
-                border-radius: var(--border-radius-md);
-                box-shadow: var(--shadow-md);
+                border-radius: var(--border-radius-lg);
+                box-shadow: var(--shadow-lg);
                 display: flex;
                 align-items: center;
-                gap: 10px;
+                gap: 12px;
                 z-index: 1000;
                 transform: translateY(100px);
                 opacity: 0;
-                transition: transform 0.3s ease, opacity 0.3s ease;
+                transition: all 0.4s var(--transition-ease);
+                border-left: 4px solid var(--success-color);
             }
             
             .toast.show {
@@ -520,10 +712,18 @@ document.addEventListener('DOMContentLoaded', () => {
             .toast.success-toast i {
                 color: var(--success-color);
                 font-size: 18px;
+                background-color: rgba(0, 200, 81, 0.1);
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
             }
             
             .copy-btn.copied {
                 background-color: var(--success-color);
+                color: white;
             }
             
             @media (max-width: 768px) {
