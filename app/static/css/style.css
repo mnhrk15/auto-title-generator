@@ -954,6 +954,42 @@ input[type="text"]:focus + .search-icon {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
 }
 
+.field-copy-btn {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--transition-fast) var(--transition-ease);
+    color: var(--text-color-light);
+    box-shadow: var(--shadow-sm);
+    z-index: 2;
+}
+
+.field-copy-btn:hover {
+    background-color: var(--success-color);
+    color: white;
+    border-color: var(--success-color);
+}
+
+.field-copy-btn.copied {
+    background-color: var(--success-color);
+    color: white;
+    opacity: 1;
+}
+
+.textarea-container:hover .field-copy-btn {
+    opacity: 1;
+}
+
 textarea {
     width: 100%;
     padding: var(--spacing-md);
@@ -1225,6 +1261,13 @@ textarea:focus {
     
     input[type="text"], .primary-button, .secondary-button {
         height: 46px;
+    }
+    
+    .field-copy-btn {
+        opacity: 0.7;
+        width: 24px;
+        height: 24px;
+        font-size: 0.8rem;
     }
 }
 

@@ -404,7 +404,45 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         
-        // クリップボードコピー機能
+        // 各フィールドのコピーボタンの機能を追加
+        const fieldCopyBtns = card.querySelectorAll('.field-copy-btn');
+        fieldCopyBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fieldType = btn.getAttribute('data-field');
+                const textarea = card.querySelector(`.${fieldType}`);
+                
+                if (!textarea) return;
+                
+                // テキストをコピー
+                navigator.clipboard.writeText(textarea.value).then(() => {
+                    // コピー成功表示
+                    const originalIcon = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-check"></i>';
+                    btn.classList.add('copied');
+                    
+                    // 元に戻す
+                    setTimeout(() => {
+                        btn.innerHTML = originalIcon;
+                        btn.classList.remove('copied');
+                    }, 1500);
+                    
+                    // 成功メッセージ
+                    let fieldName = '';
+                    switch(fieldType) {
+                        case 'title': fieldName = 'タイトル'; break;
+                        case 'menu': fieldName = 'メニュー'; break;
+                        case 'comment': fieldName = 'コメント'; break;
+                        case 'hashtag': fieldName = 'ハッシュタグ'; break;
+                    }
+                    showSuccessToast(`${fieldName}をコピーしました`);
+                }).catch(err => {
+                    showError('コピーに失敗しました');
+                    console.error('コピーに失敗:', err);
+                });
+            });
+        });
+        
+        // クリップボードコピー機能（全体）
         const copyBtn = card.querySelector('.copy-btn');
         copyBtn.addEventListener('click', () => {
             const text = `【タイトル】
