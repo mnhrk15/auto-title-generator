@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from logging.handlers import RotatingFileHandler
 from flask import Flask, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
@@ -68,15 +69,74 @@ def bad_request_error(error):
         'status': 400
     }), 400
 
+@app.route('/favicon.ico')
 def favicon():
     """faviconのルート"""
     return current_app.send_static_file('favicon.ico')
 
+@app.route('/')
 def index():
     """トップページのルート"""
     current_app.logger.info('トップページにアクセスがありました')
     return render_template('index.html')
 
+# ヘルパー関数: 非同期処理の実行
+def run_async_task(coro):
+    """非同期コルーチンを同期的に実行するヘルパー関数"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+# スクレイピングと生成を非同期で行う関数
+async def process_template_generation(keyword: str, gender: str) -> list:
+    """スクレイピングとテンプレート生成を非同期で処理する"""
+    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}"')
+    
+    # 非同期でスクレイピングを実行
+    async with HotPepperScraper() as scraper:
+        current_app.logger.info(f'スクレイピング開始: キーワード: "{keyword}", 性別: "{gender}"')
+        titles = await scraper.scrape_titles_async(keyword, gender)
+        current_app.logger.info(f'スクレイピング結果: {len(titles)} 件のタイトルを取得')
+    
+    # スクレイピング結果をログに記録
+    if titles:
+        current_app.logger.info(f'スクレイピング結果のタイトル例 (最大10件):')
+        for i, title in enumerate(titles[:10]):
+            current_app.logger.info(f'  {i+1}: {title}')
+        
+        if len(titles) > 10:
+            current_app.logger.info(f'  ... 他 {len(titles) - 10} 件')
+    
+    if not titles:
+        current_app.logger.warning(f'キーワード "{keyword}" に一致するヘアスタイルが見つかりませんでした')
+        return []
+        
+    # 非同期でテンプレート生成を実行
+    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}')
+    generator = TemplateGenerator()
+    templates = await generator.generate_templates_async(titles, keyword)
+    
+    current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
+    
+    # 生成されたテンプレートをログに記録
+    for i, template in enumerate(templates):
+        current_app.logger.info(f'生成テンプレート {i+1}:')
+        current_app.logger.info(f'  タイトル: {template.get("title", "不明")}')
+        current_app.logger.info(f'  メニュー: {template.get("menu", "不明")}')
+        current_app.logger.info(f'  ハッシュタグ: {template.get("hashtag", "不明")}')
+        
+        # キーワードチェック
+        if keyword.lower() in template.get("title", "").lower():
+            current_app.logger.info(f'  ✅ タイトルにキーワード "{keyword}" が含まれています')
+        else:
+            current_app.logger.warning(f'  ❌ タイトルにキーワード "{keyword}" が含まれていません: "{template.get("title", "")}"')
+    
+    return templates
+
+@app.route('/api/generate', methods=['POST'])
 def generate():
     """テンプレート生成のAPIエンドポイント"""
     try:
@@ -118,47 +178,15 @@ def generate():
                 'status': 400
             }), 400
             
-        current_app.logger.info(f'スクレイピング開始: キーワード: "{keyword}", 性別: "{gender}"')
-        with HotPepperScraper() as scraper:
-            titles = scraper.scrape_titles(keyword, gender)
-            
-        current_app.logger.info(f'スクレイピング結果: {len(titles)} 件のタイトルを取得')
+        # 非同期処理を同期的に実行
+        templates = run_async_task(process_template_generation(keyword, gender))
         
-        # スクレイピング結果をログに記録
-        if titles:
-            current_app.logger.info(f'スクレイピング結果のタイトル例 (最大10件):')
-            for i, title in enumerate(titles[:10]):
-                current_app.logger.info(f'  {i+1}: {title}')
-            
-            if len(titles) > 10:
-                current_app.logger.info(f'  ... 他 {len(titles) - 10} 件')
-        
-        if not titles:
-            current_app.logger.warning(f'キーワード "{keyword}" に一致するヘアスタイルが見つかりませんでした')
+        if not templates:
             return jsonify({
                 'success': False,
                 'error': '一致するヘアスタイルが見つかりませんでした。別のキーワードをお試しください。',
                 'status': 404
             }), 404
-            
-        current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}')
-        generator = TemplateGenerator()
-        templates = generator.generate_templates(titles, keyword)
-        
-        current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
-        
-        # 生成されたテンプレートをログに記録
-        for i, template in enumerate(templates):
-            current_app.logger.info(f'生成テンプレート {i+1}:')
-            current_app.logger.info(f'  タイトル: {template.get("title", "不明")}')
-            current_app.logger.info(f'  メニュー: {template.get("menu", "不明")}')
-            current_app.logger.info(f'  ハッシュタグ: {template.get("hashtag", "不明")}')
-            
-            # キーワードチェック
-            if keyword.lower() in template.get("title", "").lower():
-                current_app.logger.info(f'  ✅ タイトルにキーワード "{keyword}" が含まれています')
-            else:
-                current_app.logger.warning(f'  ❌ タイトルにキーワード "{keyword}" が含まれていません: "{template.get("title", "")}"')
         
         return jsonify({
             'success': True,
@@ -191,4 +219,4 @@ def generate():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)

@@ -2,6 +2,7 @@ import google.generativeai as genai
 from typing import List, Dict
 import json
 import logging
+import asyncio
 from . import config
 
 # ロガーの設定
@@ -76,21 +77,17 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
 
 固有名詞（商品名、ブランド名）は避け、汎用的な表現を使用してください。
 
-以下の形式でJSON配列として結果を返してください。必ず各要素の文字数制限を守ってください：
+結果は以下のJSON形式で出力してください:
 
 [
   {{
-    "title": "★20代30代髪質改善×透明感◎艶髪ストレート",
-    "menu": "カット+カラー+髪質改善トリートメント+炭酸スパ付き+ホームケア付き",
-    "comment": "髪のうねりやパサつきでお悩みの方におすすめ。髪質改善トリートメントで、まとまりのある艶やかな髪へ。ダメージを受けにくい髪質に導きます。",
-    "hashtag": "髪質改善,透明感カラー,艶髪,ストレートヘア,トリートメント,ダメージケア,サラツヤ"
+    "title": "【タイトル】",
+    "menu": "【メニュー】",
+    "comment": "【コメント】",
+    "hashtag": ["#ハッシュタグ1", "#ハッシュタグ2", ... ]
   }},
-  // 残りのテンプレートも同様の形式で
+  ...
 ]
-
-必ず上記のJSON形式を守り、文字数制限内で生成してください。
-
-また、必ずキーワード「{keyword}」をすべてのタイトルに含めることを最優先してください。タイトルにキーワードが含まれていない場合、そのテンプレートは使用できません。
 """
         logger.debug(f"プロンプト作成: 入力タイトル数: {len(titles)}, キーワード: '{keyword}'")
         return prompt
@@ -98,36 +95,50 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
     def _validate_template(self, template: Dict[str, str], keyword: str) -> bool:
         """テンプレートの文字数制限チェックとキーワード含有チェック"""
         try:
-            # 文字数制限チェック
-            if len(template['title']) > config.CHAR_LIMITS['title']:
-                logger.warning(f"タイトルが文字数制限を超えています: {len(template['title'])} > {config.CHAR_LIMITS['title']}")
-                return False
-            if len(template['menu']) > config.CHAR_LIMITS['menu']:
-                logger.warning(f"メニューが文字数制限を超えています: {len(template['menu'])} > {config.CHAR_LIMITS['menu']}")
-                return False
-            if len(template['comment']) > config.CHAR_LIMITS['comment']:
-                logger.warning(f"コメントが文字数制限を超えています: {len(template['comment'])} > {config.CHAR_LIMITS['comment']}")
-                return False
-            
-            # ハッシュタグの各要素の文字数チェック
-            for tag in template['hashtag'].split(','):
-                if len(tag.strip()) > config.CHAR_LIMITS['hashtag']:
-                    logger.warning(f"ハッシュタグが文字数制限を超えています: '{tag.strip()}' ({len(tag.strip())} > {config.CHAR_LIMITS['hashtag']})")
+            # 必須キーの存在チェック
+            required_keys = ['title', 'menu', 'comment', 'hashtag']
+            for key in required_keys:
+                if key not in template:
+                    logger.warning(f"テンプレートに必須キー '{key}' がありません")
                     return False
             
-            # キーワードがタイトルに含まれているかチェック
+            # タイトルにキーワードが含まれているかチェック
             if keyword.lower() not in template['title'].lower():
-                logger.warning(f"タイトルにキーワード '{keyword}' が含まれていません: '{template['title']}'")
+                logger.warning(f"タイトルにキーワード '{keyword}' が含まれていません: {template['title']}")
                 return False
                 
+            # 文字数制限チェック
+            for key, limit in config.CHAR_LIMITS.items():
+                if key == 'hashtag':
+                    # ハッシュタグは配列なのでスキップ
+                    continue
+                    
+                if len(template[key]) > limit:
+                    logger.warning(f"{key}の文字数が制限を超えています: {len(template[key])} > {limit}")
+                    return False
+            
+            # ハッシュタグのチェック
+            if not isinstance(template['hashtag'], list):
+                logger.warning(f"ハッシュタグがリスト形式ではありません: {type(template['hashtag'])}")
+                return False
+                
+            if len(template['hashtag']) < 7:
+                logger.warning(f"ハッシュタグの数が少なすぎます: {len(template['hashtag'])} < 7")
+                return False
+                
+            for tag in template['hashtag']:
+                if len(tag) > config.CHAR_LIMITS['hashtag']:
+                    logger.warning(f"ハッシュタグが長すぎます: {tag} ({len(tag)} > {config.CHAR_LIMITS['hashtag']})")
+                    return False
+            
             logger.debug(f"テンプレート検証成功: '{template['title']}'")
             return True
         except (KeyError, AttributeError) as e:
             logger.error(f"テンプレート検証エラー: {str(e)}")
             return False
-        
-    def generate_templates(self, titles: List[str], keyword: str) -> List[Dict[str, str]]:
-        """テンプレートの生成"""
+    
+    async def generate_templates_async(self, titles: List[str], keyword: str) -> List[Dict[str, str]]:
+        """テンプレートの非同期生成"""
         # 入力検証を追加
         if not titles:
             logger.error("タイトルリストが空です")
@@ -136,12 +147,15 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             logger.error("キーワードが指定されていません")
             raise ValueError("キーワードが指定されていません")
             
-        logger.info(f"テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}'")
+        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}'")
         prompt = self._create_prompt(titles, keyword)
         
         try:
             logger.info("Gemini APIリクエスト送信中...")
-            response = self.model.generate_content(prompt)
+            # 非同期で処理するためにgenerate_contentをrun_in_executorで実行
+            # Google APIが直接的な非同期をサポートしていないため、ThreadPoolExecutorを使用して実行
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, lambda: self.model.generate_content(prompt))
             response_text = response.text
             logger.debug(f"Gemini APIレスポンス受信: 文字数 {len(response_text)}")
             
@@ -193,4 +207,14 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
                 logger.error(f"テンプレート生成エラー (ValueError): {str(e)}")
                 raise e
             logger.error(f"テンプレート生成エラー: {str(e)}")
-            raise Exception(f"Template generation failed: {str(e)}") 
+            raise Exception(f"Template generation failed: {str(e)}")
+        
+    def generate_templates(self, titles: List[str], keyword: str) -> List[Dict[str, str]]:
+        """テンプレートの生成（同期版ラッパー）"""
+        logger.info("同期版 generate_templates が呼び出されました - 内部で非同期処理を実行します")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(self.generate_templates_async(titles, keyword))
+        finally:
+            loop.close()
