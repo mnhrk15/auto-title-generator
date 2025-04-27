@@ -375,8 +375,39 @@ document.addEventListener('DOMContentLoaded', () => {
             nextPageBtn.classList.remove('disabled');
         }
         
+        // ページ番号の表示数を制限（ページ数が多い場合）
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, paginationState.currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(paginationState.totalPages, startPage + maxVisiblePages - 1);
+        
+        // 表示範囲の調整
+        if (endPage - startPage + 1 < maxVisiblePages && startPage > 1) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+        
+        // 最初のページへのリンク（必要な場合）
+        if (startPage > 1) {
+            const firstPageBtn = document.createElement('button');
+            firstPageBtn.classList.add('page-btn');
+            firstPageBtn.textContent = '1';
+            
+            firstPageBtn.addEventListener('click', () => {
+                displayTemplatesForPage(1);
+            });
+            
+            paginationNumbers.appendChild(firstPageBtn);
+            
+            // 省略記号（必要な場合）
+            if (startPage > 2) {
+                const ellipsis = document.createElement('span');
+                ellipsis.classList.add('pagination-ellipsis');
+                ellipsis.textContent = '...';
+                paginationNumbers.appendChild(ellipsis);
+            }
+        }
+        
         // ページ番号ボタンを生成
-        for (let i = 1; i <= paginationState.totalPages; i++) {
+        for (let i = startPage; i <= endPage; i++) {
             const pageBtn = document.createElement('button');
             pageBtn.classList.add('page-btn');
             pageBtn.textContent = i;
@@ -392,6 +423,27 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             paginationNumbers.appendChild(pageBtn);
+        }
+        
+        // 最後のページへのリンク（必要な場合）
+        if (endPage < paginationState.totalPages) {
+            // 省略記号（必要な場合）
+            if (endPage < paginationState.totalPages - 1) {
+                const ellipsis = document.createElement('span');
+                ellipsis.classList.add('pagination-ellipsis');
+                ellipsis.textContent = '...';
+                paginationNumbers.appendChild(ellipsis);
+            }
+            
+            const lastPageBtn = document.createElement('button');
+            lastPageBtn.classList.add('page-btn');
+            lastPageBtn.textContent = paginationState.totalPages;
+            
+            lastPageBtn.addEventListener('click', () => {
+                displayTemplatesForPage(paginationState.totalPages);
+            });
+            
+            paginationNumbers.appendChild(lastPageBtn);
         }
     }
     
@@ -467,6 +519,10 @@ document.addEventListener('DOMContentLoaded', () => {
         menuTextarea.value = template.menu;
         commentTextarea.value = template.comment;
         hashtagTextarea.value = template.hashtag;
+        
+        // タイトルのスタイルを控えめに設定
+        titleTextarea.style.color = 'var(--text-color)';
+        titleTextarea.style.fontWeight = 'normal';
         
         // 文字数カウンターの更新
         updateCharCount(titleTextarea, titleCounter, 30);

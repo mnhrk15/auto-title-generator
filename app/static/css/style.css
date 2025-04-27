@@ -1193,7 +1193,9 @@ textarea::placeholder {
 
 .title {
     min-height: 60px;
-    font-weight: 600;
+    font-weight: normal;
+    color: var(--text-color);
+    font-size: 1rem;
 }
 
 .menu {
@@ -1631,9 +1633,17 @@ textarea:focus {
 .pagination {
     display: flex;
     justify-content: center;
+    align-items: center;
     margin-top: var(--spacing-xl);
     gap: var(--spacing-sm);
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+}
+
+#pagination-numbers {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: var(--spacing-sm);
 }
 
 .page-btn {
@@ -1673,6 +1683,16 @@ textarea:focus {
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
+}
+
+.pagination-ellipsis {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    padding: 0 var(--spacing-xs);
+    color: var(--text-color-light);
+    font-weight: 600;
 }
 
 /* レスポンシブ対応：テンプレート表示セクション */
