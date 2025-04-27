@@ -8,6 +8,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ヘアスタイルタイトルジェネレーター</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    
+    <!-- レスポンシブデザインテスト用のスタイル -->
+    <style>
+        .responsive-debug {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 9999;
+            display: none;
+        }
+    </style>
 </head>
 <body>
 <header class="app-header">
@@ -21,37 +37,8 @@
 
 <main class="app-main">
     <div class="container">
-        <section class="guide">
-            <div class="guide-header">
-                <i class="fas fa-lightbulb"></i>
-                <h2>使い方</h2>
-            </div>
-            <div class="guide-content">
-                <div class="guide-step">
-                    <div class="guide-step-number">1</div>
-                    <div class="guide-step-text">
-                        <i class="fas fa-keyboard"></i> 
-                        <span>検索したいキーワードを入力してください</span>
-                    </div>
-                </div>
-                <div class="guide-step">
-                    <div class="guide-step-number">2</div>
-                    <div class="guide-step-text">
-                        <i class="fas fa-search"></i> 
-                        <span>「生成」ボタンを押すと、HotPepper Beautyから関連タイトルを取得し、新しいテンプレート案を生成します</span>
-                    </div>
-                </div>
-                <div class="guide-step">
-                    <div class="guide-step-number">3</div>
-                    <div class="guide-step-text">
-                        <i class="fas fa-clipboard"></i> 
-                        <span>結果が表示されたら、内容を編集したり、コピーやファイル出力ができます</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="search-section">
+        <!-- 検索セクションを独立させる -->
+        <div class="search-section">
             <div class="search-container">
                 <div class="gender-selection">
                     <div class="gender-option-wrapper">
@@ -77,7 +64,38 @@
                     </button>
                 </div>
             </div>
-        </section>
+        </div>
+
+        <!-- ガイドセクションを折りたたみ可能に変更 -->
+        <details class="guide-collapsible">
+            <summary class="guide-summary">
+                <i class="fas fa-lightbulb"></i>
+                <span>使い方</span>
+            </summary>
+            <div class="guide-content">
+                <div class="guide-step">
+                    <div class="guide-step-number">1</div>
+                    <div class="guide-step-text">
+                        <i class="fas fa-keyboard"></i> 
+                        <span>検索したいキーワードを入力してください</span>
+                    </div>
+                </div>
+                <div class="guide-step">
+                    <div class="guide-step-number">2</div>
+                    <div class="guide-step-text">
+                        <i class="fas fa-search"></i> 
+                        <span>「生成」ボタンを押すと、HotPepper Beautyから関連タイトルを取得し、新しいテンプレート案を生成します</span>
+                    </div>
+                </div>
+                <div class="guide-step">
+                    <div class="guide-step-number">3</div>
+                    <div class="guide-step-text">
+                        <i class="fas fa-clipboard"></i> 
+                        <span>結果が表示されたら、内容を編集したり、コピーやファイル出力ができます</span>
+                    </div>
+                </div>
+            </div>
+        </details>
 
   <!-- ローディングインジケーター -->
     <div id="loading" class="loading hidden">
@@ -126,7 +144,31 @@
             <i class="fas fa-check-circle"></i>
             生成結果
         </h2>
-        <div id="template-container" class="template-container"></div>
+        
+        <section class="templates-section">
+            <div class="template-heading">
+                <h2>あなたのキーワードに最適化されたテンプレート</h2>
+            </div>
+            
+            <!-- ローディングスピナー -->
+            <div id="templates-loading" class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            
+            <div id="template-container" class="template-container"></div>
+            
+            <!-- ページネーション -->
+            <div class="pagination">
+                <button class="page-btn nav-btn disabled" id="prev-page">
+                    <i class="fas fa-chevron-left"></i> 前へ
+                </button>
+                <div id="pagination-numbers"></div>
+                <button class="page-btn nav-btn disabled" id="next-page">
+                    次へ <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </section>
+        
         <div class="export-buttons">
             <button id="export-all" class="primary-button">
                 <i class="fas fa-file-export"></i> 全てエクスポート
@@ -135,13 +177,18 @@
                 <i class="fas fa-copy"></i> 全てコピー
             </button>
         </div>
+        
+        <!-- コピー完了トースト -->
+        <div id="copied-toast" class="copied-toast">
+            クリップボードにコピーしました
+        </div>
     </div>
     </div>
 </main>
 
-<footer class="app-footer">
-    <div class="container">
-        <p>© 2025 ヘアスタイルタイトルジェネレーター</p>
+<footer class="footer">
+    <div class="footer-copyright">
+        © 2025 ヘアスタイルタイトルジェネレーター All Rights Reserved.
     </div>
 </footer>
 
@@ -230,6 +277,42 @@
         </div>
     </div>
 </template>
+
+<!-- レスポンシブデザインテスト用のデバッグツール -->
+<div class="responsive-debug" id="responsive-debug"></div>
+
+<script>
+    // デバッグ用：レスポンシブデザインの確認
+    document.addEventListener('DOMContentLoaded', function() {
+        // URLパラメータでデバッグモードをオンにする
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugMode = urlParams.get('debug') === 'responsive';
+        
+        if (debugMode) {
+            const debugEl = document.getElementById('responsive-debug');
+            debugEl.style.display = 'block';
+            
+            function updateDebugInfo() {
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                let breakpoint = '';
+                
+                if (width <= 576) breakpoint = 'xs (スマホ縦)';
+                else if (width <= 768) breakpoint = 'sm (スマホ横/タブレット縦)';
+                else if (width <= 1024) breakpoint = 'md (タブレット横)';
+                else breakpoint = 'lg (デスクトップ)';
+                
+                debugEl.innerHTML = `
+                    幅: ${width}px / 高さ: ${height}px<br>
+                    ブレークポイント: ${breakpoint}
+                `;
+            }
+            
+            window.addEventListener('resize', updateDebugInfo);
+            updateDebugInfo();
+        }
+    });
+</script>
 </body>
 </html>
 {% endblock %} 

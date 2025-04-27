@@ -13,6 +13,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportAllBtn = document.getElementById('export-all');
     const copyAllBtn = document.getElementById('copy-all');
     const stepIndicators = document.querySelectorAll('.step-indicator');
+    const genderRadios = document.querySelectorAll('input[name="gender"]');
+    
+    // ページネーションとトースト通知の要素
+    const prevPageBtn = document.getElementById('prev-page');
+    const nextPageBtn = document.getElementById('next-page');
+    const paginationNumbers = document.getElementById('pagination-numbers');
+    const copiedToast = document.getElementById('copied-toast');
+    const templatesLoading = document.getElementById('templates-loading');
     
     // プログレスバーの状態
     let progressState = {
@@ -25,6 +33,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ],
         interval: null,
         subInterval: null
+    };
+    
+    // ページネーション状態
+    let paginationState = {
+        currentPage: 1,
+        itemsPerPage: 6,
+        totalPages: 1,
+        allTemplates: []
     };
     
     // 初期アニメーション
@@ -282,33 +298,132 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
     
-    // テンプレートカードの表示
+    // テンプレート表示関数の更新
     function displayTemplates(templates) {
-        templateContainer.innerHTML = '';
+        // テンプレートを状態に保存
+        paginationState.allTemplates = templates;
         
-        // 遅延表示でアニメーション効果を高める
-        templates.forEach((template, index) => {
-            setTimeout(() => {
-                const card = createTemplateCard(template);
-                card.style.opacity = '0';
-                card.style.transform = 'translateY(20px)';
-                templateContainer.appendChild(card);
-                
-                // フェードイン
-                setTimeout(() => {
-                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, 50);
-            }, index * 100);
-        });
+        // ページネーション設定
+        paginationState.totalPages = Math.ceil(templates.length / paginationState.itemsPerPage);
+        paginationState.currentPage = 1;
         
-        showResults();
+        // ページネーションUIを更新
+        updatePaginationUI();
         
-        // スクロール
+        // 最初のページを表示
+        displayTemplatesForPage(1);
+    }
+    
+    // 特定のページのテンプレートを表示
+    function displayTemplatesForPage(page) {
+        // ローディングスピナーを表示
+        templatesLoading.classList.add('active');
+        
+        // 少し遅延させてUIの応答性を向上
         setTimeout(() => {
-            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // テンプレートコンテナをクリア
+            templateContainer.innerHTML = '';
+            
+            const startIndex = (page - 1) * paginationState.itemsPerPage;
+            const endIndex = startIndex + paginationState.itemsPerPage;
+            const pageTemplates = paginationState.allTemplates.slice(startIndex, endIndex);
+            
+            // ページのテンプレートを表示
+            pageTemplates.forEach(template => {
+                const card = createTemplateCard(template);
+                templateContainer.appendChild(card);
+            });
+            
+            // 現在のページを更新
+            paginationState.currentPage = page;
+            
+            // ページネーションUIを更新
+            updatePaginationUI();
+            
+            // ローディングスピナーを非表示
+            templatesLoading.classList.remove('active');
+            
+            // テキストエリアのリサイズを初期化
+            initializeTextareas();
         }, 300);
+    }
+    
+    // ページネーションUIを更新
+    function updatePaginationUI() {
+        // ページ番号を生成
+        paginationNumbers.innerHTML = '';
+        
+        // 総ページ数が1以下の場合はページネーションを非表示
+        if (paginationState.totalPages <= 1) {
+            document.querySelector('.pagination').style.display = 'none';
+            return;
+        } else {
+            document.querySelector('.pagination').style.display = 'flex';
+        }
+        
+        // 前へボタンの状態を更新
+        if (paginationState.currentPage <= 1) {
+            prevPageBtn.classList.add('disabled');
+        } else {
+            prevPageBtn.classList.remove('disabled');
+        }
+        
+        // 次へボタンの状態を更新
+        if (paginationState.currentPage >= paginationState.totalPages) {
+            nextPageBtn.classList.add('disabled');
+        } else {
+            nextPageBtn.classList.remove('disabled');
+        }
+        
+        // ページ番号ボタンを生成
+        for (let i = 1; i <= paginationState.totalPages; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.classList.add('page-btn');
+            pageBtn.textContent = i;
+            
+            if (i === paginationState.currentPage) {
+                pageBtn.classList.add('current-page');
+            }
+            
+            pageBtn.addEventListener('click', () => {
+                if (i !== paginationState.currentPage) {
+                    displayTemplatesForPage(i);
+                }
+            });
+            
+            paginationNumbers.appendChild(pageBtn);
+        }
+    }
+    
+    // ページネーションイベントリスナー
+    prevPageBtn.addEventListener('click', () => {
+        if (paginationState.currentPage > 1) {
+            displayTemplatesForPage(paginationState.currentPage - 1);
+        }
+    });
+    
+    nextPageBtn.addEventListener('click', () => {
+        if (paginationState.currentPage < paginationState.totalPages) {
+            displayTemplatesForPage(paginationState.currentPage + 1);
+        }
+    });
+    
+    // トースト表示関数
+    function showToast(message, duration = 2000) {
+        copiedToast.textContent = message;
+        copiedToast.classList.add('show');
+        
+        setTimeout(() => {
+            copiedToast.classList.remove('show');
+        }, duration);
+    }
+    
+    // コピー操作後のトースト表示を統一
+    function showCopiedToast(fieldName = '') {
+        const message = fieldName 
+            ? `${fieldName}をクリップボードにコピーしました` 
+            : 'クリップボードにコピーしました';
+        showToast(message);
     }
     
     // 初期要素のアニメーション
@@ -426,15 +541,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         btn.classList.remove('copied');
                     }, 1500);
                     
-                    // 成功メッセージ
-                    let fieldName = '';
-                    switch(fieldType) {
-                        case 'title': fieldName = 'タイトル'; break;
-                        case 'menu': fieldName = 'メニュー'; break;
-                        case 'comment': fieldName = 'コメント'; break;
-                        case 'hashtag': fieldName = 'ハッシュタグ'; break;
-                    }
-                    showSuccessToast(`${fieldName}をコピーしました`);
+                    // 適切なメッセージでトースト表示
+                    const fieldLabels = {
+                        'title': 'タイトル',
+                        'menu': 'メニュー',
+                        'comment': 'コメント',
+                        'hashtag': 'ハッシュタグ'
+                    };
+                    showCopiedToast(fieldLabels[fieldType]);
                 }).catch(err => {
                     showError('コピーに失敗しました');
                     console.error('コピーに失敗:', err);
@@ -467,7 +581,7 @@ ${hashtagTextarea.value}`;
                     copyBtn.classList.remove('copied');
                 }, 2000);
                 
-                showSuccessToast('テキストをクリップボードにコピーしました');
+                showCopiedToast('テンプレート全体');
             }).catch(err => {
                 showError('コピーに失敗しました');
                 console.error('コピーに失敗:', err);
@@ -692,7 +806,7 @@ ${hashtagTextarea.value}`;
         ].join('\n\n'));
         
         navigator.clipboard.writeText(text).then(() => {
-            showSuccessToast('全テンプレートをクリップボードにコピーしました');
+            showCopiedToast('すべてのテンプレート');
         }).catch(error => {
             showError('コピーに失敗しました');
             console.error('コピーエラー:', error);
@@ -852,5 +966,48 @@ ${hashtagTextarea.value}`;
             }
         `;
         document.head.appendChild(style);
+    }
+
+    // 性別選択の視認性向上対応
+    function updateGenderSelectionStyles() {
+        const genderOptions = document.querySelectorAll('.gender-option-wrapper');
+        
+        genderOptions.forEach(option => {
+            const radio = option.querySelector('input[type="radio"]');
+            if (radio.checked) {
+                option.querySelector('.gender-option').classList.add('gender-option-active');
+                option.querySelector('.gender-option').classList.remove('gender-option-inactive');
+            } else {
+                option.querySelector('.gender-option').classList.remove('gender-option-active');
+                option.querySelector('.gender-option').classList.add('gender-option-inactive');
+            }
+        });
+    }
+    
+    // 初期表示時に性別選択のスタイルを適用
+    updateGenderSelectionStyles();
+    
+    // 性別選択変更時のイベントリスナー
+    genderRadios.forEach(radio => {
+        radio.addEventListener('change', updateGenderSelectionStyles);
+    });
+
+    // テキストエリアの初期化関数
+    function initializeTextareas() {
+        const textareas = document.querySelectorAll('textarea');
+        textareas.forEach(textarea => {
+            autoResizeTextarea(textarea);
+            
+            // 文字数カウンターの初期化
+            const field = textarea.classList[0];
+            const countElement = textarea.closest('.field').querySelector(`.${field}-count`);
+            const maxLength = textarea.getAttribute('maxlength');
+            
+            if (field === 'hashtag') {
+                updateHashtagCount(textarea, countElement);
+            } else {
+                updateCharCount(textarea, countElement, maxLength);
+            }
+        });
     }
 }); 
