@@ -12,17 +12,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const templateContainer = document.getElementById('template-container');
     const exportAllBtn = document.getElementById('export-all');
     const copyAllBtn = document.getElementById('copy-all');
+    const stepIndicators = document.querySelectorAll('.step-indicator');
     
     // プログレスバーの状態
     let progressState = {
         currentStep: 0,
         steps: [
-            { name: 'スクレイピング中...', percent: 25 },
-            { name: 'タイトル解析中...', percent: 50 },
-            { name: 'テンプレート生成中...', percent: 75 },
-            { name: '完了', percent: 100 }
+            { name: 'スクレイピング中...', percent: 20, duration: 5000 },
+            { name: 'タイトル解析中...', percent: 40, duration: 3000 },
+            { name: 'テンプレート生成中...', percent: 85, duration: 5000 },
+            { name: '完了', percent: 100, duration: 500 }
         ],
-        interval: null
+        interval: null,
+        subInterval: null
     };
     
     // 初期アニメーション
@@ -107,6 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetProgress() {
         progressState.currentStep = 0;
         updateProgressUI(0, progressState.steps[0].name);
+        
+        // すべてのステップインジケーターをリセット
+        stepIndicators.forEach((indicator, index) => {
+            indicator.classList.remove('active', 'completed');
+        });
+        
+        // 最初のステップをアクティブにする
+        stepIndicators[0].classList.add('active');
     }
     
     // プログレスシミュレーションを開始
@@ -115,40 +125,101 @@ document.addEventListener('DOMContentLoaded', () => {
         if (progressState.interval) {
             clearInterval(progressState.interval);
         }
+        if (progressState.subInterval) {
+            clearInterval(progressState.subInterval);
+        }
         
         // 最初のステップを表示
-        updateProgressUI(
-            progressState.steps[0].percent,
-            progressState.steps[0].name
+        updateProgressUI(0, progressState.steps[0].name);
+        stepIndicators[0].classList.add('active');
+        
+        // 最初のステップの進行状態を徐々に更新
+        startSubProgressAnimation(0);
+        
+        // 次のステップに進む処理
+        progressState.interval = setTimeout(moveToNextStep, progressState.steps[0].duration);
+    }
+    
+    // 段階的なプログレス表示のアニメーション
+    function startSubProgressAnimation(stepIndex) {
+        const currentStep = progressState.steps[stepIndex];
+        const prevStep = stepIndex > 0 ? progressState.steps[stepIndex - 1] : { percent: 0 };
+        const startPercent = prevStep.percent;
+        const endPercent = currentStep.percent;
+        const duration = currentStep.duration;
+        const stepSize = (endPercent - startPercent) / (duration / 100); // 100msごとの増加量
+        
+        let currentPercent = startPercent;
+        
+        // 既存のサブインターバルをクリア
+        if (progressState.subInterval) {
+            clearInterval(progressState.subInterval);
+        }
+        
+        // 段階的に進行状況を更新
+        progressState.subInterval = setInterval(() => {
+            currentPercent = Math.min(currentPercent + stepSize, endPercent);
+            updateProgressUI(Math.floor(currentPercent), currentStep.name);
+            
+            if (currentPercent >= endPercent) {
+                clearInterval(progressState.subInterval);
+            }
+        }, 100);
+    }
+    
+    // 次のステップに進む
+    function moveToNextStep() {
+        // 現在のステップをインクリメント
+        progressState.currentStep = Math.min(
+            progressState.currentStep + 1,
+            progressState.steps.length - 1
         );
         
-        // 次のステップに進む前の遅延時間（ミリ秒）
-        const stepDelay = 2000;
+        // ステップインジケーターを更新
+        updateStepIndicators();
         
-        // 進行状況のシミュレーション
-        progressState.interval = setInterval(() => {
-            // 次のステップに進む
-            progressState.currentStep = Math.min(
-                progressState.currentStep + 1,
-                progressState.steps.length - 1
+        // 現在のステップのアニメーションを開始
+        startSubProgressAnimation(progressState.currentStep);
+        
+        // 最終ステップでなければ、次のステップの準備
+        if (progressState.currentStep < progressState.steps.length - 1) {
+            progressState.interval = setTimeout(
+                moveToNextStep, 
+                progressState.steps[progressState.currentStep].duration
             );
-            
-            // UIを更新
-            const step = progressState.steps[progressState.currentStep];
-            updateProgressUI(step.percent, step.name);
-            
-            // 最終ステップに達したら停止
-            if (progressState.currentStep >= progressState.steps.length - 1) {
-                stopProgressSimulation();
+        }
+    }
+    
+    // ステップインジケーターを更新
+    function updateStepIndicators() {
+        // すべてのインジケーターをリセット
+        stepIndicators.forEach((indicator, index) => {
+            // 現在のステップより前のステップは完了としてマーク
+            if (index < progressState.currentStep) {
+                indicator.classList.remove('active');
+                indicator.classList.add('completed');
             }
-        }, stepDelay);
+            // 現在のステップはアクティブとしてマーク
+            else if (index === progressState.currentStep) {
+                indicator.classList.add('active');
+                indicator.classList.remove('completed');
+            }
+            // 将来のステップはノーマル状態
+            else {
+                indicator.classList.remove('active', 'completed');
+            }
+        });
     }
     
     // プログレスシミュレーションを停止
     function stopProgressSimulation() {
         if (progressState.interval) {
-            clearInterval(progressState.interval);
+            clearTimeout(progressState.interval);
             progressState.interval = null;
+        }
+        if (progressState.subInterval) {
+            clearInterval(progressState.subInterval);
+            progressState.subInterval = null;
         }
     }
     
@@ -156,6 +227,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function completeProgress() {
         stopProgressSimulation();
         updateProgressUI(100, '完了');
+        
+        // すべてのステップを完了としてマーク
+        stepIndicators.forEach(indicator => {
+            indicator.classList.remove('active');
+            indicator.classList.add('completed');
+        });
     }
     
     // プログレスUIを更新

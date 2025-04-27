@@ -545,6 +545,102 @@ input[type="text"]:focus + .search-icon {
     margin: var(--spacing-lg) 0;
 }
 
+/* ステップインジケーター */
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+    position: relative;
+}
+
+.progress-steps::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: rgba(67, 97, 238, 0.08);
+    z-index: 1;
+}
+
+.step-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 24%;
+    position: relative;
+    z-index: 2;
+}
+
+.step-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: var(--card-bg);
+    border: 2px solid rgba(67, 97, 238, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: var(--spacing-sm);
+    transition: all 0.3s var(--transition-ease);
+    z-index: 2;
+}
+
+.step-dot::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: rgba(67, 97, 238, 0.2);
+    transform: scale(0);
+    transition: transform 0.3s var(--transition-ease);
+}
+
+.step-indicator.active .step-dot {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+}
+
+.step-indicator.active .step-dot::before {
+    background-color: var(--primary-color);
+    transform: scale(1);
+}
+
+.step-indicator.completed .step-dot {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.step-indicator.completed .step-dot::before {
+    content: '\f00c';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    color: white;
+    font-size: 12px;
+    transform: scale(1);
+    background-color: transparent;
+}
+
+.step-label {
+    font-size: 0.8rem;
+    text-align: center;
+    color: var(--text-color-light);
+    font-weight: 500;
+    transition: all 0.3s var(--transition-ease);
+    white-space: nowrap;
+}
+
+.step-indicator.active .step-label {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.step-indicator.completed .step-label {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
 .progress-bar {
     width: 100%;
     height: 12px;
@@ -981,16 +1077,15 @@ textarea:focus {
 /* レスポンシブデザイン */
 @media (max-width: 768px) {
     body {
-        font-size: 15px;
+        padding: var(--spacing-md);
     }
     
     .container {
-        padding: var(--spacing-sm);
+        padding: var(--spacing-md);
     }
     
     .search-box {
         flex-direction: column;
-        gap: var(--spacing-sm);
     }
     
     .search-container {
@@ -999,41 +1094,36 @@ textarea:focus {
     
     .gender-selection {
         flex-direction: row;
-        gap: var(--spacing-sm);
         margin-bottom: var(--spacing-md);
     }
     
     .gender-option-wrapper {
-        flex: 1;
-        min-width: 0;
+        width: 50%;
     }
     
     .template-container {
         grid-template-columns: 1fr;
-        gap: var(--spacing-lg);
     }
     
     .export-buttons {
         flex-direction: column;
-        align-items: stretch;
-        gap: var(--spacing-sm);
+        gap: var(--spacing-md);
     }
     
     .app-header {
-        padding: var(--spacing-md) 0;
-        margin-bottom: var(--spacing-lg);
+        padding: var(--spacing-lg) var(--spacing-md);
     }
     
     .app-header-content {
-        padding: 0 var(--spacing-sm);
+        flex-direction: column;
     }
     
     h1 {
-        font-size: 1.5rem;
+        font-size: 1.6rem;
     }
     
     .logo {
-        font-size: 1.8rem;
+        margin-bottom: var(--spacing-md);
         width: 60px;
         height: 60px;
     }
@@ -1043,59 +1133,77 @@ textarea:focus {
     }
     
     .guide-header i {
-        width: 36px;
-        height: 36px;
-        font-size: 1.4rem;
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
     }
     
     .guide-step-number {
-        width: 24px;
-        height: 24px;
-        font-size: 0.8rem;
-    }
-    
-    textarea {
-        min-height: 50px;
-        padding: var(--spacing-sm);
-    }
-    
-    .title, .menu, .hashtag {
-        min-height: 50px;
-    }
-    
-    .comment {
-        min-height: 80px;
-    }
-    
-    .field {
-        margin-bottom: var(--spacing-sm);
-    }
-    
-    .field label {
+        width: 30px;
+        height: 30px;
         font-size: 0.9rem;
     }
     
+    textarea {
+        font-size: 0.9rem;
+    }
+    
+    .title, .menu, .hashtag {
+        min-height: 70px;
+    }
+    
+    .comment {
+        min-height: 90px;
+    }
+    
+    .field {
+        margin-bottom: var(--spacing-md);
+    }
+    
+    .field label {
+        margin-bottom: var(--spacing-xs);
+    }
+    
     .field-info {
-        font-size: 0.8rem;
+        display: none;
     }
     
     .char-count {
         font-size: 0.8rem;
-        padding: 1px 6px;
     }
     
     .loading-content {
-        padding: var(--spacing-md);
+        width: 90%;
     }
     
     .progress-status {
         flex-direction: column;
-        align-items: center;
+        align-items: flex-start;
         gap: var(--spacing-xs);
     }
     
+    .progress-steps {
+        overflow-x: auto;
+        padding-bottom: var(--spacing-xs);
+    }
+    
+    .step-label {
+        font-size: 0.7rem;
+    }
+    
+    .step-dot {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .step-indicator {
+        width: 80px;
+        flex-shrink: 0;
+        margin: 0 var(--spacing-xs);
+    }
+    
     .card-header {
-        padding: var(--spacing-sm) var(--spacing-md);
+        padding: var(--spacing-md);
     }
     
     .card-content {
@@ -1103,11 +1211,11 @@ textarea:focus {
     }
     
     .card-actions {
-        padding: var(--spacing-sm) var(--spacing-md);
+        padding: var(--spacing-md);
     }
     
     .results-header {
-        margin-bottom: var(--spacing-lg);
+        font-size: 1.4rem;
     }
     
     .results-header i {
