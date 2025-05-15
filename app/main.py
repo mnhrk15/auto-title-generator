@@ -1,7 +1,6 @@
 import os
 import logging
 import asyncio
-import time # time モジュールをインポート
 from logging.handlers import RotatingFileHandler
 from flask import Flask, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
@@ -95,15 +94,12 @@ def run_async_task(coro):
 async def process_template_generation(keyword: str, gender: str, season: str = None) -> list:
     """スクレイピングとテンプレート生成を非同期で処理する"""
     current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}"')
-    process_start_time = time.perf_counter() # 全体処理開始時間
     
     # 非同期でスクレイピングを実行
-    scraping_start_time = time.perf_counter()
     async with HotPepperScraper() as scraper:
         current_app.logger.info(f'スクレイピング開始: キーワード: "{keyword}", 性別: "{gender}"')
         titles = await scraper.scrape_titles_async(keyword, gender)
-        scraping_end_time = time.perf_counter()
-        current_app.logger.info(f'スクレイピング完了. 所要時間: {scraping_end_time - scraping_start_time:.2f}秒. {len(titles)}件のタイトルを取得')
+        current_app.logger.info(f'スクレイピング結果: {len(titles)} 件のタイトルを取得')
     
     # スクレイピング結果をログに記録
     if titles:
@@ -119,12 +115,11 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
         return []
         
     # 非同期でテンプレート生成を実行
-    generation_start_time = time.perf_counter()
     current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, シーズン: "{season}"')
     generator = TemplateGenerator()
     templates = await generator.generate_templates_async(titles, keyword, season)
-    generation_end_time = time.perf_counter()
-    current_app.logger.info(f'テンプレート生成完了. 所要時間: {generation_end_time - generation_start_time:.2f}秒. {len(templates)}件のテンプレートを生成')
+    
+    current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
     
     # 生成されたテンプレートをログに記録
     for i, template in enumerate(templates):
@@ -139,8 +134,6 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
         else:
             current_app.logger.warning(f'  ❌ タイトルにキーワード "{keyword}" が含まれていません: "{template.get("title", "")}"')
     
-    process_end_time = time.perf_counter() # 全体処理終了時間
-    current_app.logger.info(f'非同期処理完了. 全体所要時間: {process_end_time - process_start_time:.2f}秒')
     return templates
 
 @app.route('/api/generate', methods=['POST'])
