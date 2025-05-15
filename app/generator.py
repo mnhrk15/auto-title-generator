@@ -13,7 +13,7 @@ class TemplateGenerator:
         if not config.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set")
         genai.configure(api_key=config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
+        self.model = genai.GenerativeModel('gemini-2.0-flash')
         logger.info("TemplateGeneratorが初期化されました")
         
     def _create_prompt(self, titles: List[str], keyword: str, season: str = None) -> str:

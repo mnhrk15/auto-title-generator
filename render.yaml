@@ -14,6 +14,6 @@ services:
       - key: SCRAPING_DELAY_MIN
         value: 1
       - key: SCRAPING_DELAY_MAX
-        value: 3
-      - key: MAX_PAGES
         value: 2
+      - key: MAX_PAGES
+        value: 1
