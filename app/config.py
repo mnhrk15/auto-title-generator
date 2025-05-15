@@ -18,7 +18,7 @@ MENS_URL = 'https://beauty.hotpepper.jp/CSP/bt/hairCatalogSearch/mens/condtion/'
 BASE_URL = LADIES_URL  # デフォルトはレディース
 
 # Template Generation Settings
-MAX_TEMPLATES = 20
+MAX_TEMPLATES = 15
 CHAR_LIMITS = {
     'title': 30,
     'menu': 50,
