@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     generateBtn.addEventListener('click', async () => {
         const keyword = keywordInput.value.trim();
         const gender = document.querySelector('input[name="gender"]:checked').value;
+        const season = document.getElementById('season').value;
         
         if (!keyword) {
             showError('キーワードを入力してください。');
@@ -88,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ keyword, gender })
+                body: JSON.stringify({ keyword, gender, season })
             });
             
             const data = await response.json();
@@ -675,8 +676,8 @@ ${hashtagTextarea.value}`;
     
     // CSVエクスポート
     exportAllBtn.addEventListener('click', () => {
-        const templates = getTemplatesFromCards();
-        if (templates.length === 0) {
+        const templates = paginationState.allTemplates;
+        if (!templates || templates.length === 0) {
             showError('エクスポートするテンプレートがありません');
             return;
         }
@@ -800,17 +801,18 @@ ${hashtagTextarea.value}`;
         
         // CSV形式でエクスポート
         exportDialog.querySelector('[data-format="csv"]').addEventListener('click', () => {
-            const csv = [
-                ['タイトル', 'メニュー', 'コメント', 'ハッシュタグ'].join(','),
-                ...templates.map(template => [
-                    `"${template.title.replace(/"/g, '""')}"`,
-                    `"${template.menu.replace(/"/g, '""')}"`,
-                    `"${template.comment.replace(/"/g, '""')}"`,
-                    `"${template.hashtag.replace(/"/g, '""')}"`,
-                ].join(','))
-            ].join('\n');
+            const csvHeader = ['タイトル', 'メニュー', 'コメント', 'ハッシュタグ'].join(',');
+            const csvRows = templates.map(template => [
+                `"${template.title.replace(/"/g, '""')}"`,
+                `"${template.menu.replace(/"/g, '""')}"`,
+                `"${template.comment.replace(/"/g, '""')}"`,
+                `"${(Array.isArray(template.hashtag) ? template.hashtag.join(' ') : '').replace(/"/g, '""')}"`,
+            ].join(','));
             
-            downloadFile(csv, 'hair_templates.csv', 'text/csv');
+            // BOMを追加し、ヘッダーと行を結合
+            const csvContent = '\uFEFF' + csvHeader + '\n' + csvRows.join('\n');
+            
+            downloadFile(csvContent, 'hair_templates.csv', 'text/csv;charset=utf-8'); // charsetを指定
             showSuccessToast('CSVファイルをダウンロードしました');
             document.body.removeChild(exportDialog);
         });
@@ -846,8 +848,8 @@ ${hashtagTextarea.value}`;
     
     // 全テンプレートをコピー
     copyAllBtn.addEventListener('click', () => {
-        const templates = getTemplatesFromCards();
-        if (templates.length === 0) {
+        const templates = paginationState.allTemplates;
+        if (!templates || templates.length === 0) {
             showError('コピーするテンプレートがありません');
             return;
         }
