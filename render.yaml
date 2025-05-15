@@ -3,7 +3,7 @@ services:
     name: template-generator
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn run:app --timeout 120
+    startCommand: gunicorn run:app --timeout 120 --workers 1 --log-level debug
     envVars:
       - key: FLASK_SECRET_KEY
         generateValue: true
