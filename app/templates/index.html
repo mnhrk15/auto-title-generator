@@ -59,6 +59,20 @@
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="keyword" placeholder="例：髪質改善" maxlength="50">
                     </div>
+                    <div class="input-wrapper season-selection">
+                        <i class="fas fa-calendar-alt season-icon"></i>
+                        <select id="season" class="season-select">
+                            <option value="none" selected>季節を指定しない</option>
+                            <option value="spring">春</option>
+                            <option value="summer">夏</option>
+                            <option value="autumn">秋</option>
+                            <option value="winter">冬</option>
+                            <option value="all_year">通年</option>
+                            <option value="graduation_entrance">卒業・入学</option>
+                            <option value="rainy_season">梅雨</option>
+                            <option value="year_end_new_year">年末年始・成人式</option>
+                        </select>
+                    </div>
                     <button id="generate-button" class="primary-button">
                         <i class="fas fa-magic"></i> 生成
                     </button>

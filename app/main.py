@@ -91,9 +91,9 @@ def run_async_task(coro):
         loop.close()
 
 # スクレイピングと生成を非同期で行う関数
-async def process_template_generation(keyword: str, gender: str) -> list:
+async def process_template_generation(keyword: str, gender: str, season: str = None) -> list:
     """スクレイピングとテンプレート生成を非同期で処理する"""
-    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}"')
+    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}"')
     
     # 非同期でスクレイピングを実行
     async with HotPepperScraper() as scraper:
@@ -115,9 +115,9 @@ async def process_template_generation(keyword: str, gender: str) -> list:
         return []
         
     # 非同期でテンプレート生成を実行
-    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}')
+    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, シーズン: "{season}"')
     generator = TemplateGenerator()
-    templates = await generator.generate_templates_async(titles, keyword)
+    templates = await generator.generate_templates_async(titles, keyword, season)
     
     current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
     
@@ -160,9 +160,10 @@ def generate():
         
         keyword = data.get('keyword')
         gender = data.get('gender', 'ladies')
-        num_templates = int(data.get('num_templates', 5))
+        season = data.get('season') # 'none' や空文字の場合もありうる
+        num_templates = int(data.get('num_templates', 5)) # この変数は現在 process_template_generation で使われていないが、将来のために残す
         
-        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", テンプレート数: {num_templates}')
+        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", テンプレート数: {num_templates}')
         
         if not keyword:
             return jsonify({
@@ -179,7 +180,7 @@ def generate():
             }), 400
             
         # 非同期処理を同期的に実行
-        templates = run_async_task(process_template_generation(keyword, gender))
+        templates = run_async_task(process_template_generation(keyword, gender, season))
         
         if not templates:
             return jsonify({

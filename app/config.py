@@ -18,12 +18,24 @@ MENS_URL = 'https://beauty.hotpepper.jp/CSP/bt/hairCatalogSearch/mens/condtion/'
 BASE_URL = LADIES_URL  # デフォルトはレディース
 
 # Template Generation Settings
-MAX_TEMPLATES = 10
+MAX_TEMPLATES = 20
 CHAR_LIMITS = {
     'title': 30,
     'menu': 50,
     'comment': 120,
     'hashtag': 20  # per word
+}
+
+# Season Keywords for Prompt Engineering
+SEASON_KEYWORDS = {
+    "spring": ["春カラー", "スプリング"],
+    "summer": ["夏カラー", "サマー"],
+    "autumn": ["秋カラー", "オータム"],
+    "winter": ["冬カラー", "ウィンター"],
+    "all_year": ["定番", "いつでも人気", "ベーシック"],
+    "graduation_entrance": ["卒業式", "入学式", "卒園式", "入園式", "新生活応援"],
+    "rainy_season": ["梅雨", "湿気対策", "うねり解消", "縮毛矯正", "ストレートパーマ"],
+    "year_end_new_year": ["年末年始", "クリスマス", "お正月", "冬休み", "カウントダウン", "成人式"]
 }
 
 # Flask Settings
