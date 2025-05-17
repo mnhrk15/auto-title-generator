@@ -105,7 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 結果表示領域までスクロール
                 resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
-                showError(data.error);
+                showError(data.error.message || '不明なエラーが発生しました。');
             }
         } catch (error) {
             console.error('Error:', error);

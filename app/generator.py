@@ -209,10 +209,8 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
         
         try:
             logger.info("Gemini APIリクエスト送信中...")
-            # 非同期で処理するためにgenerate_contentをrun_in_executorで実行
-            # Google APIが直接的な非同期をサポートしていないため、ThreadPoolExecutorを使用して実行
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, lambda: self.model.generate_content(prompt))
+            # google-generativeai ライブラリの非同期メソッドを直接呼び出す
+            response = await self.model.generate_content_async(prompt)
             response_text = response.text
             logger.debug(f"Gemini APIレスポンス受信: 文字数 {len(response_text)}")
             
