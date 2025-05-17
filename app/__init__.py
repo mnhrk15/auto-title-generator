@@ -3,7 +3,7 @@ from . import config
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from . import main
+from .main import main_bp
 
 def create_app():
     app = Flask(__name__)
@@ -11,6 +11,9 @@ def create_app():
     
     # ロギングの設定
     setup_logging(app)
+    
+    # Blueprintの登録
+    app.register_blueprint(main_bp)
     
     return app
 
@@ -45,10 +48,9 @@ def setup_logging(app):
 
 app = create_app()
 
-# ルートの登録
-from . import main
+# ルートの登録 (Blueprint に移管したため不要)
+# from . import main # create_app() の中で main_bp をインポートしているので不要
 
-# Expose routes
-app.add_url_rule('/', 'index', main.index)
-app.add_url_rule('/generate', 'generate', main.generate, methods=['POST'])
-app.add_url_rule('/favicon.ico', 'favicon', main.favicon) 
+# Expose routes (Blueprint に移管したため不要)
+# app.add_url_rule('/', 'index', main.index)
+# app.add_url_rule('/favicon.ico', 'favicon', main.favicon) 

@@ -2,79 +2,82 @@ import os
 import logging
 import asyncio
 from logging.handlers import RotatingFileHandler
-from flask import Flask, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
 from .scraping import HotPepperScraper
 from .generator import TemplateGenerator
 from .config import GEMINI_API_KEY
 
-# ロガーの設定
-def setup_logging(app):
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-    
-    file_handler = RotatingFileHandler(
-        'logs/app.log',
-        maxBytes=1024 * 1024,  # 1MB
-        backupCount=10
-    )
-    
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    file_handler.setFormatter(formatter)
-    
-    # 開発環境ではDEBUG、本番環境ではINFO
-    if app.debug:
-        file_handler.setLevel(logging.DEBUG)
-    else:
-        file_handler.setLevel(logging.INFO)
-    
-    app.logger.addHandler(file_handler)
-    
-    # 他のモジュールのロガー設定
-    logging.getLogger('werkzeug').addHandler(file_handler)
+# Blueprintの作成
+main_bp = Blueprint('main', __name__)
 
-app = Flask(__name__)
-app.config['GEMINI_API_KEY'] = GEMINI_API_KEY
+# ロガーの設定
+# def setup_logging(app): # app/__init__.py で実行されるため不要
+#     if not os.path.exists('logs'):
+#         os.makedirs('logs')
+#     
+#     file_handler = RotatingFileHandler(
+#         'logs/app.log',
+#         maxBytes=1024 * 1024,  # 1MB
+#         backupCount=10
+#     )
+#     
+#     formatter = logging.Formatter(
+#         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+#     )
+#     file_handler.setFormatter(formatter)
+#     
+#     # 開発環境ではDEBUG、本番環境ではINFO
+#     if app.debug:
+#         file_handler.setLevel(logging.DEBUG)
+#     else:
+#         file_handler.setLevel(logging.INFO)
+#     
+#     app.logger.addHandler(file_handler)
+#     
+#     # 他のモジュールのロガー設定
+#     logging.getLogger('werkzeug').addHandler(file_handler)
+
+# app = Flask(__name__) # ここで app を再定義しない
+# app.config['GEMINI_API_KEY'] = GEMINI_API_KEY # config は app/__init__.py で読み込まれる
 
 # ロギングの設定
-setup_logging(app)
+# setup_logging(app) # app/__init__.py で実行されるため不要
 
 # エラーハンドラー
-@app.errorhandler(500)
+@main_bp.app_errorhandler(500)
 def internal_error(error):
-    app.logger.error(f'サーバーエラー: {str(error)}')
+    current_app.logger.error(f'サーバーエラー: {str(error)}')
     return jsonify({
         'success': False,
         'error': 'サーバー内部でエラーが発生しました。しばらく時間をおいて再度お試しください。',
         'status': 500
     }), 500
 
-@app.errorhandler(404)
+@main_bp.app_errorhandler(404)
 def not_found_error(error):
-    app.logger.info(f'ページが見つかりません: {request.url}')
+    current_app.logger.info(f'ページが見つかりません: {request.url}')
     return jsonify({
         'success': False,
         'error': 'リクエストされたページが見つかりません。',
         'status': 404
     }), 404
 
-@app.errorhandler(400)
+@main_bp.app_errorhandler(400)
 def bad_request_error(error):
-    app.logger.warning(f'不正なリクエスト: {str(error)}')
+    current_app.logger.warning(f'不正なリクエスト: {str(error)}')
     return jsonify({
         'success': False,
         'error': f'Invalid JSON: {str(error)}',
         'status': 400
     }), 400
 
-@app.route('/favicon.ico')
+@main_bp.route('/favicon.ico')
 def favicon():
     """faviconのルート"""
     return current_app.send_static_file('favicon.ico')
 
-@app.route('/')
+@main_bp.route('/')
 def index():
     """トップページのルート"""
     current_app.logger.info('トップページにアクセスがありました')
@@ -104,8 +107,8 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     # スクレイピング結果をログに記録
     if titles:
         current_app.logger.info(f'スクレイピング結果のタイトル例 (最大10件):')
-        for i, title in enumerate(titles[:10]):
-            current_app.logger.info(f'  {i+1}: {title}')
+        for i, title_text in enumerate(titles[:10]):
+            current_app.logger.info(f'  {i+1}: {title_text}')
         
         if len(titles) > 10:
             current_app.logger.info(f'  ... 他 {len(titles) - 10} 件')
@@ -136,7 +139,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     
     return templates
 
-@app.route('/api/generate', methods=['POST'])
+@main_bp.route('/api/generate', methods=['POST'])
 def generate():
     """テンプレート生成のAPIエンドポイント"""
     try:
@@ -219,5 +222,5 @@ def generate():
             'status': 500
         }), 500
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     app.run(debug=True) # run.py から実行するため不要
