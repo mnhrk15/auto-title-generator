@@ -1,6 +1,6 @@
 import os
 import logging
-import asyncio
+# import asyncio # Removed as run_async_task is deleted
 from logging.handlers import RotatingFileHandler
 from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
@@ -50,7 +50,10 @@ def internal_error(error):
     current_app.logger.error(f'サーバーエラー: {str(error)}')
     return jsonify({
         'success': False,
-        'error': 'サーバー内部でエラーが発生しました。しばらく時間をおいて再度お試しください。',
+        'error': {
+            'message': 'サーバー内部でエラーが発生しました。しばらく時間をおいて再度お試しください。',
+            'code': 'INTERNAL_SERVER_ERROR'
+        },
         'status': 500
     }), 500
 
@@ -59,16 +62,28 @@ def not_found_error(error):
     current_app.logger.info(f'ページが見つかりません: {request.url}')
     return jsonify({
         'success': False,
-        'error': 'リクエストされたページが見つかりません。',
+        'error': {
+            'message': 'リクエストされたページが見つかりません。',
+            'code': 'NOT_FOUND'
+        },
         'status': 404
     }), 404
 
 @main_bp.app_errorhandler(400)
 def bad_request_error(error):
-    current_app.logger.warning(f'不正なリクエスト: {str(error)}')
+    # BadRequest 例外から元のメッセージを取得しようと試みる
+    # werkzeug.exceptions.BadRequest は description 属性にメッセージを持つ
+    message = str(error)
+    if hasattr(error, 'description') and error.description:
+        message = error.description
+        
+    current_app.logger.warning(f'不正なリクエスト: {message}')
     return jsonify({
         'success': False,
-        'error': f'Invalid JSON: {str(error)}',
+        'error': {
+            'message': f'不正なリクエストです: {message}',
+            'code': 'BAD_REQUEST'
+        },
         'status': 400
     }), 400
 
@@ -82,16 +97,6 @@ def index():
     """トップページのルート"""
     current_app.logger.info('トップページにアクセスがありました')
     return render_template('index.html')
-
-# ヘルパー関数: 非同期処理の実行
-def run_async_task(coro):
-    """非同期コルーチンを同期的に実行するヘルパー関数"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 # スクレイピングと生成を非同期で行う関数
 async def process_template_generation(keyword: str, gender: str, season: str = None) -> list:
@@ -140,24 +145,30 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     return templates
 
 @main_bp.route('/api/generate', methods=['POST'])
-def generate():
+async def generate():
     """テンプレート生成のAPIエンドポイント"""
     try:
         # 不正なJSONリクエストの場合は400エラーを返す
         if request.is_json is False and request.data:
-            current_app.logger.warning('不正なJSONリクエストを受信しました')
+            current_app.logger.warning('不正なJSONリクエストを受信しました (Content-Typeが正しくないか、JSON形式ではありません)')
             return jsonify({
                 'success': False,
-                'error': 'Invalid JSON: The request payload is not valid JSON',
+                'error': {
+                    'message': 'リクエストの形式が正しくありません。Content-Typeがapplication/jsonであること、有効なJSONであることを確認してください。',
+                    'code': 'INVALID_JSON'
+                },
                 'status': 400
             }), 400
             
-        data = request.get_json()
-        if not data:
-            current_app.logger.warning('リクエストデータがありません')
+        data = request.get_json() # ここで BadRequest が発生する可能性があり、app_errorhandler(400) で処理される
+        if data is None: # request.get_json() はパース失敗時にNoneを返すことがある (force=Falseの場合など)。通常はBadRequest。
+            current_app.logger.warning('リクエストボディが空か、JSONとしてパースできませんでした。')
             return jsonify({
                 'success': False,
-                'error': 'リクエストデータが不正です。キーワードを入力してください。',
+                'error': {
+                    'message': 'リクエストボディが空か、JSONとしてパースできませんでした。',
+                    'code': 'INVALID_JSON'
+                },
                 'status': 400
             }), 400
         
@@ -171,25 +182,34 @@ def generate():
         if not keyword:
             return jsonify({
                 'success': False,
-                'error': 'キーワードを入力してください。',
+                'error': {
+                    'message': 'キーワードを入力してください。',
+                    'code': 'VALIDATION_ERROR'
+                },
                 'status': 400
             }), 400
             
         if gender not in ['ladies', 'mens']:
             return jsonify({
                 'success': False,
-                'error': '無効な性別が指定されました。',
+                'error': {
+                    'message': '無効な性別が指定されました。ladies または mens を指定してください。',
+                    'code': 'VALIDATION_ERROR'
+                },
                 'status': 400
             }), 400
             
-        # 非同期処理を同期的に実行
-        templates = run_async_task(process_template_generation(keyword, gender, season))
+        # 非同期処理を直接 await
+        templates = await process_template_generation(keyword, gender, season)
         
         if not templates:
             return jsonify({
                 'success': False,
-                'error': '一致するヘアスタイルが見つかりませんでした。別のキーワードをお試しください。',
-                'status': 404
+                'error': {
+                    'message': '一致するヘアスタイルが見つかりませんでした。別のキーワードをお試しください。',
+                    'code': 'NO_RESULTS_FOUND'
+                },
+                'status': 404 # 該当なしなので404
             }), 404
         
         return jsonify({
@@ -199,26 +219,42 @@ def generate():
         })
         
     except BadRequest as e:
-        current_app.logger.warning(f'不正なJSONリクエスト: {str(e)}')
+        current_app.logger.warning(f'不正なJSONリクエスト (BadRequest例外): {str(e)}')
+        # この例外は app_errorhandler(400) で処理されるので、ここでは再raiseするか、
+        # もし app_errorhandler が期待通りに動作しない場合のフォールバックとして残す
+        # 今回は app_errorhandler に処理を委ねるため、このブロックは理論上到達しないはず
+        # ただし、より具体的なエラーコードを返したい場合はここで処理する
         return jsonify({
             'success': False,
-            'error': f'Invalid JSON: {str(e)}',
+            'error': {
+                'message': f'リクエストの解析に失敗しました: {e.description if hasattr(e, "description") else str(e)}',
+                'code': 'INVALID_JSON' # BadRequest は大抵JSON関連なので
+            },
             'status': 400
         }), 400
         
     except ValueError as e:
-        current_app.logger.warning(f'不正なリクエスト: {str(e)}')
+        current_app.logger.warning(f'不正なリクエスト (ValueError): {str(e)}')
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': {
+                'message': f'リクエストデータが不正です: {str(e)}',
+                'code': 'VALIDATION_ERROR' # ValueErrorは主にバリデーションエラーとして扱う
+            },
             'status': 400
         }), 400
         
     except Exception as e:
-        current_app.logger.error(f'テンプレート生成中にエラー: {str(e)}')
+        current_app.logger.error(f'テンプレート生成中に予期せぬエラー: {str(e)}', exc_info=True)
+        # この例外は app_errorhandler(500) で処理されるので、ここでは再raiseするか、
+        # もし app_errorhandler が期待通りに動作しない場合のフォールバックとして残す
+        # 通常は app_errorhandler に任せる
         return jsonify({
             'success': False,
-            'error': 'テンプレート生成中にエラーが発生しました。',
+            'error': {
+                'message': 'テンプレート生成中に予期せぬエラーが発生しました。',
+                'code': 'INTERNAL_SERVER_ERROR'
+            },
             'status': 500
         }), 500
 
