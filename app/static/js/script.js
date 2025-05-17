@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
         
         try {
-            const response = await fetch('/generate', {
+            const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
