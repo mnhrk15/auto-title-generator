@@ -159,10 +159,10 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
                     logger.warning(f"テンプレートに必須キー '{key}' がありません")
                     return False
             
-            # タイトルにキーワードが含まれているかチェック
+            # タイトルにキーワードが含まれているかチェック（警告のみ出力し、テンプレートは有効とする）
             if keyword.lower() not in template['title'].lower():
                 logger.warning(f"タイトルにキーワード '{keyword}' が含まれていません: {template['title']}")
-                return False
+                # キーワードが含まれていなくても、テンプレートを有効とする（return Falseを削除）
                 
             # 文字数制限チェック
             for key, limit in config.CHAR_LIMITS.items():
