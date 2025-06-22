@@ -1,1 +1,1 @@
-web: gunicorn run:app -c gunicorn.conf.py 
+web: gunicorn asgi:app -c gunicorn.conf.py 

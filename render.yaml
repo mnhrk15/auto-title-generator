@@ -3,7 +3,7 @@ services:
     name: template-generator
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn run:app -c gunicorn.conf.py
+    startCommand: gunicorn asgi:app -c gunicorn.conf.py
     envVars:
       - key: FLASK_SECRET_KEY
         generateValue: true
