@@ -1,31 +1,6 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ヘアスタイルタイトルジェネレーター</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    
-    <!-- レスポンシブデザインテスト用のスタイル -->
-    <style>
-        .responsive-debug {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 9999;
-            display: none;
-        }
-    </style>
-</head>
-<body>
 <header class="app-header">
     <div class="app-header-content">
         <div class="logo">
@@ -256,12 +231,12 @@
                     <div class="field-label-group">
                         <i class="fas fa-comment"></i>
                         <span>コメント</span>
-                        <span class="field-info">（100文字以内）</span>
+                        <span class="field-info">（120文字以内）</span>
                     </div>
-                    <span class="char-count comment-count">0/100</span>
+                    <span class="char-count comment-count">0/120</span>
                 </label>
                 <div class="textarea-container">
-                    <textarea class="comment" maxlength="100" rows="3" placeholder="コメントを入力してください"></textarea>
+                    <textarea class="comment" maxlength="120" rows="3" placeholder="コメントを入力してください"></textarea>
                     <button class="field-copy-btn" data-field="comment" title="コメントをコピー">
                         <i class="fas fa-copy"></i>
                     </button>
@@ -272,12 +247,12 @@
                     <div class="field-label-group">
                         <i class="fas fa-hashtag"></i>
                         <span>ハッシュタグ</span>
-                        <span class="field-info">（50文字以内）</span>
+                        <span class="field-info">（カンマ区切り, 各20文字以内）</span>
                     </div>
-                    <span class="char-count hashtag-count">0/50</span>
+                    <span class="char-count hashtag-count"></span>
                 </label>
                 <div class="textarea-container">
-                    <textarea class="hashtag" maxlength="50" rows="2" placeholder="ハッシュタグを入力してください"></textarea>
+                    <textarea class="hashtag" rows="2" placeholder="ハッシュタグをカンマ区切りで入力してください"></textarea>
                     <button class="field-copy-btn" data-field="hashtag" title="ハッシュタグをコピー">
                         <i class="fas fa-copy"></i>
                     </button>
@@ -327,6 +302,4 @@
         }
     });
 </script>
-</body>
-</html>
 {% endblock %} 
