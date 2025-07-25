@@ -36,11 +36,13 @@ class TestTemplateGeneratorIntegration:
             assert len(template["comment"]) <= config.CHAR_LIMITS["comment"]
             
             # ハッシュタグの検証
-            hashtags = template["hashtag"].split(",")
-            assert all(len(tag.strip()) <= config.CHAR_LIMITS["hashtag"] for tag in hashtags)
-            assert len(hashtags) >= 1
+            assert isinstance(template["hashtag"], list)
+            assert all(isinstance(tag, str) for tag in template["hashtag"])
+            assert all(len(tag) <= config.CHAR_LIMITS["hashtag"] for tag in template["hashtag"])
+            assert len(template["hashtag"]) >= 7
             
-    def test_generate_templates_with_multiple_titles(self, generator):
+    @pytest.mark.asyncio
+    async def test_generate_templates_with_multiple_titles(self, generator):
         """複数のタイトルを入力として使用した場合のテスト"""
         titles = [
             "★髪質改善トリートメントで艶髪ストレート",
@@ -49,7 +51,7 @@ class TestTemplateGeneratorIntegration:
         ]
         keyword = "髪質改善"
         
-        templates = generator.generate_templates(titles, keyword)
+        templates = await generator.generate_templates_async(titles, keyword)
         
         assert isinstance(templates, list)
         assert len(templates) <= config.MAX_TEMPLATES
@@ -58,13 +60,14 @@ class TestTemplateGeneratorIntegration:
         generated_titles = [template["title"] for template in templates]
         assert not any(title in titles for title in generated_titles)
         
-    def test_generate_templates_with_different_keywords(self, generator):
+    @pytest.mark.asyncio
+    async def test_generate_templates_with_different_keywords(self, generator):
         """異なるキーワードでの生成テスト"""
         titles = ["★髪質改善トリートメントで艶髪ストレート"]
         keywords = ["髪質改善", "透明感カラー", "艶髪"]
         
         for keyword in keywords:
-            templates = generator.generate_templates(titles, keyword)
+            templates = await generator.generate_templates_async(titles, keyword)
             
             assert isinstance(templates, list)
             assert len(templates) <= config.MAX_TEMPLATES
@@ -73,8 +76,9 @@ class TestTemplateGeneratorIntegration:
             for template in templates:
                 assert keyword in template["title"]
                 
-    def test_api_error_handling(self, generator):
+    @pytest.mark.asyncio
+    async def test_api_error_handling(self, generator):
         """APIエラー時の処理をテスト"""
         # 無効な入力を使用してエラーを発生させる
         with pytest.raises(ValueError):
-            generator.generate_templates([], "")  # 空のタイトルリストと空のキーワード 
+            await generator.generate_templates_async([], "")  # 空のタイトルリストと空のキーワード 
