@@ -16,9 +16,12 @@ class TemplateGenerator:
         self.model = genai.GenerativeModel('gemini-2.0-flash')
         logger.info("TemplateGeneratorが初期化されました")
         
-    def _create_prompt(self, titles: List[str], keyword: str, season: str = None) -> str:
+    def _create_prompt(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies') -> str:
         """プロンプトテンプレートの作成"""
         titles_json = json.dumps(titles, ensure_ascii=False, indent=2)
+        
+        # 性別に応じた設定
+        gender_name = "レディース" if gender == 'ladies' else "メンズ"
         
         season_intro = ""
         season_instruction = ""
@@ -53,15 +56,17 @@ class TemplateGenerator:
 """
 
         prompt = f"""
-あなたは日本の美容トレンドに詳しく、魅力的なコピーライティングが得意なマーケターです。
+あなたは日本の{gender_name}美容トレンドに詳しく、魅力的なコピーライティングが得意なマーケターです。
 HotPepper Beautyの人気サロンで使用されている、効果的なタイトルやキャッチコピーの特徴を熟知しています。
 {season_intro}
-以下のヘアスタイルタイトルリストは、HotPepper Beautyで「{keyword}」というキーワードで検索して得られた結果です：
+以下の{gender_name}ヘアスタイルタイトルリストは、HotPepper Beautyで「{keyword}」というキーワードで検索して得られた結果です：
 
 {titles_json}
 
-上記リストとキーワード「{keyword}」を参考に、最新トレンドを反映した、新しい魅力的なヘアスタイルタイトル案を{config.MAX_TEMPLATES}つ生成してください。
-タイトルには必ずキーワード「{keyword}」を含め、合計で**5つ以上**のキーワードを盛り込んでください。これにより検索露出を最大化し、より多くのユーザーにアピールできます。
+
+上記リストとキーワード「{keyword}」を参考に、最新トレンドを反映した、新しい魅力的な{gender_name}ヘアスタイルタイトル案を{config.MAX_TEMPLATES}つ生成してください。
+タイトルには必ずキーワード「{keyword}」を含め、合計で**5つ以上**のキーワードを盛り込んでください。(例:ブリーチなし/ダブルカラー/初カラー/20代30代40代/春カラー/透明感) これにより検索露出を最大化し、より多くのユーザーにアピールできます。
+
 多くのキーワードを盛り込むことは重要ですが、同時に指定された文字数制限も厳守してください。
 
 **掘り下げキーワードの活用:** 提供されたリストや一般的な表現から一歩踏み込み、スタイルや技術をより具体的に表現する『掘り下げキーワード』を積極的に使用してください。例えば、『ショートヘア』だけでなく『小顔ショート』『ハンサムショート』、『メンズパーマ』だけでなく『スパイラルパーマ』や『ツイストパーマ』のように、より専門的で顧客の具体的なイメージを喚起する言葉を選びましょう。これにより、他の一般的なタイトルとの差別化を図り、顧客の検索意図により合致した提案が可能になります。
@@ -146,7 +151,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
   ...
 ]
 """
-        logger.debug(f"プロンプト作成: 入力タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}'")
+        logger.debug(f"プロンプト作成: 入力タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}'")
         return prompt
         
     def _validate_template(self, template: Dict[str, str], keyword: str) -> bool:
@@ -194,7 +199,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             logger.error(f"テンプレート検証エラー: {str(e)}")
             return False
     
-    async def generate_templates_async(self, titles: List[str], keyword: str, season: str = None) -> List[Dict[str, str]]:
+    async def generate_templates_async(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies') -> List[Dict[str, str]]:
         """テンプレートの非同期生成"""
         # 入力検証を追加
         if not titles:
@@ -204,10 +209,11 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             logger.error("キーワードが指定されていません")
             raise ValueError("キーワードが指定されていません")
             
-        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}'")
-        prompt = self._create_prompt(titles, keyword, season)
+        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}'")
+        prompt = self._create_prompt(titles, keyword, season, gender)
         
         try:
+            logger.debug(f"生成されたプロンプト全体:\n{prompt}")
             logger.info("Gemini APIリクエスト送信中...")
             # google-generativeai ライブラリの非同期メソッドを直接呼び出す
             response = await self.model.generate_content_async(prompt)
@@ -264,12 +270,12 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             logger.error(f"テンプレート生成エラー: {str(e)}")
             raise Exception(f"Template generation failed: {str(e)}")
         
-    def generate_templates(self, titles: List[str], keyword: str, season: str = None) -> List[Dict[str, str]]:
+    def generate_templates(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies') -> List[Dict[str, str]]:
         """テンプレートの生成（同期版ラッパー）"""
-        logger.info(f"同期版 generate_templates が呼び出されました - キーワード: '{keyword}', シーズン: '{season}' - 内部で非同期処理を実行します")
+        logger.info(f"同期版 generate_templates が呼び出されました - キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}' - 内部で非同期処理を実行します")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.generate_templates_async(titles, keyword, season))
+            return loop.run_until_complete(self.generate_templates_async(titles, keyword, season, gender))
         finally:
             loop.close()
