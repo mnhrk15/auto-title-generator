@@ -111,6 +111,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     
     # スクレイピング結果をログに記録
     if titles:
+        current_app.logger.debug(f"スクレイピングで取得した全タイトルリスト: {titles}")
         current_app.logger.info(f'スクレイピング結果のタイトル例 (最大10件):')
         for i, title_text in enumerate(titles[:10]):
             current_app.logger.info(f'  {i+1}: {title_text}')
@@ -125,7 +126,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     # 非同期でテンプレート生成を実行
     current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, シーズン: "{season}"')
     generator = TemplateGenerator()
-    templates = await generator.generate_templates_async(titles, keyword, season)
+    templates = await generator.generate_templates_async(titles, keyword, season, gender)
     
     current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
     

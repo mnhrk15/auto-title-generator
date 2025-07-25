@@ -102,7 +102,7 @@ class HotPepperScraper:
                     # ページURLの構築
                     url = f"{base_url}?keyword={encoded_keyword}"
                     if page > 1:
-                        url += f"&page={page}"
+                        url += f"&pn={page}"
                     
                     logger.info(f"ページ {page} をスクレイピング中: {url}")
                     
@@ -159,8 +159,11 @@ class HotPepperScraper:
                     logger.error(f"ページ {page} の取得中にエラーが発生: {str(e)}")
                     break
             
-            logger.info(f"スクレイピング完了: {len(titles)} 件のタイトルを取得しました")
-            return titles
+            # 重複を除去して元の順序を維持
+            unique_titles = list(dict.fromkeys(titles))
+            
+            logger.info(f"スクレイピング完了: {len(titles)} 件のタイトルを取得後、重複を除き {len(unique_titles)} 件になりました")
+            return unique_titles
             
         except Exception as e:
             logger.error(f"スクレイピング中に予期せぬエラーが発生: {str(e)}")
