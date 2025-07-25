@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
         steps: [
             { name: 'スクレイピング中...', percent: 20, duration: 5000 },
             { name: 'タイトル解析中...', percent: 40, duration: 3000 },
-            { name: 'テンプレート生成中...', percent: 85, duration: 5000 },
-            { name: '完了', percent: 100, duration: 500 }
+            { name: 'テンプレート生成中...', percent: 85, duration: 10000 },
+            { name: '完了', percent: 100, duration: 100 }
         ],
         interval: null,
         subInterval: null
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const keyword = keywordInput.value.trim();
         const gender = document.querySelector('input[name="gender"]:checked').value;
         const season = document.getElementById('season').value;
-        const model = document.getElementById('model').value;
+        const model = 'gemini-2.5-flash'; // デフォルトでGemini Flashを使用
         
         if (!keyword) {
             showError('キーワードを入力してください。');
