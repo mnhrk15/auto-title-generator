@@ -1,19 +1,21 @@
+# Render Deployment Configuration
+# Optimized for Gemini 2.5 Flash Lite with thinking_budget=0 performance
 services:
   - type: web
     name: template-generator
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn asgi:app -c gunicorn.conf.py
+    startCommand: gunicorn asgi:app -c gunicorn.conf.py  # ASGI-enabled for async support
     envVars:
       - key: FLASK_SECRET_KEY
         generateValue: true
       - key: FLASK_DEBUG
-        value: False
+        value: False  # Production mode
       - key: GEMINI_API_KEY
-        sync: false
+        sync: false  # Set manually in Render dashboard (required for AI generation)
       - key: SCRAPING_DELAY_MIN
-        value: 1
+        value: 1  # Rate limiting for HotPepper Beauty scraping
       - key: SCRAPING_DELAY_MAX
-        value: 2
+        value: 2  # Rate limiting for HotPepper Beauty scraping
       - key: MAX_PAGES
-        value: 1
+        value: 1  # Optimized for fast scraping with minimal resource usage

@@ -99,9 +99,9 @@ def index():
     return render_template('index.html')
 
 # スクレイピングと生成を非同期で行う関数
-async def process_template_generation(keyword: str, gender: str, season: str = None) -> list:
+async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-2.5-flash-lite') -> list:
     """スクレイピングとテンプレート生成を非同期で処理する"""
-    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}"')
+    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", モデル: "{model}"')
     
     # 非同期でスクレイピングを実行
     async with HotPepperScraper() as scraper:
@@ -124,8 +124,8 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
         return []
         
     # 非同期でテンプレート生成を実行
-    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, シーズン: "{season}"')
-    generator = TemplateGenerator()
+    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, シーズン: "{season}", モデル: "{model}"')
+    generator = TemplateGenerator(model_name=model)
     templates = await generator.generate_templates_async(titles, keyword, season, gender)
     
     current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
@@ -176,9 +176,10 @@ async def generate():
         keyword = data.get('keyword')
         gender = data.get('gender', 'ladies')
         season = data.get('season') # 'none' や空文字の場合もありうる
+        model = data.get('model', 'gemini-2.5-flash-lite') # モデル選択
         num_templates = int(data.get('num_templates', 5)) # この変数は現在 process_template_generation で使われていないが、将来のために残す
         
-        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", テンプレート数: {num_templates}')
+        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", モデル: "{model}", テンプレート数: {num_templates}')
         
         if not keyword:
             return jsonify({
@@ -201,7 +202,7 @@ async def generate():
             }), 400
             
         # 非同期処理を直接 await
-        templates = await process_template_generation(keyword, gender, season)
+        templates = await process_template_generation(keyword, gender, season, model)
         
         if not templates:
             return jsonify({
