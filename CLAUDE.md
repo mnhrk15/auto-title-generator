@@ -36,20 +36,23 @@ gunicorn asgi:app -c gunicorn.conf.py
 # Run all tests
 pytest tests/
 
-# Run specific test file
-pytest tests/test_generator.py
-
-# Run with coverage
-pytest tests/ --cov=app
-
-# Run specific test with verbose output
-pytest tests/test_integration.py -v
-
-# Run async tests specifically
+# Run all tests with async support (recommended)
 pytest tests/ --asyncio-mode=auto
+
+# Run specific test file
+pytest tests/test_generator.py -v
+
+# Run with coverage report
+pytest tests/ --cov=app --cov-report=html
+
+# Run integration tests (requires GEMINI_API_KEY)
+pytest tests/test_integration.py -v
 
 # Run tests excluding UI tests (if Selenium not available)
 pytest tests/ -k "not test_ui"
+
+# Run tests with detailed output and show local variables on failure
+pytest tests/ -vvs --tb=long
 ```
 
 ### Deployment
@@ -95,14 +98,15 @@ The application is configured for Render deployment:
 ## Important Technical Considerations
 
 ### Environment Variables (Required)
-- `GEMINI_API_KEY`: Google Gemini API key (required for AI generation)
-- `FLASK_SECRET_KEY`: Flask session security key
+- `GEMINI_API_KEY`: Google Gemini API key (required for AI generation) - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
+- `FLASK_SECRET_KEY`: Flask session security key (use secure random string in production)
 - `FLASK_DEBUG`: Set to 'True' for development, 'False' for production
-- `FLASK_HOST`: Default '0.0.0.0' for Render deployment
-- `PORT`: Server port (Render automatically provides this)
-- `SCRAPING_DELAY_MIN/MAX`: Rate limiting for web scraping (default: 1-3 seconds)
-- `MAX_PAGES`: Limit for scraping pages per request (default: 3, production: 1)
+- `FLASK_HOST`: Default '0.0.0.0' for Render deployment, '127.0.0.1' for local development
+- `PORT`: Server port (Render automatically provides this, defaults to 5000 locally)
+- `SCRAPING_DELAY_MIN/MAX`: Rate limiting for web scraping (default: 1-3 seconds, increase if getting blocked)
+- `MAX_PAGES`: Limit for scraping pages per request (default: 3, production: 1 for faster performance)
 - `FLASK_ENV`: Set to 'production' for SSL verification in scraping
+- `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL - default: INFO)
 
 ### Google Gemini SDK Configuration
 
@@ -111,13 +115,14 @@ The application is configured for Render deployment:
 **New SDK (Primary)**: `google-genai 1.27.0`
 - Supports thinking_budget parameter for performance optimization
 - Used in `TemplateGenerator` constructor: `self.client = new_genai.Client(api_key=config.GEMINI_API_KEY)`
-- Ultra-fast generation with `thinking_budget=0` setting
-- Model: `gemini-2.5-flash-lite`
+- Ultra-fast generation with `thinking_budget=0` setting (disables internal reasoning)
+- Model: `gemini-2.5-flash-lite` for maximum speed
+- Located at `app/generator.py:27`
 
 **Legacy SDK (Fallback)**: `google-generativeai 0.8.5`
-- Automatic fallback when new SDK fails
+- Automatic fallback when new SDK fails (see `app/generator.py:249`)
 - Used via: `genai.GenerativeModel('gemini-2.5-flash-lite')`
-- Maintains backward compatibility
+- Maintains backward compatibility for all deployment environments
 
 **Performance Optimization**:
 ```python
