@@ -1781,51 +1781,56 @@ textarea:focus {
     100% { transform: rotate(360deg); }
 }
 
-/* Style for the season selection dropdown to match other input fields */
-.search-box .input-wrapper.season-selection {
+/* Style for the season and model selection dropdowns to match other input fields */
+.search-box .input-wrapper.season-selection,
+.search-box .input-wrapper.model-selection {
     display: flex;
     align-items: center;
-    /* flex-grow: 1; /* Take up available space if needed, or set a specific width */
-    /* margin-right: 10px; /* Adjust spacing as needed */
+    position: relative;
 }
 
-.season-icon {
+.season-icon, .model-icon {
     position: absolute; /* Changed from relative for better alignment within wrapper */
     left: 15px; /* Match search-icon if it's similar */
-    color: var(--icon-color, #aaa); /* Use existing icon color variable or a suitable default */
+    color: var(--text-color-light); /* Use consistent icon color */
     font-size: 0.9em; /* Match other icons */
     pointer-events: none; /* Allow clicks to pass through to the select */
+    z-index: 2;
 }
 
-.season-select {
+.season-select, .model-select {
     flex-grow: 1;
     width: 100%; /* Make select take full width of its wrapper */
     height: var(--input-height, 48px); /* Match existing input height */
     padding: 0.75rem 1rem 0.75rem 2.5rem; /* Adjust left padding for icon */
     font-size: var(--input-font-size, 1rem);
-    border: 1px solid var(--border-color, #ddd);
-    border-radius: var(--border-radius-md, 6px);
-    background-color: var(--input-bg, #fff);
-    color: var(--text-color, #333);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    background-color: var(--card-bg);
+    color: var(--text-color);
     appearance: none; /* Remove default browser arrow */
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23aaa' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E"); /* Custom arrow */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236c757d' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E"); /* Custom arrow */
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 1em;
     cursor: pointer;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: all var(--transition-fast) var(--transition-ease);
+    box-shadow: var(--shadow-sm);
 }
 
-.season-select:hover {
-    border-color: var(--primary-color-light, #777);
+.season-select:hover, .model-select:hover {
+    border-color: var(--primary-color-light);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
 }
 
-.season-select:focus {
+.season-select:focus, .model-select:focus {
     outline: none;
-    border-color: var(--primary-color, #007bff);
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15); /* Use existing focus shadow or adjust */
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+    transform: translateY(-1px);
 }
 
 /* Adjustments for the search-box layout if needed */
@@ -1841,10 +1846,11 @@ textarea:focus {
     min-width: 200px; /* Minimum width for keyword input */
 }
 
-.search-box > .input-wrapper.season-selection {
-    flex-grow: 0; /* Season select takes less space */
-    flex-basis: 200px; /* Base width for season select, adjust as needed */
-     min-width: 180px;
+.search-box > .input-wrapper.season-selection,
+.search-box > .input-wrapper.model-selection {
+    flex-grow: 0; /* Season/Model select takes less space */
+    flex-basis: 200px; /* Base width for selects, adjust as needed */
+    min-width: 180px;
 }
 
 .search-box > .primary-button {
@@ -1877,12 +1883,32 @@ textarea:focus {
     }
     .search-box > .input-wrapper,
     .search-box > .input-wrapper.season-selection,
+    .search-box > .input-wrapper.model-selection,
     .search-box > .primary-button {
         width: 100%;
         flex-basis: auto;
         margin-right: 0; /* Remove right margin if any for stacked layout */
     }
-    .season-select {
+    .season-select, .model-select {
         padding: 0.75rem 1rem 0.75rem 2.5rem; /* Ensure padding is consistent */
+    }
+}
+
+/* Additional mobile optimization for model selection */
+@media (max-width: 576px) {
+    .search-box > .input-wrapper.season-selection,
+    .search-box > .input-wrapper.model-selection {
+        flex-basis: auto;
+        min-width: auto;
+    }
+    
+    .season-select, .model-select {
+        font-size: 0.9rem;
+        padding: 0.7rem 1rem 0.7rem 2.3rem;
+    }
+    
+    .season-icon, .model-icon {
+        left: 12px;
+        font-size: 0.85em;
     }
 } 

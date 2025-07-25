@@ -1,4 +1,6 @@
 import google.generativeai as genai
+from google import genai as new_genai
+from google.genai import types
 from typing import List, Dict
 import json
 import logging
@@ -9,12 +11,24 @@ from . import config
 logger = logging.getLogger(__name__)
 
 class TemplateGenerator:
-    def __init__(self):
+    def __init__(self, model_name='gemini-2.5-flash-lite'):
         if not config.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set")
+        
+        # サポートされているモデルの検証
+        supported_models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
+        if model_name not in supported_models:
+            logger.warning(f"Unsupported model: {model_name}, falling back to gemini-2.5-flash-lite")
+            model_name = 'gemini-2.5-flash-lite'
+        
+        self.model_name = model_name
+        
+        # 新しいSDKのクライアント初期化
+        self.client = new_genai.Client(api_key=config.GEMINI_API_KEY)
+        # 旧SDKとの互換性のため
         genai.configure(api_key=config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
-        logger.info("TemplateGeneratorが初期化されました")
+        self.model = genai.GenerativeModel(model_name)
+        logger.info(f"TemplateGeneratorが初期化されました（新SDK対応、モデル: {model_name}）")
         
     def _create_prompt(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies') -> str:
         """プロンプトテンプレートの作成"""
@@ -214,10 +228,34 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
         
         try:
             logger.debug(f"生成されたプロンプト全体:\n{prompt}")
-            logger.info("Gemini APIリクエスト送信中...")
-            # google-generativeai ライブラリの非同期メソッドを直接呼び出す
-            response = await self.model.generate_content_async(prompt)
-            response_text = response.text
+            logger.info("Gemini APIリクエスト送信中（新SDK + thinking_budget=0）...")
+            
+            # 新しいSDKでthinking_budget=0を設定
+            try:
+                config_with_thinking = types.GenerateContentConfig(
+                    temperature=0.7,
+                    max_output_tokens=8192,
+                    thinking_config=types.ThinkingConfig(
+                        thinking_budget=0  # 高速化のため思考プロセスを無効化
+                    )
+                )
+                response = await self.client.aio.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=config_with_thinking
+                )
+                response_text = response.text
+                logger.info("新SDK使用（thinking_budget=0）")
+            except Exception as e:
+                logger.warning(f"新SDK使用失敗、旧SDKにフォールバック: {str(e)}")
+                # 旧SDKにフォールバック
+                generation_config = genai.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=8192,
+                )
+                response = await self.model.generate_content_async(prompt, generation_config=generation_config)
+                response_text = response.text
+                logger.info("旧SDK使用")
             logger.debug(f"Gemini APIレスポンス受信: 文字数 {len(response_text)}")
             
             # JSON文字列の抽出（レスポンスにマークダウンなどが含まれている可能性があるため）

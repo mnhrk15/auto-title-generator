@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const keyword = keywordInput.value.trim();
         const gender = document.querySelector('input[name="gender"]:checked').value;
         const season = document.getElementById('season').value;
+        const model = document.getElementById('model').value;
         
         if (!keyword) {
             showError('キーワードを入力してください。');
@@ -89,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ keyword, gender, season })
+                body: JSON.stringify({ keyword, gender, season, model })
             });
             
             const data = await response.json();
