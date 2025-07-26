@@ -1,0 +1,25 @@
+[
+  {
+    "name": "有効なキーワード",
+    "keyword": "有効キーワード",
+    "gender": "ladies",
+    "condition": "有効な条件"
+  },
+  {
+    "name": "無効なキーワード1",
+    "keyword": "無効キーワード1",
+    "gender": "invalid_gender",
+    "condition": "無効な性別値"
+  },
+  {
+    "keyword": "名前なし",
+    "gender": "mens",
+    "condition": "名前フィールドが欠落"
+  },
+  {
+    "name": "",
+    "keyword": "空の名前",
+    "gender": "ladies",
+    "condition": "空の名前フィールド"
+  }
+]

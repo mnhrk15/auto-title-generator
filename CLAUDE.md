@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 2.5 Flash AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance.
+This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 2.5 Flash AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, streamlined UI with blue color theme, and real-time keyword updates.
 
 ## Common Development Commands
 

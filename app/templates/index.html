@@ -55,6 +55,20 @@
             </div>
         </div>
 
+        <!-- 特集キーワードセクション -->
+        <div class="featured-keywords-section">
+            <h3 class="featured-keywords-title">
+                今月の特集キーワード
+            </h3>
+            <div class="featured-keywords-container" id="featured-keywords-container">
+                <!-- JavaScriptで動的に生成 -->
+                <div class="featured-keywords-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    特集キーワードを読み込み中...
+                </div>
+            </div>
+        </div>
+
         <!-- ガイドセクションを折りたたみ可能に変更 -->
         <details class="guide-collapsible">
             <summary class="guide-summary">
@@ -189,6 +203,11 @@
                 <i class="fas fa-bookmark"></i>
                 <span>テンプレート</span>
             </span>
+            <!-- 特集対応テンプレート識別マーク -->
+            <div class="featured-indicator" style="display: none;">
+                <i class="fas fa-star"></i>
+                <span>特集対応</span>
+            </div>
             <div class="card-actions-mini">
                 <i class="fas fa-pen-fancy" title="編集中"></i>
             </div>
