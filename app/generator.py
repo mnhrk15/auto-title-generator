@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from google import genai as new_genai
 from google.genai import types
-from typing import List, Dict
+from typing import List, Dict, Optional
 import json
 import logging
 import asyncio
@@ -30,7 +30,7 @@ class TemplateGenerator:
         self.model = genai.GenerativeModel(model_name)
         logger.info(f"TemplateGeneratorが初期化されました（新SDK対応、モデル: {model_name}）")
         
-    def _create_prompt(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies') -> str:
+    def _create_prompt(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> str:
         """プロンプトテンプレートの作成"""
         titles_json = json.dumps(titles, ensure_ascii=False, indent=2)
         
@@ -69,10 +69,66 @@ class TemplateGenerator:
     - 特定のシーズン指定はありませんが、もし可能であれば、美容トレンドに合ったシーズンワードを適宜取り入れてください。必須ではありません。
 """
 
+        # 混在キーワード処理のための生成コンテキスト解析
+        context = generation_context or {}
+        keyword_type = context.get('keyword_type', 'normal')
+        processing_mode = context.get('processing_mode', 'standard')
+        original_keyword = context.get('original_keyword', keyword)
+        
+        # 特集キーワード用のプロンプト強化ロジック（混在処理対応）
+        featured_instruction = ""
+        if featured_info:
+            try:
+                # 特集情報の検証
+                if not isinstance(featured_info, dict):
+                    logger.warning(f"特集情報が辞書形式ではありません: {type(featured_info)} - 特集機能をスキップ")
+                elif 'condition' not in featured_info or not featured_info['condition']:
+                    logger.warning("特集情報に条件が含まれていません - 特集機能をスキップ")
+                else:
+                    condition = str(featured_info['condition']).strip()
+                    if len(condition) > 1000:  # 条件文の長さ制限
+                        logger.warning(f"特集条件文が長すぎます ({len(condition)} > 1000文字) - 切り詰めます")
+                        condition = condition[:1000] + "..."
+                    
+                    # 混在キーワード処理に応じた指示文の調整
+                    if keyword_type == "mixed":
+                        featured_instruction = f"""
+
+【重要】特集掲載条件の厳守（混在キーワード処理）
+入力されたキーワード「{original_keyword}」には特集キーワード「{featured_info.get('name', keyword)}」が含まれています。
+以下の特集掲載条件を絶対に満たすテンプレートを生成してください：
+
+{condition}
+
+混在キーワード処理のため、特集キーワードの条件を最優先としつつ、
+他のキーワード要素も適切に組み込んでください。
+特集掲載の対象外とならないよう、上記の条件を厳密に守ってください。
+
+"""
+                    else:
+                        featured_instruction = f"""
+
+【重要】特集掲載条件の厳守
+このキーワード「{keyword}」は今月の特集キーワードです。
+以下の条件を絶対に満たすテンプレートを生成してください：
+
+{condition}
+
+この条件を満たさないテンプレートは特集掲載の対象外となるため、
+必ず上記の条件を最優先事項として考慮してください。
+特に、タイトル生成時には上記の条件を厳密に守り、
+指定されたキーワードや表現を必ず含めるようにしてください。
+
+"""
+                    logger.debug(f"特集プロンプト強化を適用: キーワード '{keyword}', タイプ: {keyword_type}")
+            except Exception as e:
+                logger.error(f"特集プロンプト生成中にエラー: {str(e)} - 特集機能をスキップ")
+                featured_instruction = ""
+
         prompt = f"""
 あなたは日本の{gender_name}美容トレンドに詳しく、魅力的なコピーライティングが得意なマーケターです。
 HotPepper Beautyの人気サロンで使用されている、効果的なタイトルやキャッチコピーの特徴を熟知しています。
-{season_intro}
+{season_intro}{featured_instruction}
 以下の{gender_name}ヘアスタイルタイトルリストは、HotPepper Beautyで「{keyword}」というキーワードで検索して得られた結果です：
 
 {titles_json}
@@ -145,7 +201,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
 - 他サロンとの差別化ポイントを強調
 - **必ず90-120文字の範囲で生成してください**
 
-**良いコメント例（90-120文字を目安）:**
+**良いコメント例（100-120文字を目安）:**
 *   `透けるような透明感のミルクティーグレージュ。ブリーチよりも傷まず、ノンカラーよりも圧倒的に透明感がでるので、現状の髪色が暗めの方、いつもオレンジになってしまう方はこちらがおススメです♪` (92文字)
 *   `大人気のハイトーンカラー＊綺麗なハイトーンを維持するには2ヶ月半でのリタッチがオススメです＊綺麗なブリーチのベースを作ることで色落ちも気になりにくくなり、ストレスなくハイトーンを続けられます＊ぜひお任せください！` (106文字)
 *   `気に入ったスタイルは【ブックマーク】をしていただくと便利です！顔形に合わせた小顔似合わせカットが大人気の20代30代から40代50代まで幅広い年齢層の方にご来店いただいています。ヘアスタイルでお悩みの方はお気軽にご相談ください♪` (114文字)
@@ -153,7 +209,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
 *   `ショート、ボブ、パーマが得意です！朝が楽になる素敵なスタイルをご提案させて頂きます。ショートスタイルやパーマなどでお悩みの方はお気軽にご相談ください！気に入ったスタイルは【ブックマーク】してご提示ください♪` (103文字)
 *   `ショート・ボブ・ミディアムが得意。２０、３０代のOLさんから４０、５０代の主婦の方まで幅広くご来店いただいています。白髪染めやパーマなどでお悩みの方はお気軽にご相談ください。気に入ったスタイルは【ブックマーク】すると便利です♪` (113文字)
 
-**重要**: 上記の例のように、**必ず90-120文字程度**の十分な情報量のあるコメントを生成してください。短すぎるコメント（80文字未満など）は避けてください。**120文字を超えるコメントは生成しないでください。**
+**重要**: 上記の例のように、**必ず100-120文字程度**の十分な情報量のあるコメントを生成してください。短すぎるコメント（80文字未満など）は避けてください。**120文字を超えるコメントは生成しないでください。**
 
 【ハッシュタグ】(各{config.CHAR_LIMITS['hashtag']}文字以内、7個以上)
 - トレンドのキーワードを含める
@@ -190,7 +246,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
     "title": "【タイトル】",
     "menu": "【メニュー】",
     "comment": "【コメント】",
-    "hashtag": ["#ハッシュタグ1", "#ハッシュタグ2", ... ]
+    "hashtag": ["ハッシュタグ1", "ハッシュタグ2", ... ]
   }},
   ...
 ]
@@ -243,7 +299,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             logger.error(f"テンプレート検証エラー: {str(e)}")
             return False
     
-    async def generate_templates_async(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies') -> List[Dict[str, str]]:
+    async def generate_templates_async(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> List[Dict[str, str]]:
         """テンプレートの非同期生成"""
         # 入力検証を追加
         if not titles:
@@ -253,8 +309,13 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             logger.error("キーワードが指定されていません")
             raise ValueError("キーワードが指定されていません")
             
-        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}'")
-        prompt = self._create_prompt(titles, keyword, season, gender)
+        # 生成コンテキストの処理
+        context = generation_context or {}
+        keyword_type = context.get('keyword_type', 'normal')
+        processing_mode = context.get('processing_mode', 'standard')
+        
+        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}', 特集対応: {featured_info is not None}, キーワードタイプ: {keyword_type}, 処理モード: {processing_mode}")
+        prompt = self._create_prompt(titles, keyword, season, gender, featured_info, generation_context)
         
         try:
             logger.debug(f"生成されたプロンプト全体:\n{prompt}")
@@ -338,12 +399,13 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             logger.error(f"テンプレート生成エラー: {str(e)}")
             raise Exception(f"Template generation failed: {str(e)}")
         
-    def generate_templates(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies') -> List[Dict[str, str]]:
+    def generate_templates(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> List[Dict[str, str]]:
         """テンプレートの生成（同期版ラッパー）"""
-        logger.info(f"同期版 generate_templates が呼び出されました - キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}' - 内部で非同期処理を実行します")
+        context = generation_context or {}
+        logger.info(f"同期版 generate_templates が呼び出されました - キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}', 特集対応: {featured_info is not None}, コンテキスト: {context.get('keyword_type', 'normal')} - 内部で非同期処理を実行します")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.generate_templates_async(titles, keyword, season, gender))
+            return loop.run_until_complete(self.generate_templates_async(titles, keyword, season, gender, featured_info, generation_context))
         finally:
             loop.close()

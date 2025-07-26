@@ -43,11 +43,761 @@ document.addEventListener('DOMContentLoaded', () => {
         allTemplates: []
     };
     
+    // 特集キーワード管理クラス
+    class FeaturedKeywordsManager {
+        constructor() {
+            this.keywords = [];
+            this.selectedKeyword = null;
+            this.lastSelectionTime = null;
+            this.container = document.getElementById('featured-keywords-container');
+            this.keywordInput = document.getElementById('keyword');
+            this.genderRadios = document.querySelectorAll('input[name="gender"]');
+        }
+        
+        async init() {
+            try {
+                console.log('特集キーワード機能の初期化を開始します');
+                
+                // ローディング状態を表示
+                this.showLoading();
+                
+                await this.loadFeaturedKeywords();
+                this.renderFeaturedKeywords();
+                this.setupGenderChangeListeners();
+                
+                console.log('特集キーワード機能の初期化が完了しました');
+                
+            } catch (error) {
+                console.error('特集キーワードの初期化に失敗:', error);
+                
+                // エラーの種類に応じた処理
+                let errorMessage = '特集キーワードの読み込みに失敗しました';
+                let showRetryButton = true;
+                
+                if (error.message.includes('タイムアウト')) {
+                    errorMessage = '特集キーワードの読み込みがタイムアウトしました';
+                } else if (error.message.includes('ネットワーク')) {
+                    errorMessage = 'ネットワークエラーが発生しました';
+                } else if (error.message.includes('サーバーエラー')) {
+                    errorMessage = 'サーバーで問題が発生しています';
+                    showRetryButton = false; // サーバーエラーの場合はリトライボタンを表示しない
+                }
+                
+                this.showError(errorMessage, showRetryButton);
+                
+                // 通常機能は継続できることをユーザーに通知
+                this.showFallbackNotification();
+            }
+        }
+        
+        setupGenderChangeListeners() {
+            // 性別ラジオボタンの手動変更を監視
+            this.genderRadios.forEach(radio => {
+                radio.addEventListener('change', (event) => {
+                    // 特集キーワード選択による自動変更でない場合
+                    if (this.lastSelectionTime && Date.now() - this.lastSelectionTime < 1000) {
+                        return; // 自動選択による変更の場合は何もしない
+                    }
+                    
+                    // 性別変更時に特集キーワードを再読み込み
+                    console.log(`性別が変更されました: ${event.target.value}`);
+                    this.reloadKeywordsForGender(event.target.value);
+                    
+                    // 手動変更の場合、特集キーワード選択をクリア
+                    if (this.selectedKeyword) {
+                        this.clearSelection();
+                        
+                        // 手動変更のフィードバック
+                        const genderLabels = {
+                            'ladies': 'レディース',
+                            'mens': 'メンズ'
+                        };
+                        
+                        const toast = document.createElement('div');
+                        toast.className = 'manual-gender-change-toast';
+                        toast.innerHTML = `
+                            <i class="fas fa-hand-pointer"></i>
+                            <span>性別を手動で「${genderLabels[event.target.value]}」に変更しました</span>
+                        `;
+                        
+                        document.body.appendChild(toast);
+                        
+                        setTimeout(() => {
+                            toast.classList.add('show');
+                        }, 10);
+                        
+                        setTimeout(() => {
+                            toast.classList.remove('show');
+                            setTimeout(() => {
+                                if (document.body.contains(toast)) {
+                                    document.body.removeChild(toast);
+                                }
+                            }, 300);
+                        }, 2000);
+                    }
+                });
+            });
+        }
+        
+        async loadFeaturedKeywords(gender = null) {
+            try {
+                // 現在選択されている性別を取得
+                if (!gender) {
+                    const selectedGender = document.querySelector('input[name="gender"]:checked');
+                    gender = selectedGender ? selectedGender.value : 'ladies';
+                }
+                
+                console.log(`特集キーワードの読み込みを開始します (性別: ${gender})`);
+                
+                // タイムアウト設定付きでfetch
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
+                
+                const response = await fetch(`/api/featured-keywords?gender=${gender}`, {
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`特集キーワードAPI HTTPエラー: ${response.status} ${response.statusText}`, errorText);
+                    throw new Error(`サーバーエラー (${response.status}): ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('特集キーワードAPIレスポンス:', data);
+                
+                // レスポンスデータの検証
+                if (!data || typeof data !== 'object') {
+                    throw new Error('無効なレスポンス形式です');
+                }
+                
+                // 成功レスポンスの処理
+                if (data.success === true || data.success === undefined) {
+                    this.keywords = Array.isArray(data.keywords) ? data.keywords : [];
+                    
+                    // フォールバック情報の処理
+                    if (data.fallback) {
+                        console.warn('特集キーワード機能はフォールバックモードで動作しています:', data.message);
+                        this.showFallbackMessage(data.message);
+                    }
+                    
+                    // 健全性状態の処理
+                    if (data.health_status) {
+                        console.log('特集キーワード機能の健全性状態:', data.health_status);
+                        if (!data.health_status.is_available && data.health_status.last_error) {
+                            console.warn('特集キーワード機能に問題があります:', data.health_status.last_error);
+                        }
+                    }
+                    
+                    console.log(`特集キーワードを正常に読み込みました: ${this.keywords.length}件`);
+                } else {
+                    // エラーレスポンスの処理
+                    const errorMessage = data.error?.message || data.message || '特集キーワードの取得に失敗しました';
+                    throw new Error(errorMessage);
+                }
+                
+            } catch (error) {
+                console.error('特集キーワードの取得に失敗:', error);
+                
+                // エラーの種類に応じた処理
+                if (error.name === 'AbortError') {
+                    throw new Error('特集キーワードの読み込みがタイムアウトしました');
+                } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    throw new Error('ネットワークエラーが発生しました');
+                } else {
+                    throw error;
+                }
+            }
+        }
+        
+        renderFeaturedKeywords() {
+            if (!this.container) return;
+            
+            // ローディング表示を削除
+            this.container.innerHTML = '';
+            
+            if (this.keywords.length === 0) {
+                this.container.innerHTML = `
+                    <div class="featured-keywords-empty">
+                        <i class="fas fa-info-circle"></i>
+                        現在、特集キーワードはありません
+                    </div>
+                `;
+                return;
+            }
+            
+            // 特集キーワードボタンを生成
+            this.keywords.forEach(keyword => {
+                const button = this.createKeywordButton(keyword);
+                this.container.appendChild(button);
+            });
+        }
+        
+        createKeywordButton(keyword) {
+            const button = document.createElement('button');
+            button.className = 'featured-keyword-btn';
+            button.innerHTML = `
+                <i class="fas fa-star"></i>
+                <span>${keyword.name}</span>
+            `;
+            
+            // データ属性を追加してキーワード情報を保存
+            button.setAttribute('data-keyword', keyword.keyword);
+            button.setAttribute('data-name', keyword.name);
+            button.setAttribute('data-gender', keyword.gender);
+            
+            // クリックイベントハンドラーを追加
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // ボタンの無効化（連続クリック防止）
+                button.disabled = true;
+                
+                try {
+                    this.selectFeaturedKeyword(keyword);
+                } catch (error) {
+                    console.error('特集キーワード選択エラー:', error);
+                    // エラー時のフィードバック
+                    this.showErrorFeedback('キーワードの選択に失敗しました');
+                } finally {
+                    // ボタンを再度有効化
+                    setTimeout(() => {
+                        button.disabled = false;
+                    }, 500);
+                }
+            });
+            
+            // キーボードアクセシビリティ対応
+            button.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    button.click();
+                }
+            });
+            
+            // ホバー効果の強化
+            button.addEventListener('mouseenter', () => {
+                if (!button.classList.contains('active')) {
+                    button.style.transform = 'translateY(-2px) scale(1.02)';
+                }
+            });
+            
+            button.addEventListener('mouseleave', () => {
+                if (!button.classList.contains('active')) {
+                    button.style.transform = '';
+                }
+            });
+            
+            // クリック効果
+            button.addEventListener('mousedown', () => {
+                button.style.transform = 'translateY(0) scale(0.98)';
+            });
+            
+            button.addEventListener('mouseup', () => {
+                if (button.classList.contains('active')) {
+                    button.style.transform = 'translateY(-2px)';
+                } else {
+                    button.style.transform = '';
+                }
+            });
+            
+            // フォーカス効果
+            button.addEventListener('focus', () => {
+                button.style.outline = '2px solid rgba(255, 255, 255, 0.5)';
+                button.style.outlineOffset = '2px';
+            });
+            
+            button.addEventListener('blur', () => {
+                button.style.outline = '';
+                button.style.outlineOffset = '';
+            });
+            
+            // アクセシビリティ属性を設定
+            button.setAttribute('role', 'button');
+            button.setAttribute('aria-pressed', 'false');
+            button.setAttribute('tabindex', '0');
+            
+            return button;
+        }
+        
+        selectFeaturedKeyword(keyword) {
+            // 同じキーワードが既に選択されている場合は選択解除
+            if (this.selectedKeyword && this.selectedKeyword.keyword === keyword.keyword) {
+                this.deselectFeaturedKeyword();
+                return;
+            }
+            
+            // 既存の選択状態をクリア
+            this.clearSelection();
+            
+            // キーワードを入力欄に設定
+            if (this.keywordInput) {
+                // キーワードを設定
+                this.keywordInput.value = keyword.keyword;
+                
+                // 入力欄にフォーカスを当てる
+                this.keywordInput.focus();
+                
+                // 入力イベントを発火させて他の処理をトリガー
+                this.keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            
+            // 性別を自動選択
+            this.selectGender(keyword.gender);
+            
+            // 選択状態を視覚的に表示
+            this.updateButtonState(keyword);
+            
+            // 選択されたキーワードを記録
+            this.selectedKeyword = keyword;
+            
+            // 選択時刻を記録（手動選択判定用）
+            this.lastSelectionTime = Date.now();
+            
+        }
+        
+        deselectFeaturedKeyword() {
+            // 選択解除のフィードバック
+            if (this.selectedKeyword) {
+                const toast = document.createElement('div');
+                toast.className = 'featured-deselection-toast';
+                toast.innerHTML = `
+                    <i class="fas fa-times-circle"></i>
+                    <span>特集キーワード「${this.selectedKeyword.name}」の選択を解除しました</span>
+                `;
+                
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.classList.add('show');
+                }, 10);
+                
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        if (document.body.contains(toast)) {
+                            document.body.removeChild(toast);
+                        }
+                    }, 300);
+                }, 2000);
+            }
+            
+            // 入力欄をクリア
+            if (this.keywordInput) {
+                this.keywordInput.value = '';
+                this.keywordInput.focus();
+                this.keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            
+            // 選択状態をクリア
+            this.clearSelection();
+        }
+        
+        selectGender(gender) {
+            // 現在選択されている性別を取得
+            const currentGender = document.querySelector('input[name="gender"]:checked')?.value;
+            
+            // 既に同じ性別が選択されている場合は何もしない
+            if (currentGender === gender) {
+                return;
+            }
+            
+            // 異なる性別が選択されている場合の処理
+            if (currentGender && currentGender !== gender) {
+                // ユーザーが手動で選択した可能性があるかチェック
+                const wasManuallySelected = this.checkIfManuallySelected();
+                
+                if (wasManuallySelected) {
+                    // 確認ダイアログを表示
+                    const genderLabels = {
+                        'ladies': 'レディース',
+                        'mens': 'メンズ'
+                    };
+                    
+                    const currentLabel = genderLabels[currentGender];
+                    const newLabel = genderLabels[gender];
+                    
+                    if (!confirm(`現在の性別設定「${currentLabel}」を「${newLabel}」に変更しますか？`)) {
+                        return; // ユーザーがキャンセルした場合は変更しない
+                    }
+                }
+            }
+            
+            // 性別を設定
+            this.genderRadios.forEach(radio => {
+                if (radio.value === gender) {
+                    radio.checked = true;
+                    // changeイベントを発火させて他の処理をトリガー
+                    radio.dispatchEvent(new Event('change', { bubbles: true }));
+                } else {
+                    radio.checked = false;
+                }
+            });
+            
+            // 性別変更のフィードバック
+            this.showGenderChangeFeedback(gender);
+        }
+        
+        checkIfManuallySelected() {
+            // 最後の特集キーワード選択から一定時間が経過している場合、
+            // ユーザーが手動で変更した可能性が高い
+            if (!this.lastSelectionTime) {
+                return true; // 特集キーワードが選択されていない場合は手動選択とみなす
+            }
+            
+            const timeSinceLastSelection = Date.now() - this.lastSelectionTime;
+            return timeSinceLastSelection > 3000; // 3秒以上経過していれば手動選択とみなす
+        }
+        
+        showGenderChangeFeedback(gender) {
+            const genderLabels = {
+                'ladies': 'レディース',
+                'mens': 'メンズ'
+            };
+            
+            // 性別変更のフィードバックを表示
+            const toast = document.createElement('div');
+            toast.className = 'gender-change-toast';
+            toast.innerHTML = `
+                <i class="fas fa-${gender === 'ladies' ? 'female' : 'male'}"></i>
+                <span>性別を「${genderLabels[gender]}」に設定しました</span>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // アニメーションのために少し待つ
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            // 数秒後に消す
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, 1500);
+        }
+        
+        updateButtonState(selectedKeyword) {
+            const buttons = this.container.querySelectorAll('.featured-keyword-btn');
+            buttons.forEach(button => {
+                const buttonText = button.querySelector('span').textContent;
+                if (buttonText === selectedKeyword.name) {
+                    // アクティブ状態に設定
+                    button.classList.add('active');
+                    button.setAttribute('aria-pressed', 'true');
+                    
+                    // アクティブ状態のアニメーション効果
+                    button.style.animation = 'none';
+                    setTimeout(() => {
+                        button.style.animation = '';
+                    }, 10);
+                } else {
+                    // 非アクティブ状態に設定
+                    button.classList.remove('active');
+                    button.setAttribute('aria-pressed', 'false');
+                }
+            });
+        }
+        
+        async reloadKeywordsForGender(gender) {
+            try {
+                console.log(`性別 ${gender} の特集キーワードを再読み込みします`);
+                
+                // ローディング状態を表示
+                this.showLoading();
+                
+                // 現在の選択をクリア
+                this.clearSelection();
+                
+                // 新しい性別のキーワードを読み込み
+                await this.loadFeaturedKeywords(gender);
+                this.renderFeaturedKeywords();
+                
+                console.log(`性別 ${gender} の特集キーワード再読み込みが完了しました`);
+                
+            } catch (error) {
+                console.error('特集キーワードの再読み込みに失敗:', error);
+                this.showError('特集キーワードの更新に失敗しました', true);
+            }
+        }
+        
+        clearSelection() {
+            const buttons = this.container.querySelectorAll('.featured-keyword-btn');
+            buttons.forEach(button => {
+                // アクティブ状態をクリア
+                button.classList.remove('active');
+                button.setAttribute('aria-pressed', 'false');
+                
+                // クリア時のアニメーション効果
+                if (button.classList.contains('active')) {
+                    button.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        button.style.transform = '';
+                    }, 150);
+                }
+            });
+            
+            // 選択状態をリセット
+            this.selectedKeyword = null;
+            this.lastSelectionTime = null;
+        }
+        
+        showLoading() {
+            if (!this.container) return;
+            
+            this.container.innerHTML = `
+                <div class="featured-keywords-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>特集キーワードを読み込み中...</span>
+                </div>
+            `;
+        }
+        
+        showError(message = '特集キーワードの読み込みに失敗しました', showRetryButton = true) {
+            if (!this.container) return;
+            
+            const retryButtonHtml = showRetryButton ? `
+                <button class="featured-keywords-retry-btn" onclick="featuredKeywordsManager.retry()">
+                    <i class="fas fa-redo"></i>
+                    再試行
+                </button>
+            ` : '';
+            
+            this.container.innerHTML = `
+                <div class="featured-keywords-error">
+                    <div class="error-content">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span class="error-message">${message}</span>
+                    </div>
+                    ${retryButtonHtml}
+                </div>
+            `;
+        }
+        
+        showFallbackMessage(message) {
+            if (!this.container) return;
+            
+            // 既存のコンテンツの上に警告メッセージを表示
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'featured-keywords-warning';
+            warningDiv.innerHTML = `
+                <i class="fas fa-info-circle"></i>
+                <span>${message}</span>
+            `;
+            
+            this.container.insertBefore(warningDiv, this.container.firstChild);
+            
+            // 数秒後に自動で消す
+            setTimeout(() => {
+                if (warningDiv.parentNode) {
+                    warningDiv.parentNode.removeChild(warningDiv);
+                }
+            }, 5000);
+        }
+        
+        showFallbackNotification() {
+            // 通常機能は継続できることをユーザーに通知
+            const notification = document.createElement('div');
+            notification.className = 'featured-fallback-notification';
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas fa-info-circle"></i>
+                    <div class="notification-text">
+                        <strong>特集キーワード機能が利用できません</strong>
+                        <p>通常のテンプレート生成機能は引き続きご利用いただけます。</p>
+                    </div>
+                    <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // アニメーションで表示
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 100);
+            
+            // 10秒後に自動で消す
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 10000);
+        }
+        
+        async retry() {
+            console.log('特集キーワードの再試行を開始します');
+            
+            try {
+                // ローディング状態を表示
+                this.showLoading();
+                
+                // 少し待ってから再試行（ユーザビリティ向上）
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                await this.loadFeaturedKeywords();
+                this.renderFeaturedKeywords();
+                
+                console.log('特集キーワードの再試行が成功しました');
+                
+                // 成功通知
+                this.showRetrySuccessToast();
+                
+            } catch (error) {
+                console.error('特集キーワードの再試行に失敗:', error);
+                
+                let errorMessage = '再試行に失敗しました';
+                let showRetryButton = true;
+                
+                if (error.message.includes('タイムアウト')) {
+                    errorMessage = '再試行がタイムアウトしました';
+                } else if (error.message.includes('ネットワーク')) {
+                    errorMessage = 'ネットワークエラーが継続しています';
+                } else if (error.message.includes('サーバーエラー')) {
+                    errorMessage = 'サーバーの問題が継続しています';
+                    showRetryButton = false;
+                }
+                
+                this.showError(errorMessage, showRetryButton);
+            }
+        }
+        
+        showRetrySuccessToast() {
+            const toast = document.createElement('div');
+            toast.className = 'featured-retry-success-toast';
+            toast.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                <span>特集キーワードを正常に読み込みました</span>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+        
+        
+        showErrorFeedback(message) {
+            // エラーフィードバックを表示
+            const toast = document.createElement('div');
+            toast.className = 'featured-error-toast';
+            toast.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>${message}</span>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // アニメーションのために少し待つ
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            // 数秒後に消す
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, 2500);
+        }
+    }
+    
+    // 特集キーワードマネージャーを初期化
+    const featuredKeywordsManager = new FeaturedKeywordsManager();
+    featuredKeywordsManager.init();
+    
+    // 特集キーワードエラー時のフォールバック通知
+    function showFeaturedErrorFallbackNotification() {
+        const notification = document.createElement('div');
+        notification.className = 'featured-error-fallback-notification';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-info-circle"></i>
+                <div class="notification-text">
+                    <strong>特集キーワード機能でエラーが発生しました</strong>
+                    <p>特集キーワードの選択を解除して、通常のテンプレート生成をお試しください。</p>
+                </div>
+                <div class="notification-actions">
+                    <button class="notification-action-btn" onclick="featuredKeywordsManager.clearSelection(); this.parentElement.parentElement.parentElement.remove();">
+                        <i class="fas fa-times-circle"></i>
+                        選択を解除
+                    </button>
+                    <button class="notification-close" onclick="this.parentElement.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // アニメーションで表示
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        // 15秒後に自動で消す
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }, 15000);
+    }
+    
     // 初期アニメーション
     animateElements();
     
     // フォーカス処理
     keywordInput.focus();
+
+    // キーワード入力欄の変更時に特集キーワード選択をクリア
+    keywordInput.addEventListener('input', () => {
+        if (featuredKeywordsManager.selectedKeyword) {
+            const currentValue = keywordInput.value.trim();
+            const selectedValue = featuredKeywordsManager.selectedKeyword.keyword;
+            
+            // 入力値が選択された特集キーワードと異なる場合、選択をクリア
+            if (currentValue !== selectedValue) {
+                featuredKeywordsManager.clearSelection();
+            }
+        }
+    });
 
     // キーボードショートカット
     document.addEventListener('keydown', (e) => {
@@ -85,34 +835,112 @@ document.addEventListener('DOMContentLoaded', () => {
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
         
         try {
+            // タイムアウト設定付きでfetch
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒タイムアウト
+            
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ keyword, gender, season, model })
+                body: JSON.stringify({ keyword, gender, season, model }),
+                signal: controller.signal
             });
             
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`テンプレート生成API HTTPエラー: ${response.status} ${response.statusText}`, errorText);
+                throw new Error(`サーバーエラー (${response.status}): ${response.statusText}`);
+            }
+            
             const data = await response.json();
+            console.log('テンプレート生成APIレスポンス:', data);
             
             // プログレスを100%に設定
             completeProgress();
             
             if (data.success) {
+                // 特集キーワード対応テンプレートの場合の特別な処理
+                if (data.is_featured && data.featured_keyword_info) {
+                    const featuredName = data.featured_keyword_info.name;
+                    console.log(`特集キーワード対応テンプレートが生成されました: ${featuredName}`);
+                    
+                    // 特集対応テンプレート生成の成功通知
+                    showFeaturedSuccessToast(featuredName, data.templates.length);
+                    
+                    // 特集テンプレートであることを視覚的に示すための追加情報
+                    if (data.templates && data.templates.length > 0) {
+                        data.templates.forEach(template => {
+                            template._is_featured = true; // フロントエンド用フラグ
+                            template._featured_keyword_name = featuredName;
+                        });
+                    }
+                } else if (data.is_featured) {
+                    // 特集キーワードだが詳細情報がない場合
+                    console.log('特集キーワード対応テンプレートが生成されました（詳細情報なし）');
+                    showSuccessToast('特集対応テンプレートを生成しました ⭐');
+                } else {
+                    // 通常テンプレートの場合
+                    showSuccessToast('テンプレートを生成しました');
+                }
+                
                 displayTemplates(data.templates);
                 showResults();
-                // 成功時のフィードバック
-                showSuccessToast('テンプレートを生成しました');
+                
                 // 結果表示領域までスクロール
                 resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
-                showError(data.error.message || '不明なエラーが発生しました。');
+                // エラーレスポンスの処理
+                const errorMessage = data.error?.message || data.message || '不明なエラーが発生しました。';
+                const errorCode = data.error?.code || 'UNKNOWN_ERROR';
+                
+                console.error('テンプレート生成エラー:', errorCode, errorMessage);
+                
+                // エラーコードに応じた処理
+                if (errorCode === 'FEATURED_KEYWORDS_ERROR') {
+                    showError('特集キーワード機能でエラーが発生しましたが、通常のテンプレート生成を試行できます。');
+                    
+                    // 特集キーワード選択をクリアして通常生成を促す
+                    if (featuredKeywordsManager.selectedKeyword) {
+                        featuredKeywordsManager.clearSelection();
+                        showFeaturedErrorFallbackNotification();
+                    }
+                } else if (errorCode === 'NO_RESULTS_FOUND') {
+                    showError('一致するヘアスタイルが見つかりませんでした。別のキーワードをお試しください。');
+                } else if (errorCode === 'VALIDATION_ERROR') {
+                    showError(errorMessage);
+                } else {
+                    showError(errorMessage);
+                }
             }
         } catch (error) {
-            console.error('Error:', error);
-            showError('テンプレートの生成中にエラーが発生しました。');
-            // エラー時もプログレスを完了に設定
+            console.error('テンプレート生成中にエラー:', error);
+            
+            // プログレスを完了に設定
             completeProgress();
+            
+            // エラーの種類に応じた処理
+            let errorMessage = 'テンプレートの生成中にエラーが発生しました。';
+            
+            if (error.name === 'AbortError') {
+                errorMessage = 'テンプレート生成がタイムアウトしました。もう一度お試しください。';
+            } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+            } else if (error.message.includes('サーバーエラー')) {
+                errorMessage = 'サーバーで問題が発生しています。しばらく時間をおいて再度お試しください。';
+            }
+            
+            showError(errorMessage);
+            
+            // 特集キーワードが選択されている場合の追加処理
+            if (featuredKeywordsManager.selectedKeyword) {
+                setTimeout(() => {
+                    showFeaturedErrorFallbackNotification();
+                }, 2000);
+            }
         } finally {
             hideLoading();
             // ボタンを再度有効化
@@ -298,6 +1126,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 300);
         }, 3000);
+    }
+    
+    // 特集対応テンプレート生成成功トースト表示
+    function showFeaturedSuccessToast(featuredName, templateCount) {
+        // 既存のトーストを削除
+        const existingToast = document.querySelector('.toast');
+        if (existingToast) {
+            document.body.removeChild(existingToast);
+        }
+        
+        // 新しい特集対応トースト作成
+        const toast = document.createElement('div');
+        toast.className = 'toast featured-success-toast';
+        toast.innerHTML = `
+            <i class="fas fa-star"></i>
+            <div class="toast-content">
+                <div class="toast-title">特集対応テンプレート生成完了！</div>
+                <div class="toast-message">「${featuredName}」の特集テンプレート ${templateCount}件を生成しました</div>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // アニメーションのために少し待つ
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+        
+        // 少し長めに表示（特集対応の重要性を強調）
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }, 4000);
     }
     
     // テンプレート表示関数の更新
@@ -515,6 +1380,37 @@ document.addEventListener('DOMContentLoaded', () => {
         const menuCounter = card.querySelector('.menu-count');
         const commentCounter = card.querySelector('.comment-count');
         const hashtagCounter = card.querySelector('.hashtag-count');
+        
+        // 特集対応テンプレート識別機能の実装
+        const featuredIndicator = card.querySelector('.featured-indicator');
+        
+        // 特集対応テンプレートの場合の視覚的識別マーク
+        if (template.is_featured || template._is_featured) {
+            // 特集対応マークを表示
+            featuredIndicator.style.display = 'flex';
+            
+            // カード全体に特集スタイルを適用
+            card.classList.add('featured');
+            
+            // 特集キーワード名がある場合はツールチップに表示
+            const featuredKeywordName = template.featured_keyword_name || template._featured_keyword_name;
+            if (featuredKeywordName) {
+                featuredIndicator.title = `特集キーワード: ${featuredKeywordName}`;
+                
+                // 特集キーワード名をインジケーターのテキストに表示
+                const indicatorText = featuredIndicator.querySelector('span');
+                if (indicatorText) {
+                    indicatorText.textContent = `特集対応 (${featuredKeywordName})`;
+                }
+            }
+            
+            // 特集対応テンプレートであることをログに記録
+            console.log(`特集対応テンプレートを表示: ${template.title} (キーワード: ${featuredKeywordName || '不明'})`);
+        } else {
+            // 通常テンプレートの場合は特集マークを非表示
+            featuredIndicator.style.display = 'none';
+            card.classList.remove('featured');
+        }
         
         // テンプレートのデータをセット
         titleTextarea.value = template.title;
@@ -1007,6 +1903,58 @@ ${hashtagTextarea.value}`;
                 align-items: center;
                 justify-content: center;
                 border-radius: 50%;
+            }
+            
+            /* 特集対応テンプレート成功トースト */
+            .toast.featured-success-toast {
+                background: linear-gradient(135deg, #ffd700, #ffed4e);
+                color: #2b2d42;
+                border-left: 4px solid #ffb700;
+                min-width: 350px;
+                padding: 16px 24px;
+                box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+            }
+            
+            .toast.featured-success-toast i {
+                color: #2b2d42;
+                font-size: 20px;
+                background-color: rgba(43, 45, 66, 0.1);
+                width: 35px;
+                height: 35px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                animation: featuredToastStar 2s ease-in-out infinite alternate;
+            }
+            
+            .toast-content {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            
+            .toast-title {
+                font-weight: 700;
+                font-size: 14px;
+                color: #2b2d42;
+            }
+            
+            .toast-message {
+                font-size: 13px;
+                color: #2b2d42;
+                opacity: 0.9;
+            }
+            
+            @keyframes featuredToastStar {
+                0% {
+                    transform: scale(1);
+                    box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+                }
+                100% {
+                    transform: scale(1.1);
+                    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+                }
             }
             
             .copy-btn.copied {
