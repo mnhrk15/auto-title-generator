@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { name: 'スクレイピング中...', percent: 20, duration: 5000 },
             { name: 'タイトル解析中...', percent: 40, duration: 3000 },
             { name: 'テンプレート生成中...', percent: 85, duration: 10000 },
-            { name: '完了', percent: 100, duration: 100 }
+            { name: '完了', percent: 100, duration: 300 }
         ],
         interval: null,
         subInterval: null
