@@ -78,8 +78,8 @@ body {
 /* ヘッダー */
 .app-header {
     text-align: center;
-    margin-bottom: var(--spacing-xl);
-    padding: 2rem 0;
+    margin-bottom: var(--spacing-lg);
+    padding: 1.5rem 0;
     position: relative;
     background: var(--primary-gradient);
     color: white;
@@ -231,7 +231,7 @@ h1 {
 .guide-collapsible {
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
     box-shadow: var(--shadow-sm);
     border: 1px solid rgba(233, 236, 239, 0.8);
     transition: all var(--transition-normal) var(--transition-ease);
@@ -296,9 +296,9 @@ details[open] .guide-summary::after {
 /* ここから元のガイドスタイル */
 .guide {
     background: var(--card-bg);
-    padding: var(--spacing-xl);
+    padding: var(--spacing-lg);
     border-radius: var(--border-radius-lg);
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
     box-shadow: var(--shadow-card);
     transition: transform var(--transition-normal) var(--transition-ease),
         box-shadow var(--transition-normal) var(--transition-ease);
@@ -396,7 +396,7 @@ details[open] .guide-summary::after {
 
 /* 検索セクション */
 .search-section {
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
     animation: fadeIn 1s var(--transition-ease);
     position: relative;
     z-index: 10;
@@ -405,15 +405,15 @@ details[open] .guide-summary::after {
 .search-container {
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
-    padding: var(--spacing-xl);
+    padding: var(--spacing-lg);
     box-shadow: var(--shadow-card);
     border: 1px solid rgba(233, 236, 239, 0.8);
     position: relative;
-    margin-top: calc(-1 * var(--spacing-xl));
+    margin-top: calc(-1 * var(--spacing-lg));
 }
 
 .gender-selection {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
     display: flex;
     justify-content: center;
     gap: var(--spacing-lg);
@@ -500,9 +500,11 @@ details[open] .guide-summary::after {
 
 .search-box {
     display: flex;
+    flex-direction: row;
     gap: var(--spacing-md);
     max-width: 700px;
     margin: 0 auto;
+    align-items: center;
 }
 
 .input-wrapper {
@@ -1477,8 +1479,8 @@ textarea:focus {
 .featured-keywords-section {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: var(--border-radius-lg);
-    padding: var(--spacing-xl);
-    margin-bottom: var(--spacing-xl);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
     color: white;
     box-shadow: var(--shadow-card);
     position: relative;
@@ -1837,6 +1839,12 @@ textarea:focus {
         margin-bottom: var(--spacing-md);
     }
 
+    /* スマホでは縦並びに */
+    .search-box {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
     /* 特集キーワードセクション - スマホ対応 */
     .featured-keywords-section {
         padding: var(--spacing-lg);
@@ -1953,10 +1961,7 @@ textarea:focus {
     border-radius: var(--border-radius-sm);
 }
 
-.search-box {
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
+/* この設定を削除して横並びを維持 */
 
 input[type="text"] {
     height: 46px;
@@ -2474,14 +2479,16 @@ input[type="text"] {
 .search-box>.input-wrapper.model-selection {
     flex-grow: 0;
     /* Season/Model select takes less space */
-    flex-basis: 200px;
+    flex-basis: 180px;
     /* Base width for selects, adjust as needed */
-    min-width: 180px;
+    min-width: 160px;
 }
 
 .search-box>.primary-button {
     flex-shrink: 0;
     /* Prevent button from shrinking */
+    min-width: 120px;
+    /* Ensure button has minimum width */
 }
 
 /* Ensure icons inside input-wrappers are vertically centered if not already */
