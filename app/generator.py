@@ -11,15 +11,15 @@ from . import config
 logger = logging.getLogger(__name__)
 
 class TemplateGenerator:
-    def __init__(self, model_name='gemini-2.5-flash-lite'):
+    def __init__(self, model_name='gemini-2.5-flash'):
         if not config.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set")
         
         # サポートされているモデルの検証
         supported_models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
         if model_name not in supported_models:
-            logger.warning(f"Unsupported model: {model_name}, falling back to gemini-2.5-flash-lite")
-            model_name = 'gemini-2.5-flash-lite'
+            logger.warning(f"Unsupported model: {model_name}, falling back to gemini-2.5-flash")
+            model_name = 'gemini-2.5-flash'
         
         self.model_name = model_name
         
