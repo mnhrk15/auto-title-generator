@@ -12,7 +12,7 @@
 
 ## 技術スタック
 - **バックエンド**: Python 3.11.8, Flask 3.0.2 (ASGI対応)
-- **AI**: Google Gemini 2.5 Flash Lite (thinking_budget=0で超高速化)
+- **AI**: Google Gemini 2.5 Flash (thinking_budget=0で高速化、デフォルトモデル)
 - **SDK**: デュアルSDK構成
   - google-genai 1.27.0 (新SDK、thinking_budget対応)
   - google-generativeai 0.8.5 (従来SDK、フォールバック用)
@@ -103,12 +103,12 @@ template-generator/
 - **セッション管理**: async context managerで適切なリソース管理
 
 ### generator.py
-- **AI エンジン**: Google Gemini 2.5 Flash Lite使用（最高速モデル）
-- **超高速化**: thinking_budget=0設定で最大71%の高速化を実現
+- **AI エンジン**: Google Gemini 2.5 Flash使用（デフォルトモデル、ユーザー選択不要）
+- **高速化**: thinking_budget=0設定で約70%の高速化を実現
 - **デュアルSDK**: 新SDK優先、自動フォールバック機能付き
   - 新SDK: google-genai 1.27.0 (thinking_budget対応)
   - 従来SDK: google-generativeai 0.8.5 (互換性維持)
-- **性能**: 20件のテンプレートを約8秒で生成
+- **性能**: 20件のテンプレートを約8-10秒で生成
 - **非同期処理**: 完全async/await対応で高いスループット
 
 ### config.py
@@ -146,19 +146,19 @@ pytest tests/ --cov=app
 ## パフォーマンス特性
 
 ### AI生成速度
-- **Gemini 2.5 Flash Lite**: 最高速度モデル使用
-- **thinking_budget=0**: 思考プロセス無効化で超高速化
-- **実測値**: 20件テンプレート生成に約8秒
-- **改善率**: 従来比71%高速化
+- **Gemini 2.5 Flash**: デフォルトモデル使用（ユーザー選択不要）
+- **thinking_budget=0**: 思考プロセス無効化で高速化
+- **実測値**: 20件テンプレート生成に約8-10秒
+- **改善率**: 従来比約70%高速化
 
 ### デュアルSDK アーキテクチャ
 - **新SDK (Primary)**: google-genai 1.27.0
-  - thinking_budget=0 対応で超高速化
-  - 最新のGemini 2.5 Flash Lite最適化
+  - thinking_budget=0 対応で高速化
+  - Gemini 2.5 Flash最適化（デフォルトモデル）
 - **従来SDK (Fallback)**: google-generativeai 0.8.5
   - 後方互換性の維持
   - 新SDK失敗時の自動フォールバック
-- **パフォーマンス**: 新SDK使用時は71%高速化を実現
+- **パフォーマンス**: 新SDK使用時は約70%高速化を実現
 - **信頼性**: デュアル構成により高い可用性を確保
 
 ### 非同期処理アーキテクチャ
@@ -217,11 +217,11 @@ pytest tests/ --cov=app
      - その他必要な環境変数（render.yamlで設定済み）
 
    **パフォーマンス最適化**: 
-   - **Gemini 2.5 Flash Lite**: 最高速度AIモデル使用
-   - **thinking_budget=0**: 思考プロセス無効化で超高速化
+   - **Gemini 2.5 Flash**: デフォルトAIモデル使用（ユーザー選択不要）
+   - **thinking_budget=0**: 思考プロセス無効化で高速化
    - **デュアルSDK**: 新SDK優先、自動フォールバック
    - **非同期処理**: 完全async/awaitパイプライン
-   - **実測値**: 20件テンプレート生成を約8秒で完了（71%高速化）
+   - **実測値**: 20件テンプレート生成を約8-10秒で完了（約70%高速化）
    - **リソース最適化**: MAX_PAGES=1でスクレイピング高速化
 
 4. デプロイを開始

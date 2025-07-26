@@ -1,5 +1,5 @@
 # Render Deployment Configuration
-# Optimized for Gemini 2.5 Flash Lite with thinking_budget=0 performance
+# Optimized for Gemini 2.5 Flash with thinking_budget=0 performance
 services:
   - type: web
     name: template-generator
