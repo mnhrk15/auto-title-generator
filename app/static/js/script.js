@@ -837,7 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // タイムアウト設定付きでfetch
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒タイムアウト
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 60秒タイムアウト
             
             const response = await fetch('/api/generate', {
                 method: 'POST',
