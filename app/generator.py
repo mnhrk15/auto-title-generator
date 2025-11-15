@@ -348,7 +348,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
             try:
                 config_with_thinking = types.GenerateContentConfig(
                     temperature=0.7,
-                    max_output_tokens=8192,
+                    max_output_tokens=32768,
                     thinking_config=types.ThinkingConfig(
                         thinking_budget=0  # 高速化のため思考プロセスを無効化
                     )
@@ -365,7 +365,7 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
                 # 旧SDKにフォールバック
                 generation_config = genai.GenerationConfig(
                     temperature=0.7,
-                    max_output_tokens=8192,
+                    max_output_tokens=32768,
                 )
                 response = await self.model.generate_content_async(prompt, generation_config=generation_config)
                 response_text = response.text
