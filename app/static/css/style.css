@@ -3216,3 +3216,115 @@ input[type="text"] {
         font-size: 0.85rem;
     }
 }
+
+/* メンテナンス通知バナー */
+.maintenance-banner {
+    background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%);
+    color: white;
+    padding: var(--spacing-md) var(--spacing-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+    animation: slideDown 0.5s var(--transition-ease);
+}
+
+.maintenance-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 90% 10%, rgba(255, 255, 255, 0.1), transparent 50%);
+    z-index: 1;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.maintenance-banner.hidden {
+    display: none;
+}
+
+.banner-content {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    flex: 1;
+    position: relative;
+    z-index: 2;
+}
+
+.banner-icon {
+    font-size: 1.8rem;
+    color: white;
+    flex-shrink: 0;
+    margin-top: 2px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.banner-message {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.banner-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
+}
+
+.banner-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    opacity: 0.95;
+}
+
+/* レスポンシブ対応：メンテナンスバナー */
+@media (max-width: 576px) {
+    .maintenance-banner {
+        padding: var(--spacing-md);
+        flex-direction: column;
+    }
+
+    .banner-content {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .banner-icon {
+        font-size: 1.5rem;
+        align-self: center;
+    }
+
+    .banner-message {
+        text-align: center;
+    }
+
+    .banner-title {
+        font-size: 1rem;
+    }
+
+    .banner-text {
+        font-size: 0.9rem;
+    }
+
+    .banner-close {
+        align-self: flex-end;
+        width: 32px;
+        height: 32px;
+    }
+}
