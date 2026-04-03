@@ -12,8 +12,8 @@ google-genai==1.70.0         # Google GenAI SDK with Gemini 3 and thinkingLevel 
 python-dotenv==1.0.1         # Environment variable management
 
 # Testing Framework
-pytest==8.1.1               # Testing framework
-pytest-asyncio==0.23.4      # Async test support for pytest
+pytest>=8.0                 # Testing framework
+pytest-asyncio>=0.23        # Async test support for pytest
 responses==0.24.1            # HTTP request mocking for tests
 
 # HTTP Utilities
