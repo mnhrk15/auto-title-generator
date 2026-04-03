@@ -38,6 +38,17 @@ SEASON_KEYWORDS = {
     "year_end_new_year": ["年末年始", "クリスマス", "お正月", "冬休み", "カウントダウン", "成人式"]
 }
 
+# PV Boost Keywords - PV数向上に効果的なキーワード
+# 各キーワードが MAX_TEMPLATES 中 PV_BOOST_COUNT_PER_KEYWORD 個のタイトルに含まれる
+PV_BOOST_KEYWORDS = [
+    "ブリーチなしカラー",
+    "春カラー",
+    "夏カラー",
+    "秋カラー",
+    "冬カラー",
+]
+PV_BOOST_COUNT_PER_KEYWORD = 2
+
 # Flask Settings
 class Config:
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev')
