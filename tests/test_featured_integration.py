@@ -270,8 +270,8 @@ class TestTemplateGenerationAPI:
     def test_generate_with_featured_keyword(self, client, mock_scraper_results, mock_template_results):
         """テンプレート生成API - 特集キーワードでの生成テスト"""
         with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.scraping.HotPepperScraper') as mock_scraper_class, \
-             patch('app.generator.TemplateGenerator') as mock_generator_class:
+             patch('app.main.HotPepperScraper') as mock_scraper_class, \
+             patch('app.main.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定
             mock_featured_manager.is_available.return_value = True
@@ -306,7 +306,7 @@ class TestTemplateGenerationAPI:
                 }
                 for template in mock_template_results
             ]
-            mock_generator.generate_templates_async.return_value = mock_featured_templates
+            mock_generator.generate_templates_async = AsyncMock(return_value=mock_featured_templates)
             mock_generator_class.return_value = mock_generator
             
             # APIリクエスト実行
@@ -315,7 +315,7 @@ class TestTemplateGenerationAPI:
                                      'keyword': 'くびれヘア',
                                      'gender': 'ladies',
                                      'season': None,
-                                     'model': 'gemini-2.5-flash'
+                                     'model': 'gemini-3-flash-preview'
                                  })
             
             # レスポンス検証
@@ -345,8 +345,8 @@ class TestTemplateGenerationAPI:
     def test_generate_with_normal_keyword(self, client, mock_scraper_results, mock_template_results):
         """テンプレート生成API - 通常キーワードでの生成テスト"""
         with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.scraping.HotPepperScraper') as mock_scraper_class, \
-             patch('app.generator.TemplateGenerator') as mock_generator_class:
+             patch('app.main.HotPepperScraper') as mock_scraper_class, \
+             patch('app.main.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（通常キーワード）
             mock_featured_manager.is_available.return_value = True
@@ -373,7 +373,7 @@ class TestTemplateGenerationAPI:
                 }
                 for template in mock_template_results
             ]
-            mock_generator.generate_templates_async.return_value = mock_normal_templates
+            mock_generator.generate_templates_async = AsyncMock(return_value=mock_normal_templates)
             mock_generator_class.return_value = mock_generator
             
             # APIリクエスト実行
@@ -382,7 +382,7 @@ class TestTemplateGenerationAPI:
                                      'keyword': 'ボブ',
                                      'gender': 'ladies',
                                      'season': None,
-                                     'model': 'gemini-2.5-flash'
+                                     'model': 'gemini-3-flash-preview'
                                  })
             
             # レスポンス検証
@@ -407,8 +407,8 @@ class TestTemplateGenerationAPI:
     def test_generate_with_mixed_keywords(self, client, mock_scraper_results, mock_template_results):
         """テンプレート生成API - 混在キーワードでの生成テスト"""
         with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.scraping.HotPepperScraper') as mock_scraper_class, \
-             patch('app.generator.TemplateGenerator') as mock_generator_class:
+             patch('app.main.HotPepperScraper') as mock_scraper_class, \
+             patch('app.main.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（混在キーワード）
             mock_featured_manager.is_available.return_value = True
@@ -453,7 +453,7 @@ class TestTemplateGenerationAPI:
                 }
                 for template in mock_template_results
             ]
-            mock_generator.generate_templates_async.return_value = mock_mixed_templates
+            mock_generator.generate_templates_async = AsyncMock(return_value=mock_mixed_templates)
             mock_generator_class.return_value = mock_generator
             
             # APIリクエスト実行（混在キーワード）
@@ -462,7 +462,7 @@ class TestTemplateGenerationAPI:
                                      'keyword': 'くびれヘア ボブ',
                                      'gender': 'ladies',
                                      'season': None,
-                                     'model': 'gemini-2.5-flash'
+                                     'model': 'gemini-3-flash-preview'
                                  })
             
             # レスポンス検証
@@ -528,7 +528,7 @@ class TestTemplateGenerationAPI:
     def test_generate_no_results_found(self, client):
         """テンプレート生成API - 結果が見つからない場合のテスト"""
         with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.scraping.HotPepperScraper') as mock_scraper_class:
+             patch('app.main.HotPepperScraper') as mock_scraper_class:
             
             # FeaturedKeywordsManagerのモック設定
             mock_featured_manager.is_available.return_value = True
@@ -605,8 +605,8 @@ class TestEndToEndIntegration:
         
         # Step 2: 取得した特集キーワードでテンプレート生成
         with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.scraping.HotPepperScraper') as mock_scraper_class, \
-             patch('app.generator.TemplateGenerator') as mock_generator_class:
+             patch('app.main.HotPepperScraper') as mock_scraper_class, \
+             patch('app.main.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定
             mock_featured_manager.is_available.return_value = True
@@ -630,7 +630,7 @@ class TestEndToEndIntegration:
             
             # TemplateGeneratorのモック設定
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async.return_value = [
+            mock_generator.generate_templates_async = AsyncMock(return_value=[
                 {
                     "title": "大人可愛いくびれヘアスタイル",
                     "menu": "カット + カラー",
@@ -644,7 +644,7 @@ class TestEndToEndIntegration:
                     'featured_gender': 'ladies',
                     'is_mixed_keyword': False
                 }
-            ]
+            ])
             mock_generator_class.return_value = mock_generator
             
             # テンプレート生成
@@ -668,8 +668,8 @@ class TestEndToEndIntegration:
     def test_fallback_behavior_when_featured_unavailable(self, client):
         """特集キーワード機能が利用できない場合のフォールバック動作テスト"""
         with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.scraping.HotPepperScraper') as mock_scraper_class, \
-             patch('app.generator.TemplateGenerator') as mock_generator_class:
+             patch('app.main.HotPepperScraper') as mock_scraper_class, \
+             patch('app.main.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（機能利用不可）
             mock_featured_manager.is_available.return_value = False
@@ -688,7 +688,7 @@ class TestEndToEndIntegration:
             
             # TemplateGeneratorのモック設定
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async.return_value = [
+            mock_generator.generate_templates_async = AsyncMock(return_value=[
                 {
                     "title": "おしゃれなヘアスタイル",
                     "menu": "カット",
@@ -699,7 +699,7 @@ class TestEndToEndIntegration:
                     'original_keyword': 'ボブ',
                     'is_mixed_keyword': False
                 }
-            ]
+            ])
             mock_generator_class.return_value = mock_generator
             
             # テンプレート生成（特集キーワード機能が利用できない状態）
@@ -722,8 +722,8 @@ class TestEndToEndIntegration:
     def test_error_recovery_and_logging(self, client):
         """エラー回復とログ記録のテスト"""
         with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.scraping.HotPepperScraper') as mock_scraper_class, \
-             patch('app.generator.TemplateGenerator') as mock_generator_class:
+             patch('app.main.HotPepperScraper') as mock_scraper_class, \
+             patch('app.main.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（エラー発生）
             mock_featured_manager.is_available.side_effect = Exception("特集キーワード機能エラー")
@@ -739,7 +739,7 @@ class TestEndToEndIntegration:
             
             # TemplateGeneratorのモック設定
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async.return_value = [
+            mock_generator.generate_templates_async = AsyncMock(return_value=[
                 {
                     "title": "フォールバックテンプレート",
                     "menu": "カット",
@@ -750,7 +750,7 @@ class TestEndToEndIntegration:
                     'original_keyword': 'テストキーワード',
                     'is_mixed_keyword': False
                 }
-            ]
+            ])
             mock_generator_class.return_value = mock_generator
             
             # テンプレート生成（エラー回復テスト）

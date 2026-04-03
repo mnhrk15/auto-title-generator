@@ -118,7 +118,7 @@ featured_manager = FeaturedKeywordsManager()
 def get_featured_keywords():
     """特集キーワード一覧を取得"""
     
-async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-2.5-flash') -> list:
+async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-3-flash-preview') -> list:
     # 特集キーワード判定ロジックを追加
     is_featured = featured_manager.is_featured_keyword(keyword)
     featured_info = featured_manager.get_keyword_info(keyword) if is_featured else None

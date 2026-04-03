@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 2.5 Flash AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, streamlined UI with blue color theme, and real-time keyword updates.
+This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 3 Flash Preview AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, streamlined UI with blue color theme, and real-time keyword updates.
 
 ## Common Development Commands
 
@@ -73,7 +73,7 @@ The application is configured for Render deployment:
 
 **Async Processing Pipeline**:
 1. **Web Scraping** (`/app/scraping.py`): `HotPepperScraper` class uses aiohttp to asynchronously scrape hairstyle titles from HotPepper Beauty
-2. **AI Generation** (`/app/generator.py`): `TemplateGenerator` class uses Google Gemini 2.5 Flash (default model) with thinking_budget=0 for optimized template generation
+2. **AI Generation** (`/app/generator.py`): `TemplateGenerator` class uses Google Gemini 3 Flash Preview (default model) with thinkingLevel=MINIMAL for optimized template generation
 3. **Request Handling** (`/app/main.py`): Async route `/api/generate` orchestrates the pipeline
 
 **Configuration Management** (`/app/config.py`):
@@ -83,9 +83,9 @@ The application is configured for Render deployment:
 - Character limits for each template component
 
 ### Data Flow
-1. User submits keyword + gender + optional season via web form (model automatically set to Gemini 2.5 Flash)
+1. User submits keyword + gender + optional season via web form (model automatically set to Gemini 3 Flash Preview)
 2. `HotPepperScraper.scrape_titles_async()` scrapes relevant hairstyle titles
-3. `TemplateGenerator.generate_templates_async()` sends titles + context to Gemini 2.5 Flash API
+3. `TemplateGenerator.generate_templates_async()` sends titles + context to Gemini 3 Flash Preview API
 4. Generated templates are validated against character limits and requirements
 5. Results returned as JSON to frontend
 
@@ -110,36 +110,29 @@ The application is configured for Render deployment:
 
 ### Google Gemini SDK Configuration
 
-**Dual SDK Architecture**: The application supports both new and legacy Google Gemini SDKs for maximum compatibility:
-
-**New SDK (Primary)**: `google-genai 1.27.0`
-- Supports thinking_budget parameter for performance optimization
-- Used in `TemplateGenerator` constructor: `self.client = new_genai.Client(api_key=config.GEMINI_API_KEY)`
-- Optimized generation with `thinking_budget=0` setting (disables internal reasoning)
-- Model: `gemini-2.5-flash` (default model, no user selection required)
-- Located at `app/generator.py:27`
-
-**Legacy SDK (Fallback)**: `google-generativeai 0.8.5`
-- Automatic fallback when new SDK fails (see `app/generator.py:249`)
-- Used via: `genai.GenerativeModel('gemini-2.5-flash')`
-- Maintains backward compatibility for all deployment environments
+**SDK**: `google-genai 1.70.0`
+- Google GenAI SDK for Gemini 3 models
+- Used in `TemplateGenerator` constructor: `self.client = genai.Client(api_key=config.GEMINI_API_KEY)`
+- Optimized generation with `thinkingLevel=MINIMAL` setting (minimizes internal reasoning for speed)
+- Default model: `gemini-3-flash-preview` (no user selection required)
+- Supported models: `gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`
+- Located at `app/generator.py`
 
 **Performance Optimization**:
 ```python
-# New SDK configuration in generator.py
+# SDK configuration in generator.py
 config_with_thinking = types.GenerateContentConfig(
-    temperature=0.7,
-    max_output_tokens=8192,
+    temperature=1.0,
+    max_output_tokens=32768,
     thinking_config=types.ThinkingConfig(
-        thinking_budget=0  # Disables thinking process for max speed
+        thinking_level=types.ThinkingLevel.MINIMAL  # Minimizes thinking for speed
     )
 )
 ```
 
 **Performance Metrics**:
-- Previous model (gemini-2.0-flash): ~27 seconds
-- Current model (gemini-2.5-flash + thinking_budget=0): ~8-10 seconds
-- **Performance improvement: ~70% faster**
+- Previous model (gemini-2.5-flash + thinking_budget=0): ~8-10 seconds
+- Current model (gemini-3-flash-preview + thinkingLevel=MINIMAL): TBD (to be benchmarked)
 
 ### Async/Await Usage
 The application uses async extensively throughout the entire pipeline:
@@ -212,10 +205,10 @@ All tests use pytest with async support (`@pytest.mark.asyncio` for async functi
 ### Performance Considerations
 
 **AI Generation Optimization**:
-- **Gemini 2.5 Flash**: Default model for template generation (no user selection needed)
-- **thinking_budget=0**: Disables internal reasoning for optimized speed
-- **Performance metrics**: ~8-10 seconds for 20 templates (~70% improvement over previous)
-- **Dual SDK strategy**: New SDK primary with automatic fallback to legacy SDK
+- **Gemini 3 Flash Preview**: Default model for template generation (no user selection needed)
+- **thinkingLevel=MINIMAL**: Minimizes internal reasoning for optimized speed
+- **temperature=1.0**: Required for Gemini 3 models (values below 1.0 cause degraded output)
+- **Performance metrics**: TBD (to be benchmarked after migration)
 
 **Resource Management**:
 - **Memory optimization**: gunicorn max_requests=1000 prevents memory leaks
@@ -230,15 +223,14 @@ All tests use pytest with async support (`@pytest.mark.asyncio` for async functi
 
 ### Model and SDK Management
 When updating AI models or SDKs:
-1. Test both new and legacy SDK paths in `generator.py:235-258`
-2. Verify `thinking_budget` parameter compatibility with new models
-3. Monitor performance metrics (target: <12 seconds for 20 templates)
-4. Ensure fallback functionality works correctly (`except` block at line 249)
-5. Update version numbers in `requirements.txt` and documentation
-6. Test async functionality with both SDK paths
-7. Validate JSON response parsing works with new model outputs
-8. Check character limits still work with updated generation patterns
-9. Update default model in JavaScript (`app/static/js/script.js:65`) if changing models
+1. Verify `thinking_level` parameter compatibility with new models (Gemini 3 uses `ThinkingLevel` enum)
+2. Monitor performance metrics (target: <12 seconds for 20 templates)
+3. Update version numbers in `requirements.txt` and documentation
+4. Test async functionality with the SDK
+5. Validate JSON response parsing works with new model outputs
+6. Check character limits still work with updated generation patterns
+7. Update default model in JavaScript (`app/static/js/script.js`) and `app/main.py` if changing models
+8. Update `supported_models` list in `app/generator.py` constructor
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

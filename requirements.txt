@@ -5,15 +5,15 @@ Flask[async]==3.0.2          # ASGI-enabled Flask for async support
 beautifulsoup4==4.12.3       # HTML parsing for HotPepper Beauty scraping
 aiohttp==3.9.3               # Async HTTP client for fast scraping
 
-# Google Gemini AI Integration (Dual SDK Architecture)
-google-generativeai==0.8.5   # Legacy SDK for backward compatibility
-google-genai==1.27.0         # New SDK with thinking_budget support for performance optimization
+# Google Gemini AI Integration
+google-genai==1.70.0         # Google GenAI SDK with Gemini 3 and thinkingLevel support
 
 # Configuration and Environment
 python-dotenv==1.0.1         # Environment variable management
 
 # Testing Framework
 pytest==8.1.1               # Testing framework
+pytest-asyncio==0.23.4      # Async test support for pytest
 responses==0.24.1            # HTTP request mocking for tests
 
 # HTTP Utilities

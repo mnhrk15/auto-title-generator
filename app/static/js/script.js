@@ -812,7 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const keyword = keywordInput.value.trim();
         const gender = document.querySelector('input[name="gender"]:checked').value;
         const season = document.getElementById('season').value;
-        const model = 'gemini-2.5-flash'; // デフォルトでGemini Flashを使用
+        const model = 'gemini-3-flash-preview'; // デフォルトでGemini 3 Flash Previewを使用
         
         if (!keyword) {
             showError('キーワードを入力してください。');

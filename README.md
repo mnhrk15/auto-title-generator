@@ -15,10 +15,8 @@
 
 ## 技術スタック
 - **バックエンド**: Python 3.11.8, Flask 3.0.2 (ASGI対応)
-- **AI**: Google Gemini 2.5 Flash (thinking_budget=0で高速化、デフォルトモデル)
-- **SDK**: デュアルSDK構成
-  - google-genai 1.27.0 (新SDK、thinking_budget対応)
-  - google-generativeai 0.8.5 (従来SDK、フォールバック用)
+- **AI**: Google Gemini 3 Flash Preview (thinkingLevel=MINIMALで高速化、デフォルトモデル)
+- **SDK**: google-genai 1.70.0
 - **フロントエンド**: HTML, CSS, JavaScript
 - **スクレイピング**: BeautifulSoup4 4.12.3, aiohttp 3.9.3 (完全非同期処理)
 - **本番環境**: Gunicorn 21.2.0 + Uvicorn 0.29.0 (ASGI対応)
@@ -266,12 +264,9 @@ template-generator/
 - **セッション管理**: async context managerで適切なリソース管理
 
 ### generator.py
-- **AI エンジン**: Google Gemini 2.5 Flash使用（デフォルトモデル、ユーザー選択不要）
-- **高速化**: thinking_budget=0設定で約70%の高速化を実現
-- **デュアルSDK**: 新SDK優先、自動フォールバック機能付き
-  - 新SDK: google-genai 1.27.0 (thinking_budget対応)
-  - 従来SDK: google-generativeai 0.8.5 (互換性維持)
-- **性能**: 20件のテンプレートを約8-10秒で生成
+- **AI エンジン**: Google Gemini 3 Flash Preview使用（デフォルトモデル、ユーザー選択不要）
+- **高速化**: thinkingLevel=MINIMAL設定で思考プロセスを最小化
+- **SDK**: google-genai 1.70.0
 - **非同期処理**: 完全async/await対応で高いスループット
 
 ### config.py
@@ -329,20 +324,9 @@ pytest tests/test_featured_*.py --cov=app.featured_keywords --cov-report=html
 ## パフォーマンス特性
 
 ### AI生成速度
-- **Gemini 2.5 Flash**: デフォルトモデル使用（ユーザー選択不要）
-- **thinking_budget=0**: 思考プロセス無効化で高速化
-- **実測値**: 20件テンプレート生成に約8-10秒
-- **改善率**: 従来比約70%高速化
-
-### デュアルSDK アーキテクチャ
-- **新SDK (Primary)**: google-genai 1.27.0
-  - thinking_budget=0 対応で高速化
-  - Gemini 2.5 Flash最適化（デフォルトモデル）
-- **従来SDK (Fallback)**: google-generativeai 0.8.5
-  - 後方互換性の維持
-  - 新SDK失敗時の自動フォールバック
-- **パフォーマンス**: 新SDK使用時は約70%高速化を実現
-- **信頼性**: デュアル構成により高い可用性を確保
+- **Gemini 3 Flash Preview**: デフォルトモデル使用（ユーザー選択不要）
+- **thinkingLevel=MINIMAL**: 思考プロセス最小化で高速化
+- **SDK**: google-genai 1.70.0
 
 ### 非同期処理アーキテクチャ
 - **Flask 3.0.2**: ASGI対応で非同期ルート処理
@@ -400,11 +384,9 @@ pytest tests/test_featured_*.py --cov=app.featured_keywords --cov-report=html
      - その他必要な環境変数（render.yamlで設定済み）
 
    **パフォーマンス最適化**: 
-   - **Gemini 2.5 Flash**: デフォルトAIモデル使用（ユーザー選択不要）
-   - **thinking_budget=0**: 思考プロセス無効化で高速化
-   - **デュアルSDK**: 新SDK優先、自動フォールバック
+   - **Gemini 3 Flash Preview**: デフォルトAIモデル使用（ユーザー選択不要）
+   - **thinkingLevel=MINIMAL**: 思考プロセス最小化で高速化
    - **非同期処理**: 完全async/awaitパイプライン
-   - **実測値**: 20件テンプレート生成を約8-10秒で完了（約70%高速化）
    - **リソース最適化**: MAX_PAGES=1でスクレイピング高速化
 
 4. デプロイを開始
