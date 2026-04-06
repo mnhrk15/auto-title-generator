@@ -15,8 +15,8 @@ class TestTemplateGeneratorIntegration:
         """実際のGemini APIを使用してテンプレートを生成"""
         titles = ["★髪質改善トリートメントで艶髪ストレート"]
         keyword = "髪質改善"
-        
-        templates = generator.generate_templates(titles, keyword)
+
+        templates, _trending = generator.generate_templates(titles, keyword)
         
         # 基本的な検証
         assert isinstance(templates, list)
@@ -50,12 +50,12 @@ class TestTemplateGeneratorIntegration:
             "髪質改善×うる艶カラー"
         ]
         keyword = "髪質改善"
-        
-        templates = await generator.generate_templates_async(titles, keyword)
-        
+
+        templates, _trending = await generator.generate_templates_async(titles, keyword)
+
         assert isinstance(templates, list)
         assert len(templates) <= config.MAX_TEMPLATES
-        
+
         # 生成されたテンプレートが入力タイトルと完全に同じでないことを確認
         generated_titles = [template["title"] for template in templates]
         assert not any(title in titles for title in generated_titles)
@@ -67,11 +67,11 @@ class TestTemplateGeneratorIntegration:
         keywords = ["髪質改善", "透明感カラー", "艶髪"]
         
         for keyword in keywords:
-            templates = await generator.generate_templates_async(titles, keyword)
-            
+            templates, _trending = await generator.generate_templates_async(titles, keyword)
+
             assert isinstance(templates, list)
             assert len(templates) <= config.MAX_TEMPLATES
-            
+
             # 各テンプレートにキーワードが含まれているか確認
             for template in templates:
                 assert keyword in template["title"]

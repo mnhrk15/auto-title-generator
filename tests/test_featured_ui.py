@@ -629,7 +629,7 @@ class TestFeaturedKeywordsIntegrationUI:
             
             # テンプレートジェネレーターのモック設定
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async.return_value = [
+            mock_generator.generate_templates_async.return_value = ([
                 {
                     "title": "大人可愛いくびれヘアスタイル",
                     "menu": "カット + カラー",
@@ -644,7 +644,7 @@ class TestFeaturedKeywordsIntegrationUI:
                     'featured_gender': 'ladies',
                     'is_mixed_keyword': False
                 }
-            ]
+            ], [])
             mock_generator_class.return_value = mock_generator
             
             # テスト実行
@@ -744,7 +744,7 @@ class TestFeaturedKeywordsIntegrationUI:
             mock_scraper_class.return_value = mock_scraper
             
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async.return_value = [
+            mock_generator.generate_templates_async.return_value = ([
                 {
                     "title": "特集対応くびれヘアスタイル",
                     "menu": "カット + カラー",
@@ -754,7 +754,7 @@ class TestFeaturedKeywordsIntegrationUI:
                     'keyword_type': 'featured',
                     'processing_mode': 'featured'
                 }
-            ]
+            ], [])
             mock_generator_class.return_value = mock_generator
             
             chrome_driver.get(flask_server)

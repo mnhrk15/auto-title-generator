@@ -1,6 +1,7 @@
 import os
 import logging
 # import asyncio # Removed as run_async_task is deleted
+from typing import List, Dict, Tuple
 from logging.handlers import RotatingFileHandler
 from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
@@ -196,8 +197,12 @@ def get_featured_keywords():
         }), 200
 
 # スクレイピングと生成を非同期で行う関数
-async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-3-flash-preview') -> list:
-    """スクレイピングとテンプレート生成を非同期で処理する"""
+async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-3-flash-preview') -> Tuple[List[Dict], List[Dict]]:
+    """スクレイピングとテンプレート生成を非同期で処理する
+
+    Returns:
+        (templates, trending_keywords) のタプル
+    """
     current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", モデル: "{model}"')
     
     # 混在キーワード処理の実装（特集キーワードと通常キーワードの適切な判定処理）
@@ -366,7 +371,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     
     if not titles:
         current_app.logger.warning(f'キーワード "{keyword}" に一致するヘアスタイルが見つかりませんでした')
-        return []
+        return [], []
         
     # 非同期でテンプレート生成を実行（特集情報と処理モード情報を渡す）
     current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, シーズン: "{season}", モデル: "{model}", 特集対応: {is_featured}, 処理モード: {processing_mode}')
@@ -380,16 +385,18 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
         'normalized_keyword': normalized_keyword if 'normalized_keyword' in locals() else keyword
     }
     
-    templates = await generator.generate_templates_async(
-        titles, 
-        keyword, 
-        season, 
-        gender, 
+    templates, trending_keywords = await generator.generate_templates_async(
+        titles,
+        keyword,
+        season,
+        gender,
         featured_info=featured_info,
         generation_context=generation_context
     )
-    
+
     current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
+    if trending_keywords:
+        current_app.logger.info(f'トレンドキーワード: {[kw.get("keyword", "") for kw in trending_keywords if isinstance(kw, dict)]}')
     
     # 生成されたテンプレートをログに記録
     for i, template in enumerate(templates):
@@ -433,7 +440,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     else:
         current_app.logger.info(f'通常テンプレート生成完了: {len(templates)}件 (キーワード: "{keyword}", 処理モード: {processing_mode})')
     
-    return templates
+    return templates, trending_keywords
 
 @main_bp.route('/api/generate', methods=['POST'])
 async def generate():
@@ -492,8 +499,8 @@ async def generate():
             }), 400
             
         # 非同期処理を直接 await
-        templates = await process_template_generation(keyword, gender, season, model)
-        
+        templates, trending_keywords = await process_template_generation(keyword, gender, season, model)
+
         if not templates:
             return jsonify({
                 'success': False,
@@ -523,6 +530,7 @@ async def generate():
         return jsonify({
             'success': True,
             'templates': templates,
+            'trending_keywords': trending_keywords,
             'is_featured': response_is_featured,
             'keyword_type': response_keyword_type,
             'processing_mode': response_processing_mode,

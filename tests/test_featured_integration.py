@@ -306,7 +306,7 @@ class TestTemplateGenerationAPI:
                 }
                 for template in mock_template_results
             ]
-            mock_generator.generate_templates_async = AsyncMock(return_value=mock_featured_templates)
+            mock_generator.generate_templates_async = AsyncMock(return_value=(mock_featured_templates, []))
             mock_generator_class.return_value = mock_generator
             
             # APIリクエスト実行
@@ -373,7 +373,7 @@ class TestTemplateGenerationAPI:
                 }
                 for template in mock_template_results
             ]
-            mock_generator.generate_templates_async = AsyncMock(return_value=mock_normal_templates)
+            mock_generator.generate_templates_async = AsyncMock(return_value=(mock_normal_templates, []))
             mock_generator_class.return_value = mock_generator
             
             # APIリクエスト実行
@@ -453,7 +453,7 @@ class TestTemplateGenerationAPI:
                 }
                 for template in mock_template_results
             ]
-            mock_generator.generate_templates_async = AsyncMock(return_value=mock_mixed_templates)
+            mock_generator.generate_templates_async = AsyncMock(return_value=(mock_mixed_templates, []))
             mock_generator_class.return_value = mock_generator
             
             # APIリクエスト実行（混在キーワード）
@@ -630,7 +630,7 @@ class TestEndToEndIntegration:
             
             # TemplateGeneratorのモック設定
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async = AsyncMock(return_value=[
+            mock_generator.generate_templates_async = AsyncMock(return_value=([
                 {
                     "title": "大人可愛いくびれヘアスタイル",
                     "menu": "カット + カラー",
@@ -644,7 +644,7 @@ class TestEndToEndIntegration:
                     'featured_gender': 'ladies',
                     'is_mixed_keyword': False
                 }
-            ])
+            ], []))
             mock_generator_class.return_value = mock_generator
             
             # テンプレート生成
@@ -688,7 +688,7 @@ class TestEndToEndIntegration:
             
             # TemplateGeneratorのモック設定
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async = AsyncMock(return_value=[
+            mock_generator.generate_templates_async = AsyncMock(return_value=([
                 {
                     "title": "おしゃれなヘアスタイル",
                     "menu": "カット",
@@ -699,7 +699,7 @@ class TestEndToEndIntegration:
                     'original_keyword': 'ボブ',
                     'is_mixed_keyword': False
                 }
-            ])
+            ], []))
             mock_generator_class.return_value = mock_generator
             
             # テンプレート生成（特集キーワード機能が利用できない状態）
@@ -739,7 +739,7 @@ class TestEndToEndIntegration:
             
             # TemplateGeneratorのモック設定
             mock_generator = MagicMock()
-            mock_generator.generate_templates_async = AsyncMock(return_value=[
+            mock_generator.generate_templates_async = AsyncMock(return_value=([
                 {
                     "title": "フォールバックテンプレート",
                     "menu": "カット",
@@ -750,7 +750,7 @@ class TestEndToEndIntegration:
                     'original_keyword': 'テストキーワード',
                     'is_mixed_keyword': False
                 }
-            ])
+            ], []))
             mock_generator_class.return_value = mock_generator
             
             # テンプレート生成（エラー回復テスト）

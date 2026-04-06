@@ -27,7 +27,7 @@ def test_generate_templates_route_success(client):
     mock_templates = [{"title": "★新テンプレート", "menu": "カット+トリートメント", "comment": "サンプルコメント", "hashtag": ["髪質改善"]}]
 
     with patch('app.main.HotPepperScraper.scrape_titles_async', new_callable=AsyncMock, return_value=mock_titles) as mock_scrape, \
-         patch('app.main.TemplateGenerator.generate_templates_async', new_callable=AsyncMock, return_value=mock_templates) as mock_generate:
+         patch('app.main.TemplateGenerator.generate_templates_async', new_callable=AsyncMock, return_value=(mock_templates, [])) as mock_generate:
 
         response = client.post('/api/generate', json={'keyword': '髪質改善', 'gender': 'ladies'})
         assert response.status_code == 200
