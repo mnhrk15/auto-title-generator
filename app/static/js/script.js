@@ -23,16 +23,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const templatesLoading = document.getElementById('templates-loading');
     
     // プログレスバーの状態
+    // 実測平均 25 秒の生成処理に合わせ、3 ステップ (合計 24 秒) + creep フェーズで構成。
+    // 100% は API 応答時にのみ completeProgress() で設定する。
     let progressState = {
         currentStep: 0,
+        currentPercent: 0,
         steps: [
-            { name: 'スクレイピング中...', percent: 20, duration: 5000 },
-            { name: 'タイトル解析中...', percent: 40, duration: 3000 },
-            { name: 'テンプレート生成中...', percent: 85, duration: 10000 },
-            { name: '完了', percent: 100, duration: 300 }
+            { name: 'スクレイピング中...', percent: 25, duration: 7000 },
+            { name: 'トレンド分析中...', percent: 35, duration: 3000 },
+            { name: 'テンプレート生成中...', percent: 90, duration: 14000 }
         ],
         interval: null,
-        subInterval: null
+        subInterval: null,
+        creepInterval: null
     };
     
     // ページネーション状態
@@ -837,7 +840,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // タイムアウト設定付きでfetch
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000); // 60秒タイムアウト
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120秒タイムアウト
             
             const response = await fetch('/api/generate', {
                 method: 'POST',
@@ -918,10 +921,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('テンプレート生成中にエラー:', error);
-            
-            // プログレスを完了に設定
-            completeProgress();
-            
+
+            // エラー時はシミュレーションのみ停止 (一瞬「100% 完了」と見える不具合を回避)
+            stopProgressSimulation();
+
             // エラーの種類に応じた処理
             let errorMessage = 'テンプレートの生成中にエラーが発生しました。';
             
@@ -953,23 +956,26 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // プログレスバーをリセット
     function resetProgress() {
+        // 残存タイマーがあれば全停止 (連打や前回エラー時の状態汚染を防ぐ)
+        stopProgressSimulation();
         progressState.currentStep = 0;
+        progressState.currentPercent = 0;
         updateProgressUI(0, progressState.steps[0].name);
-        
+
         // すべてのステップインジケーターをリセット
         stepIndicators.forEach((indicator, index) => {
             indicator.classList.remove('active', 'completed');
         });
-        
+
         // 最初のステップをアクティブにする
         stepIndicators[0].classList.add('active');
     }
     
     // プログレスシミュレーションを開始
     function startProgressSimulation() {
-        // 既存のインターバルをクリア
+        // 既存のタイマーをクリア (interval は setTimeout 由来なので clearTimeout)
         if (progressState.interval) {
-            clearInterval(progressState.interval);
+            clearTimeout(progressState.interval);
         }
         if (progressState.subInterval) {
             clearInterval(progressState.subInterval);
@@ -994,21 +1000,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const endPercent = currentStep.percent;
         const duration = currentStep.duration;
         const stepSize = (endPercent - startPercent) / (duration / 100); // 100msごとの増加量
-        
-        let currentPercent = startPercent;
-        
+
+        // creep フェーズと共有するため progressState に書き込む
+        progressState.currentPercent = startPercent;
+
         // 既存のサブインターバルをクリア
         if (progressState.subInterval) {
             clearInterval(progressState.subInterval);
         }
-        
+
         // 段階的に進行状況を更新
         progressState.subInterval = setInterval(() => {
-            currentPercent = Math.min(currentPercent + stepSize, endPercent);
-            updateProgressUI(Math.floor(currentPercent), currentStep.name);
-            
-            if (currentPercent >= endPercent) {
+            progressState.currentPercent = Math.min(progressState.currentPercent + stepSize, endPercent);
+            updateProgressUI(Math.floor(progressState.currentPercent), currentStep.name);
+
+            if (progressState.currentPercent >= endPercent) {
                 clearInterval(progressState.subInterval);
+                progressState.subInterval = null;
             }
         }, 100);
     }
@@ -1020,20 +1028,48 @@ document.addEventListener('DOMContentLoaded', () => {
             progressState.currentStep + 1,
             progressState.steps.length - 1
         );
-        
+
         // ステップインジケーターを更新
         updateStepIndicators();
-        
+
         // 現在のステップのアニメーションを開始
         startSubProgressAnimation(progressState.currentStep);
-        
-        // 最終ステップでなければ、次のステップの準備
+
         if (progressState.currentStep < progressState.steps.length - 1) {
+            // 最終ステップでなければ、次のステップの準備
             progressState.interval = setTimeout(
-                moveToNextStep, 
+                moveToNextStep,
+                progressState.steps[progressState.currentStep].duration
+            );
+        } else {
+            // 最終ステップ完了後は creep フェーズへ移行 (API 応答待ちを表現)
+            progressState.interval = setTimeout(
+                startCreepPhase,
                 progressState.steps[progressState.currentStep].duration
             );
         }
+    }
+
+    // 上限に達した後、API 応答待ちの間 99% へ漸近させる
+    function startCreepPhase() {
+        // sub-animation が残っていれば停止
+        if (progressState.subInterval) {
+            clearInterval(progressState.subInterval);
+            progressState.subInterval = null;
+        }
+        if (progressState.creepInterval) {
+            clearInterval(progressState.creepInterval);
+        }
+
+        progressState.creepInterval = setInterval(() => {
+            const remaining = 99 - progressState.currentPercent;
+            if (remaining <= 0.1) return;
+            progressState.currentPercent += remaining * 0.10;
+            updateProgressUI(
+                Math.floor(progressState.currentPercent),
+                'テンプレート生成中...'
+            );
+        }, 1200);
     }
     
     // ステップインジケーターを更新
@@ -1067,6 +1103,10 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(progressState.subInterval);
             progressState.subInterval = null;
         }
+        if (progressState.creepInterval) {
+            clearInterval(progressState.creepInterval);
+            progressState.creepInterval = null;
+        }
     }
     
     // プログレスを100%に設定
@@ -1086,12 +1126,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // パーセントを更新
         progressFill.style.width = `${percent}%`;
         progressPercent.textContent = `${percent}%`;
-        
+
         // ステップ名を更新
         progressStep.textContent = stepName;
-        
+
         // ロード中のメッセージを更新
-        loadingMessage.textContent = `テンプレートを${stepName}`;
+        loadingMessage.textContent = stepName;
     }
     
     // 成功トースト表示
