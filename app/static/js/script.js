@@ -1743,7 +1743,7 @@ ${hashtagTextarea.value}`;
                 `"${template.title.replace(/"/g, '""')}"`,
                 `"${template.menu.replace(/"/g, '""')}"`,
                 `"${template.comment.replace(/"/g, '""')}"`,
-                `"${(Array.isArray(template.hashtag) ? template.hashtag.join(',') : '').replace(/"/g, '""')}"`,
+                `"${(Array.isArray(template.hashtag) ? template.hashtag.join(',') : (template.hashtag || '')).replace(/"/g, '""')}"`,
             ].join(','));
             
             // BOMを追加し、ヘッダーと行を結合
