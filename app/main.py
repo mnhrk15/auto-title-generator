@@ -197,7 +197,7 @@ def get_featured_keywords():
         }), 200
 
 # スクレイピングと生成を非同期で行う関数
-async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-3-flash-preview') -> Tuple[List[Dict], List[Dict]]:
+async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-3.1-flash-lite') -> Tuple[List[Dict], List[Dict]]:
     """スクレイピングとテンプレート生成を非同期で処理する
 
     Returns:
@@ -473,7 +473,7 @@ async def generate():
         keyword = data.get('keyword')
         gender = data.get('gender', 'ladies')
         season = data.get('season') # 'none' や空文字の場合もありうる
-        model = data.get('model', 'gemini-3-flash-preview') # モデル選択（デフォルト）
+        model = data.get('model', 'gemini-3.1-flash-lite') # モデル選択（デフォルト）
         num_templates = int(data.get('num_templates', 5)) # この変数は現在 process_template_generation で使われていないが、将来のために残す
         
         current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", モデル: "{model}", テンプレート数: {num_templates}')

@@ -114,8 +114,8 @@ The application is configured for Render deployment:
 - Google GenAI SDK for Gemini 3 models
 - Used in `TemplateGenerator` constructor: `self.client = genai.Client(api_key=config.GEMINI_API_KEY)`
 - Optimized generation with `thinkingLevel=MINIMAL` setting (minimizes internal reasoning for speed)
-- Default model: `gemini-3-flash-preview` (no user selection required)
-- Supported models: `gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`
+- Default model: `gemini-3.1-flash-lite` (no user selection required)
+- Supported models: `gemini-3.1-flash-lite`, `gemini-3-flash-preview`
 - Located at `app/generator.py`
 
 **Performance Optimization**:
@@ -132,7 +132,7 @@ config_with_thinking = types.GenerateContentConfig(
 
 **Performance Metrics**:
 - Previous model (gemini-2.5-flash + thinking_budget=0): ~8-10 seconds
-- Current model (gemini-3-flash-preview + thinkingLevel=MINIMAL): TBD (to be benchmarked)
+- Current model (gemini-3.1-flash-lite + thinkingLevel=MINIMAL): TBD (to be benchmarked)
 
 ### Async/Await Usage
 The application uses async extensively throughout the entire pipeline:
