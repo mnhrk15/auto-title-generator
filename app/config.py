@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -48,6 +50,16 @@ PV_BOOST_KEYWORDS = [
     "冬カラー",
 ]
 PV_BOOST_COUNT_PER_KEYWORD = 2
+
+# Maintenance Notice
+JST = ZoneInfo('Asia/Tokyo')
+
+# 臨時システムメンテナンス告知（'end' を過ぎると自動的に非表示になる。終了後はこの定数と関連コードを削除する）
+MAINTENANCE_NOTICE = {
+    'end': datetime(2026, 7, 21, 8, 0, tzinfo=JST),
+    'message': 'HOT PEPPER Beauty／SALON BOARD の臨時システムメンテナンスのため、'
+               '7月21日(火) 1:00〜8:00頃は本アプリのタイトル生成をご利用いただけません。',
+}
 
 # Flask Settings
 class Config:
