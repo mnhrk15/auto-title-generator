@@ -10,6 +10,13 @@
     </div>
 </header>
 
+{% if maintenance_notice %}
+<div class="maintenance-notice" role="status">
+    <i class="fas fa-triangle-exclamation"></i>
+    <span>{{ maintenance_notice }}</span>
+</div>
+{% endif %}
+
 <main class="app-main">
     <div class="container">
         <!-- 検索セクションを独立させる -->

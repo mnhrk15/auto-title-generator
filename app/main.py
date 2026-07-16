@@ -1,13 +1,14 @@
 import os
 import logging
 # import asyncio # Removed as run_async_task is deleted
+from datetime import datetime
 from typing import List, Dict, Tuple
 from logging.handlers import RotatingFileHandler
 from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
 from .scraping import HotPepperScraper
 from .generator import TemplateGenerator
-from .config import GEMINI_API_KEY
+from .config import GEMINI_API_KEY, JST, MAINTENANCE_NOTICE
 from .featured_keywords import FeaturedKeywordsManager
 from . import featured_keywords
 
@@ -98,11 +99,19 @@ def favicon():
     """faviconのルート"""
     return current_app.send_static_file('favicon.ico')
 
+def get_maintenance_notice():
+    """メンテナンス告知の文言を返す。期間終了後・未設定の場合は None。"""
+    if not MAINTENANCE_NOTICE:
+        return None
+    if datetime.now(JST) >= MAINTENANCE_NOTICE['end']:
+        return None
+    return MAINTENANCE_NOTICE['message']
+
 @main_bp.route('/')
 def index():
     """トップページのルート"""
     current_app.logger.info('トップページにアクセスがありました')
-    return render_template('index.html')
+    return render_template('index.html', maintenance_notice=get_maintenance_notice())
 
 @main_bp.route('/api/featured-keywords', methods=['GET'])
 def get_featured_keywords():

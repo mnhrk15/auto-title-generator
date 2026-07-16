@@ -1,6 +1,8 @@
 import pytest
 from app import create_app
+from app.config import JST
 import json
+from datetime import datetime, timedelta
 from unittest.mock import patch, AsyncMock
 
 @pytest.fixture
@@ -20,6 +22,30 @@ def test_index_route(client):
     response = client.get('/')
     assert response.status_code == 200
     assert 'ヘアスタイルタイトルジェネレーター' in response.data.decode('utf-8')
+
+def test_index_shows_maintenance_notice_before_end(client, monkeypatch):
+    """メンテナンス終了前: 告知バナーが表示される"""
+    notice = {
+        'end': datetime.now(JST) + timedelta(days=1),
+        'message': 'テスト用メンテナンス告知',
+    }
+    monkeypatch.setattr('app.main.MAINTENANCE_NOTICE', notice)
+
+    response = client.get('/')
+    assert response.status_code == 200
+    assert 'テスト用メンテナンス告知' in response.data.decode('utf-8')
+
+def test_index_hides_maintenance_notice_after_end(client, monkeypatch):
+    """メンテナンス終了後: 告知バナーが表示されない"""
+    notice = {
+        'end': datetime.now(JST) - timedelta(days=1),
+        'message': 'テスト用メンテナンス告知',
+    }
+    monkeypatch.setattr('app.main.MAINTENANCE_NOTICE', notice)
+
+    response = client.get('/')
+    assert response.status_code == 200
+    assert 'テスト用メンテナンス告知' not in response.data.decode('utf-8')
 
 def test_generate_templates_route_success(client):
     """正常系: テンプレート生成が成功するケース"""

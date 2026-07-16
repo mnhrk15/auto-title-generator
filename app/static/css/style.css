@@ -928,6 +928,50 @@ input[type="text"]:focus+.search-icon {
     }
 }
 
+/* メンテナンス告知バナー */
+.maintenance-notice {
+    background-color: rgba(77, 166, 255, 0.08);
+    color: var(--text-color);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    max-width: 700px;
+    margin: var(--spacing-lg) auto 0;
+    border-left: 4px solid var(--warning-color);
+    box-shadow: var(--shadow-sm);
+    font-weight: 500;
+    line-height: 1.6;
+}
+
+.maintenance-notice i {
+    font-size: 1.4rem;
+    color: var(--warning-color);
+    background-color: rgba(77, 166, 255, 0.12);
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+@media (max-width: 576px) {
+    .maintenance-notice {
+        margin: var(--spacing-md) auto 0;
+        padding: var(--spacing-sm) var(--spacing-md);
+        font-size: 0.85rem;
+    }
+
+    .maintenance-notice i {
+        font-size: 1.1rem;
+        width: 28px;
+        height: 28px;
+    }
+}
+
 /* エラーメッセージ */
 .error-message {
     background-color: rgba(239, 71, 111, 0.08);
