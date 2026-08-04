@@ -90,6 +90,52 @@ def test_generate_templates_route_generation_error(client):
         assert data['success'] is False
         assert '予期せぬエラーが発生しました' in data['error']['message']
 
+def test_generate_templates_route_passes_seasons(client):
+    """季節・カラー選択が正規化されてジェネレーターに渡されるテスト"""
+    mock_titles = ["★髪質改善トリートメントで艶髪ストレート"]
+    mock_templates = [{"title": "★新テンプレート", "menu": "カット", "comment": "コメント", "hashtag": ["髪質改善"]}]
+
+    with patch('app.main.HotPepperScraper.scrape_titles_async', new_callable=AsyncMock, return_value=mock_titles), \
+         patch('app.main.TemplateGenerator.generate_templates_async', new_callable=AsyncMock, return_value=(mock_templates, [])) as mock_generate:
+
+        response = client.post('/api/generate', json={
+            'keyword': '髪質改善',
+            'gender': 'ladies',
+            # 定義順と異なる順序・未知の値・重複を含めても正規化される
+            'seasons': ['bleach_free', 'unknown', 'spring', 'spring']
+        })
+        assert response.status_code == 200
+        assert mock_generate.call_args.args[2] == ['spring', 'bleach_free']
+
+def test_generate_templates_route_ignores_seasons_for_mens(client):
+    """メンズでは季節・カラー選択が無視されるテスト"""
+    mock_titles = ["★メンズマッシュ×ニュアンスパーマ"]
+    mock_templates = [{"title": "★新テンプレート", "menu": "カット", "comment": "コメント", "hashtag": ["メンズ"]}]
+
+    with patch('app.main.HotPepperScraper.scrape_titles_async', new_callable=AsyncMock, return_value=mock_titles), \
+         patch('app.main.TemplateGenerator.generate_templates_async', new_callable=AsyncMock, return_value=(mock_templates, [])) as mock_generate:
+
+        response = client.post('/api/generate', json={
+            'keyword': 'メンズパーマ',
+            'gender': 'mens',
+            'seasons': ['spring', 'bleach_free']
+        })
+        assert response.status_code == 200
+        assert mock_generate.call_args.args[2] == []
+
+def test_generate_templates_route_invalid_seasons_type(client):
+    """seasons がリスト形式でない場合のテスト"""
+    response = client.post('/api/generate', json={
+        'keyword': '髪質改善',
+        'gender': 'ladies',
+        'seasons': 'spring'
+    })
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert data['success'] is False
+    assert data['error']['code'] == 'VALIDATION_ERROR'
+    assert '季節・カラーの指定形式' in data['error']['message']
+
 def test_generate_templates_route_invalid_json(client):
     """不正なJSONリクエストのテスト"""
     response = client.post('/api/generate', data='invalid json', content_type='application/json')

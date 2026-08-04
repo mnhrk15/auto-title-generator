@@ -41,23 +41,36 @@
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="keyword" placeholder="例：髪質改善" maxlength="50">
                     </div>
-                    <div class="input-wrapper season-selection">
-                        <i class="fas fa-calendar-alt season-icon"></i>
-                        <select id="season" class="season-select">
-                            <option value="none" selected>季節を指定しない</option>
-                            <option value="spring">春</option>
-                            <option value="summer">夏</option>
-                            <option value="autumn">秋</option>
-                            <option value="winter">冬</option>
-                            <option value="all_year">通年</option>
-                            <option value="graduation_entrance">卒業・入学</option>
-                            <option value="rainy_season">梅雨</option>
-                            <option value="year_end_new_year">年末年始・成人式</option>
-                        </select>
-                    </div>
                     <button id="generate-button" class="primary-button">
                         <i class="fas fa-magic"></i> 生成
                     </button>
+                </div>
+                <div class="season-selection" id="season-selection" role="group" aria-labelledby="season-selection-label">
+                    <span class="season-selection-label" id="season-selection-label">
+                        <i class="fas fa-palette"></i> 季節・カラー<small>（複数選択可・任意）</small>
+                    </span>
+                    <div class="season-options">
+                        <label class="season-option">
+                            <input type="checkbox" name="season" value="spring">
+                            <span class="checkbox-label">春</span>
+                        </label>
+                        <label class="season-option">
+                            <input type="checkbox" name="season" value="summer">
+                            <span class="checkbox-label">夏</span>
+                        </label>
+                        <label class="season-option">
+                            <input type="checkbox" name="season" value="autumn">
+                            <span class="checkbox-label">秋</span>
+                        </label>
+                        <label class="season-option">
+                            <input type="checkbox" name="season" value="winter">
+                            <span class="checkbox-label">冬</span>
+                        </label>
+                        <label class="season-option">
+                            <input type="checkbox" name="season" value="bleach_free">
+                            <span class="checkbox-label">ブリーチなしカラー</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -159,7 +172,82 @@
             <div class="template-heading">
                 <h2>あなたのキーワードに最適化されたテンプレート</h2>
             </div>
-            
+
+            <!-- メンズ生成時のみ表示する注釈 -->
+            <div id="mens-title-notice" class="mens-notice hidden" role="note">
+                <i class="fas fa-circle-info"></i>
+                <div class="mens-notice-body">
+                    <p class="mens-notice-text">スタイル名が30文字のキーワードになるよう、キーワードが少ない言葉を選んだ場合はご自身で1〜2語足して活用ください</p>
+                    <details class="mens-notice-collapsible">
+                        <summary class="mens-notice-summary"><span>足す語の例</span></summary>
+                        <div class="mens-notice-content">
+                            <div class="mens-word-group is-priority">
+                                <span class="mens-word-group-title">優先</span>
+                                <ul class="mens-word-list">
+                                    <li>シースルーセンターパート</li>
+                                    <li>シースルーマッシュ</li>
+                                    <li>シースルーマッシュウルフ</li>
+                                    <li>シースルーラウンドマッシュ</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>フェイスレイヤー</li>
+                                    <li>ラウンドマッシュ</li>
+                                    <li>マッシュウルフ</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>韓国ヘア</li>
+                                    <li>韓国風ウルフ</li>
+                                    <li>コンマヘア</li>
+                                    <li>カルマヘア</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>ツーブロック</li>
+                                    <li>アップバング</li>
+                                    <li>フェード</li>
+                                    <li>スキンフェード</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>フェザーパーマ</li>
+                                    <li>フェザーカット</li>
+                                    <li>刈り上げショート</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>ニュアンスパーマ</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>サーフカール</li>
+                                    <li>スペインカール</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>ツイストスパイラルパーマ</li>
+                                </ul>
+                            </div>
+                            <div class="mens-word-group">
+                                <ul class="mens-word-list">
+                                    <li>スーツ髪型</li>
+                                    <li>スーツ黒髪</li>
+                                    <li>メンズビジネス</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
             <!-- ローディングスピナー -->
             <div id="templates-loading" class="loading-spinner">
                 <div class="spinner"></div>

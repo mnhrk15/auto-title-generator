@@ -118,7 +118,7 @@ featured_manager = FeaturedKeywordsManager()
 def get_featured_keywords():
     """特集キーワード一覧を取得"""
     
-async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-3-flash-preview') -> list:
+async def process_template_generation(keyword: str, gender: str, seasons: List[str] = None, model: str = 'gemini-3-flash-preview') -> list:
     # 特集キーワード判定ロジックを追加
     is_featured = featured_manager.is_featured_keyword(keyword)
     featured_info = featured_manager.get_keyword_info(keyword) if is_featured else None
@@ -126,7 +126,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     # TemplateGeneratorに特集情報を渡す
     generator = TemplateGenerator(model_name=model)
     templates = await generator.generate_templates_async(
-        titles, keyword, season, gender, 
+        titles, keyword, seasons, gender, 
         featured_info=featured_info
     )
 ```
@@ -138,19 +138,19 @@ class TemplateGenerator:
         self, 
         titles: List[str], 
         keyword: str, 
-        season: str = None, 
+        seasons: List[str] = None, 
         gender: str = 'ladies',
         featured_info: Dict = None  # 新規追加
     ) -> List[Dict[str, str]]:
         
-        prompt = self._create_prompt(titles, keyword, season, gender, featured_info)
+        prompt = self._create_prompt(titles, keyword, seasons, gender, featured_info)
         # 既存のロジック継続
         
     def _create_prompt(
         self, 
         titles: List[str], 
         keyword: str, 
-        season: str = None, 
+        seasons: List[str] = None, 
         gender: str = 'ladies',
         featured_info: Dict = None  # 新規追加
     ) -> str:
@@ -256,7 +256,7 @@ interface FeaturedKeyword {
 interface TemplateGenerationRequest {
     keyword: string;
     gender: 'ladies' | 'mens';
-    season?: string;
+    seasons?: string[];  // 'spring'|'summer'|'autumn'|'winter'|'bleach_free'（レディースのみ）
     model?: string;
     // 内部的に判定される
     isFeatured?: boolean;
