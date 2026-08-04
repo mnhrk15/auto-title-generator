@@ -28,28 +28,26 @@ CHAR_LIMITS = {
     'hashtag': 20  # per word
 }
 
-# Season Keywords for Prompt Engineering
-SEASON_KEYWORDS = {
-    "spring": ["春カラー", "スプリング"],
-    "summer": ["夏カラー", "サマー"],
-    "autumn": ["秋カラー", "オータム"],
-    "winter": ["冬カラー", "ウィンター"],
-    "all_year": ["定番", "いつでも人気", "ベーシック"],
-    "graduation_entrance": ["卒業式", "入学式", "卒園式", "入園式", "新生活応援"],
-    "rainy_season": ["梅雨", "湿気対策", "うねり解消", "縮毛矯正", "ストレートパーマ"],
-    "year_end_new_year": ["年末年始", "クリスマス", "お正月", "冬休み", "カウントダウン", "成人式"]
+# 季節・カラー付加キーワード（レディースのみ。UIのチェックボックスで複数選択できる）
+# キーは index.html の input[name="season"] の value と一対一で対応する
+SEASON_COLOR_CHOICES = {
+    "spring": "春カラー",
+    "summer": "夏カラー",
+    "autumn": "秋カラー",
+    "winter": "冬カラー",
+    "bleach_free": "ブリーチなしカラー",
 }
-
-# PV Boost Keywords - PV数向上に効果的なキーワード
-# 各キーワードが MAX_TEMPLATES 中 PV_BOOST_COUNT_PER_KEYWORD 個のタイトルに含まれる
-PV_BOOST_KEYWORDS = [
-    "ブリーチなしカラー",
-    "春カラー",
-    "夏カラー",
-    "秋カラー",
-    "冬カラー",
-]
-PV_BOOST_COUNT_PER_KEYWORD = 2
+# 付加時の区切り記号。タイトルが SEASON_APPEND_DELIMITERS の記号を使っていればそれに合わせ、
+# 使っていなければ SEASON_APPEND_SEPARATORS をこの順にローテーションする
+SEASON_APPEND_SEPARATORS = ("◎", "/", "×")
+SEASON_APPEND_DELIMITERS = ("/", "×")
+SEASON_APPEND_THRESHOLD = 26       # この文字数未満のタイトルのみ付加対象
+# 短尺タイトル枠: 付加後にちょうど上限文字数へ届くよう、付加する語の長さごとに目標帯を作る。
+# 目標帯の上限は「上限文字数 - 区切り記号1文字 - キーワード長」で、そこから
+# SHORT_TITLE_BAND_WIDTH 文字下までを許容幅とする（例: 春カラー → 23〜25文字）
+SHORT_TITLE_BAND_WIDTH = 2
+SHORT_TITLE_SLOTS_PER_CHOICE = 4   # チェック1つあたりの短尺枠数
+SHORT_TITLE_SLOTS_MAX = 12         # 短尺枠の合計上限（MAX_TEMPLATES のうち）
 
 # Maintenance Notice
 JST = ZoneInfo('Asia/Tokyo')

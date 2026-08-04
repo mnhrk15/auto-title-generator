@@ -2436,15 +2436,13 @@ input[type="text"] {
     }
 }
 
-/* Style for the season and model selection dropdowns to match other input fields */
-.search-box .input-wrapper.season-selection,
+/* Style for the model selection dropdown to match other input fields */
 .search-box .input-wrapper.model-selection {
     display: flex;
     align-items: center;
     position: relative;
 }
 
-.season-icon,
 .model-icon {
     position: absolute;
     /* Changed from relative for better alignment within wrapper */
@@ -2459,7 +2457,6 @@ input[type="text"] {
     z-index: 2;
 }
 
-.season-select,
 .model-select {
     flex-grow: 1;
     width: 100%;
@@ -2487,14 +2484,12 @@ input[type="text"] {
     box-shadow: var(--shadow-sm);
 }
 
-.season-select:hover,
 .model-select:hover {
     border-color: var(--primary-color-light);
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
 }
 
-.season-select:focus,
 .model-select:focus {
     outline: none;
     border-color: var(--primary-color);
@@ -2519,10 +2514,9 @@ input[type="text"] {
     /* Minimum width for keyword input */
 }
 
-.search-box>.input-wrapper.season-selection,
 .search-box>.input-wrapper.model-selection {
     flex-grow: 0;
-    /* Season/Model select takes less space */
+    /* Model select takes less space */
     flex-basis: 180px;
     /* Base width for selects, adjust as needed */
     min-width: 160px;
@@ -2544,19 +2538,6 @@ input[type="text"] {
     align-items: center;
 }
 
-/* General styling for icons in input wrappers if not already present or different */
-.input-wrapper .search-icon,
-.input-wrapper .season-icon {
-    /* Common styles can be grouped if they are identical */
-    /* position: absolute; */
-    /* If all icons are absolute */
-    /* left: 15px; */
-    /* top: 50%; */
-    /* transform: translateY(-50%); */
-    /* color: var(--icon-color, #aaa); */
-    /* font-size: 0.9em; */
-}
-
 /* Responsive adjustments for smaller screens */
 @media (max-width: 768px) {
     .search-box {
@@ -2565,7 +2546,6 @@ input[type="text"] {
     }
 
     .search-box>.input-wrapper,
-    .search-box>.input-wrapper.season-selection,
     .search-box>.input-wrapper.model-selection,
     .search-box>.primary-button {
         width: 100%;
@@ -2574,7 +2554,6 @@ input[type="text"] {
         /* Remove right margin if any for stacked layout */
     }
 
-    .season-select,
     .model-select {
         padding: 0.75rem 1rem 0.75rem 2.5rem;
         /* Ensure padding is consistent */
@@ -2584,19 +2563,16 @@ input[type="text"] {
 /* Additional mobile optimization for model selection */
 @media (max-width: 576px) {
 
-    .search-box>.input-wrapper.season-selection,
     .search-box>.input-wrapper.model-selection {
         flex-basis: auto;
         min-width: auto;
     }
 
-    .season-select,
     .model-select {
         font-size: 0.9rem;
         padding: 0.7rem 1rem 0.7rem 2.3rem;
     }
 
-    .season-icon,
     .model-icon {
         left: 12px;
         font-size: 0.85em;
@@ -3261,3 +3237,252 @@ input[type="text"] {
     }
 }
 
+
+/* ========================================
+   季節・カラー選択（レディースのみ表示）
+   ======================================== */
+
+/* 以下の display 指定はユーティリティの .hidden（前方で定義）より後に来るため、
+   .hidden が効くよう明示的に打ち消す */
+.season-selection.hidden,
+.mens-notice.hidden {
+    display: none;
+}
+
+.season-selection {
+    margin-top: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.season-selection-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-color-light);
+}
+
+.season-selection-label i {
+    color: var(--primary-color);
+}
+
+.season-selection-label small {
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+
+.season-options {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.season-option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    transition: all var(--transition-fast) var(--transition-ease);
+    border: 2px solid transparent;
+    background-color: rgba(248, 249, 255, 0.8);
+}
+
+.season-option:hover {
+    background-color: rgba(67, 97, 238, 0.08);
+    transform: translateY(-2px);
+}
+
+.season-option input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+}
+
+.checkbox-label {
+    font-size: 0.95rem;
+    transition: all var(--transition-fast) var(--transition-ease);
+    white-space: nowrap;
+}
+
+.season-option input[type="checkbox"]:checked+.checkbox-label {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.season-option input[type="checkbox"]:focus-visible+.checkbox-label {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 4px;
+}
+
+/* 選択中の季節オプションのスタイル（JSで付与） */
+.season-option-active {
+    border-color: var(--primary-color);
+    background-color: rgba(67, 97, 238, 0.08);
+    box-shadow: 0 3px 8px rgba(67, 97, 238, 0.15);
+}
+
+@media (max-width: 576px) {
+    .season-option {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .checkbox-label {
+        font-size: 0.85rem;
+    }
+}
+
+/* ========================================
+   メンズ生成時の注釈バナー
+   ======================================== */
+
+.mens-notice {
+    background-color: rgba(77, 166, 255, 0.08);
+    color: var(--text-color);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius-lg);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    max-width: 700px;
+    margin: 0 auto var(--spacing-xl);
+    border-left: 4px solid var(--warning-color);
+    box-shadow: var(--shadow-sm);
+    line-height: 1.6;
+    text-align: left;
+}
+
+.mens-notice>i {
+    font-size: 1.2rem;
+    color: var(--warning-color);
+    background-color: rgba(77, 166, 255, 0.12);
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.mens-notice-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.mens-notice-text {
+    margin: 0;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.mens-notice-collapsible {
+    margin-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-color);
+}
+
+.mens-notice-summary {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    color: var(--primary-color);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.mens-notice-summary::-webkit-details-marker {
+    display: none;
+}
+
+.mens-notice-summary::after {
+    content: '\f078';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    right: 0;
+    font-size: 0.8rem;
+    transition: transform var(--transition-fast) var(--transition-ease);
+}
+
+.mens-notice-collapsible[open] .mens-notice-summary::after {
+    transform: rotate(180deg);
+}
+
+.mens-notice-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding-bottom: var(--spacing-sm);
+}
+
+.mens-word-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.mens-word-group-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    background-color: var(--primary-color);
+    padding: 2px 8px;
+    border-radius: var(--border-radius-sm);
+    flex-shrink: 0;
+}
+
+.mens-word-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.mens-word-list li {
+    font-size: 0.85rem;
+    color: var(--text-color);
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid var(--border-color);
+    padding: 3px 10px;
+    border-radius: var(--border-radius-sm);
+}
+
+.mens-word-group.is-priority .mens-word-list li {
+    color: var(--primary-color);
+    font-weight: 600;
+    background-color: rgba(67, 97, 238, 0.08);
+    border-color: rgba(67, 97, 238, 0.3);
+}
+
+@media (max-width: 576px) {
+    .mens-notice {
+        padding: var(--spacing-sm) var(--spacing-md);
+        margin-bottom: var(--spacing-lg);
+    }
+
+    .mens-notice-text {
+        font-size: 0.85rem;
+    }
+
+    .mens-notice>i {
+        font-size: 1rem;
+        width: 28px;
+        height: 28px;
+    }
+
+    .mens-word-list li {
+        font-size: 0.78rem;
+    }
+}

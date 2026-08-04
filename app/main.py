@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
 from .scraping import HotPepperScraper
 from .generator import TemplateGenerator
-from .config import GEMINI_API_KEY, JST, MAINTENANCE_NOTICE
+from .config import GEMINI_API_KEY, JST, MAINTENANCE_NOTICE, SEASON_COLOR_CHOICES
 from .featured_keywords import FeaturedKeywordsManager
 from . import featured_keywords
 
@@ -206,13 +206,13 @@ def get_featured_keywords():
         }), 200
 
 # スクレイピングと生成を非同期で行う関数
-async def process_template_generation(keyword: str, gender: str, season: str = None, model: str = 'gemini-3.1-flash-lite') -> Tuple[List[Dict], List[Dict]]:
+async def process_template_generation(keyword: str, gender: str, seasons: List[str] = None, model: str = 'gemini-3.1-flash-lite') -> Tuple[List[Dict], List[Dict]]:
     """スクレイピングとテンプレート生成を非同期で処理する
 
     Returns:
         (templates, trending_keywords) のタプル
     """
-    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", モデル: "{model}"')
+    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", 季節・カラー選択: {seasons}, モデル: "{model}"')
     
     # 混在キーワード処理の実装（特集キーワードと通常キーワードの適切な判定処理）
     is_featured = False
@@ -383,7 +383,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
         return [], []
         
     # 非同期でテンプレート生成を実行（特集情報と処理モード情報を渡す）
-    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, シーズン: "{season}", モデル: "{model}", 特集対応: {is_featured}, 処理モード: {processing_mode}')
+    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, 季節・カラー選択: {seasons}, モデル: "{model}", 特集対応: {is_featured}, 処理モード: {processing_mode}')
     generator = TemplateGenerator(model_name=model)
     
     # 混在キーワード処理のための追加情報を準備
@@ -397,7 +397,7 @@ async def process_template_generation(keyword: str, gender: str, season: str = N
     templates, trending_keywords = await generator.generate_templates_async(
         titles,
         keyword,
-        season,
+        seasons,
         gender,
         featured_info=featured_info,
         generation_context=generation_context
@@ -481,12 +481,25 @@ async def generate():
         
         keyword = data.get('keyword')
         gender = data.get('gender', 'ladies')
-        season = data.get('season') # 'none' や空文字の場合もありうる
+        seasons = data.get('seasons', []) # 季節・カラーのチェックボックス選択（複数可・省略可）
         model = data.get('model', 'gemini-3.1-flash-lite') # モデル選択（デフォルト）
         num_templates = int(data.get('num_templates', 5)) # この変数は現在 process_template_generation で使われていないが、将来のために残す
-        
-        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", シーズン: "{season}", モデル: "{model}", テンプレート数: {num_templates}')
-        
+
+        if seasons is None:
+            seasons = []
+        if not isinstance(seasons, list):
+            current_app.logger.warning(f'seasons がリスト形式ではありません: {type(seasons)}')
+            return jsonify({
+                'success': False,
+                'error': {
+                    'message': '季節・カラーの指定形式が正しくありません。配列で指定してください。',
+                    'code': 'VALIDATION_ERROR'
+                },
+                'status': 400
+            }), 400
+
+        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", 季節・カラー選択: {seasons}, モデル: "{model}", テンプレート数: {num_templates}')
+
         if not keyword:
             return jsonify({
                 'success': False,
@@ -506,9 +519,13 @@ async def generate():
                 },
                 'status': 400
             }), 400
-            
+
+        # 季節・カラー選択の正規化（未知の値と重複を除去し、config の定義順に揃える）
+        # メンズでは季節カラー／ブリーチなしカラーを扱わないため常に無効化する
+        seasons = [] if gender == 'mens' else [key for key in SEASON_COLOR_CHOICES if key in seasons]
+
         # 非同期処理を直接 await
-        templates, trending_keywords = await process_template_generation(keyword, gender, season, model)
+        templates, trending_keywords = await process_template_generation(keyword, gender, seasons, model)
 
         if not templates:
             return jsonify({

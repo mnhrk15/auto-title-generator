@@ -27,44 +27,41 @@ class TemplateGenerator:
         self.client = genai.Client(api_key=config.GEMINI_API_KEY)
         logger.info(f"TemplateGeneratorが初期化されました（モデル: {model_name}）")
         
-    def _create_prompt(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> str:
+    @staticmethod
+    def _short_title_slots_per_keyword(selected_count: int) -> int:
+        """季節・カラー1つあたりに割り当てる短尺タイトル枠の数"""
+        return max(1, min(
+            config.SHORT_TITLE_SLOTS_PER_CHOICE,
+            config.SHORT_TITLE_SLOTS_MAX // selected_count
+        ))
+
+    @staticmethod
+    def _short_title_band_max(keyword: str) -> int:
+        """このキーワードを付加してちょうど上限文字数に収まる、付加前のタイトル文字数"""
+        # 区切り記号1文字ぶんを差し引く。付加対象にならない長さを指示しないよう閾値未満に抑える
+        return min(
+            config.CHAR_LIMITS['title'] - 1 - len(keyword),
+            config.SEASON_APPEND_THRESHOLD - 1
+        )
+
+    def _normalize_seasons(self, seasons: Optional[List[str]], gender: str) -> List[str]:
+        """季節・カラー選択値を config の定義順に正規化する（未知値と重複を除去）
+
+        メンズでは季節カラー／ブリーチなしカラーを一切扱わないため常に空リストを返す。
+        """
+        if gender == 'mens' or not seasons:
+            return []
+        return [key for key in config.SEASON_COLOR_CHOICES if key in seasons]
+
+    def _create_prompt(self, titles: List[str], keyword: str, seasons: List[str] = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> str:
         """プロンプトテンプレートの作成"""
         titles_json = json.dumps(titles, ensure_ascii=False, indent=2)
-        
+
         # 性別に応じた設定
         gender_name = "レディース" if gender == 'ladies' else "メンズ"
-        
-        season_intro = ""
-        season_instruction = ""
-        season_specific_keywords_prompt = ""
+        is_mens = gender == 'mens'
 
-        if season and season != "none" and season in config.SEASON_KEYWORDS:
-            season_name = season # UIから渡される値が日本語名でない場合、ここで変換が必要かも
-            # 実際のUIからの値に合わせて調整してください (例: "spring" -> "春")
-            # ここでは簡単のため、キーをそのまま表示名として扱います
-            if season == "spring": season_name = "春"
-            elif season == "summer": season_name = "夏"
-            elif season == "autumn": season_name = "秋"
-            elif season == "winter": season_name = "冬"
-            elif season == "all_year": season_name = "通年"
-            elif season == "graduation_entrance": season_name = "卒業・入学シーズン"
-            elif season == "rainy_season": season_name = "梅雨"
-            elif season == "year_end_new_year": season_name = "年末年始・成人式"
-            
-            season_intro = f"\n特に、ユーザーは「{season_name}」のシーズンに関心があります。これを最優先で考慮してください。\n"
-            season_instruction = f"""
-- **シーズン対応:**
-    - ユーザー指定の「{season_name}」を強く意識し、タイトル、メニュー、コメント、ハッシュタグの全てにその季節感やイベントの雰囲気を反映させてください。
-    - 例えば、「{season_name}」であれば、{config.SEASON_KEYWORDS.get(season, [])} のようなキーワードや表現が考えられます。これらを参考に、自然で魅力的な形で盛り込んでください。
-    - タイトルに含める5つ以上のキーワードのうち、1つ以上は必ずこの「{season_name}」に関連するキーワードにしてください。
-"""
-            if config.SEASON_KEYWORDS.get(season):
-                 season_specific_keywords_prompt = f"\nまた、「{season_name}」に関連するキーワードとして、例えば以下のようなものが挙げられます。これらも参考にしてください：\n`{', '.join(config.SEASON_KEYWORDS.get(season, []))}`\n"
-        else:
-            season_instruction = f"""
-- **シーズン対応:**
-    - 特定のシーズン指定はありませんが、もし可能であれば、美容トレンドに合ったシーズンワードを適宜取り入れてください。必須ではありません。
-"""
+        selected_seasons = self._normalize_seasons(seasons, gender)
 
         # 混在キーワード処理のための生成コンテキスト解析
         context = generation_context or {}
@@ -122,33 +119,35 @@ class TemplateGenerator:
                 logger.error(f"特集プロンプト生成中にエラー: {str(e)} - 特集機能をスキップ")
                 featured_instruction = ""
 
-        # PV向上キーワード指示（常に適用）
-        pv_instruction = ""
-        pv_keywords = config.PV_BOOST_KEYWORDS
-        pv_count = config.PV_BOOST_COUNT_PER_KEYWORD
-        if pv_keywords and pv_count > 0:
-            pv_keyword_rules = "\n".join(
-                f"- 「{kw}」→ タイトル{i * pv_count + 1}番目と{i * pv_count + 2}番目に含める"
-                for i, kw in enumerate(pv_keywords)
+        # タイトルの目標文字数（季節・カラー選択時は、後処理で語句を付加する余白を確保するため
+        # 一部を短めに生成させる。付加語の長さごとに目標帯を分け、付加後に上限文字数へ届くようにする）
+        title_length_rule = "- title: **25〜28文字**を目標"
+        short_title_note = ""
+        if selected_seasons:
+            slots_per_keyword = self._short_title_slots_per_keyword(len(selected_seasons))
+            bands = {}
+            for key in selected_seasons:
+                band_max = self._short_title_band_max(config.SEASON_COLOR_CHOICES[key])
+                bands[band_max] = bands.get(band_max, 0) + slots_per_keyword
+            short_slots = sum(bands.values())
+            band_rules = "、".join(
+                f"**{slots}個は{band_max - config.SHORT_TITLE_BAND_WIDTH}〜{band_max}文字**"
+                for band_max, slots in sorted(bands.items(), reverse=True)
             )
-            pv_total = len(pv_keywords) * pv_count
-            pv_instruction = f"""
-**【重要】PV向上キーワードの配置ルール:**
-以下の{len(pv_keywords)}つのPV向上キーワードを、生成する{config.MAX_TEMPLATES}個のタイトルに必ず均等に配置してください。
-各キーワードはちょうど{pv_count}個のタイトルに含めてください（合計{pv_total}個のタイトルにPV向上キーワードが入ります）。
-
-配置ルール:
-{pv_keyword_rules}
-
-※ 残りのタイトル（{pv_total + 1}番目〜{config.MAX_TEMPLATES}番目）にはPV向上キーワードを含めなくても構いません。
-※ このルールはユーザーの検索キーワード、シーズン選択、性別に関係なく、常に適用してください。
-※ PV向上キーワードはタイトルの「5つ以上のキーワード」の1つとしてカウントしてください。
-"""
-            logger.debug(f"PV向上キーワード {len(pv_keywords)}個を配置ルールとしてプロンプトに追加")
+            title_length_rule = (
+                f"- title: {config.MAX_TEMPLATES}個中{band_rules}、"
+                f"残りの{config.MAX_TEMPLATES - short_slots}個は**25〜28文字**を目標"
+            )
+            short_title_note = (
+                "\n※ 短めの目標文字数を指定しているのは、後から語句を追記するための余白を残す目的です。"
+                "追記する語句はこちらで決めるため、指定は不要です。"
+                "追記後に上限文字数いっぱいまで活用できるよう、指定した文字数の**上限側に寄せて**作成してください。\n"
+            )
+            logger.debug(f"短尺タイトル枠 {bands} をプロンプトに追加（選択: {selected_seasons}）")
 
         # メンズ固有の注意点（メンズの場合のみ）
         mens_note = ""
-        if gender == 'mens':
+        if is_mens:
             mens_note = """
 - **メンズ特有キーワードの活用:**
     - ターゲット層: メンズ、20代30代、社会人、学生
@@ -159,9 +158,68 @@ class TemplateGenerator:
     - トレンド: 韓国風、外国人風、モダン
 """
 
+        # 性別に応じた語彙・例示（メンズにレディース向けカラー語が混入しないよう分岐する）
+        if is_mens:
+            keyword_examples = "（例: 20代30代 / 束感 / 韓国風 / 好印象）"
+            title_keyword_hints = (
+                "`小顔`, `束感`, `好印象`, `清潔感`, `爽やか`, `骨格補正`, `似合わせ`, `イメチェン`, "
+                "`韓国風`, `外国人風`, `ツーブロック`, `センターパート`, `マッシュ`, `ウルフ`, `フェード`, "
+                "`ニュアンスパーマ`, `ツイストパーマ`, `スパイラルパーマ` など"
+            )
+            specificity_hint = (
+                "髪型（ショート, マッシュ, ウルフ, センターパート, ツーブロック, フェード）、"
+                "技術（カット, パーマ, ツイストパーマ, スパイラルパーマ, 刈り上げ）、"
+                "印象（小顔効果, 骨格補正, 清潔感, 束感）を複数組み合わせてください。"
+            )
+            title_examples = """- `小顔効果◎メンズパーマ波巻き×センターパート` (22文字) - ◎と×の組み合わせ
+- `韓国風マッシュ/ニュアンスパーマ爽やか` (19文字) - /で区切り
+- `韓国風マッシュニュアンスパーマ爽やか` (18文字) - 記号なし"""
+            comment_examples = """- `頭の形が綺麗に見えるよう常に意識をしています！パーマをかけることでより骨格補正効果、スタイリングも簡単！学生はもちろん、社会人の方にもオススメ！黒髪相性良し！誰もが悩む絶壁、ハチ張り一緒に解消しましょう！` (102文字)
+- `ツイストスパイラルパーマで今一番かっこいい髪型です♪ツイスパならではの動きを質感でだしつつ、やり過ぎない動きに仕上げました。ナチュラルでも、ウェットでも、ドライでも質感の好みやその日の気分で雰囲気を変えてもかっこよくキマります☆` (114文字)
+- `マッシュショートの爽やかスタイル！時間のない朝にも時短でできる朝ラクヘア！10代から20代、30代から40代、50代と幅広く人気の王道スタイルです！外国人風の奥行きと骨格補正で似合わせバツグン！` (97文字)"""
+            menu_examples = """- `カット+ツイストスパイラルパーマ+眉カット+スタイリング剤付き◎朝ラク時短で決まる束感ヘア` (45文字)
+- `カット+ニュアンスパーマ+ヘッドスパ+眉カット込み◎骨格補正で小顔見えする韓国風マッシュ` (43文字)
+- `カット+フェード+シェービング+スタイリング講習付き◎清潔感重視のビジネススタイル` (41文字)"""
+            symbol_examples = """- 「◎」: キーワードの強調（例: 小顔効果◎センターパート）
+- 「/」: キーワードの並列・区切り（例: マッシュ/韓国風/ニュアンスパーマ）
+- 「◆」: 装飾・強調（例: 好印象メンズショート◆束感）
+- 「×」: スタイルや技術の並列（例: ツーブロック×スパイラルパーマ）
+- 記号なし: 自然な連結（例: 韓国風マッシュニュアンスパーマ爽やか）"""
+            hashtag_examples = '- `["韓国風", "マッシュ", "ニュアンスパーマ", "無造作", "メンズヘア", "おしゃれ", "トレンド", "ヘアスタイル", "美容院", "カット"]`'
+        else:
+            keyword_examples = "（例: 20代30代 / 透明感 / 韓国風 / 小顔）"
+            title_keyword_hints = (
+                "`大人可愛い`, `小顔`, `美髪`, `艶髪`, `透明感`, `似合わせ`, `イメチェン`, `レイヤー`, `ウルフ`, "
+                "`くびれ`, `韓国風`, `シースルーバング`, `髪質改善`, `暗髪`, `インナーカラー`, `ハイライト`, "
+                "`バレイヤージュ`, `縮毛矯正`, `デジタルパーマ` など"
+            )
+            specificity_hint = (
+                "髪型（ボブ, ミディアム, ロング, ショート, ウルフ, レイヤー）、"
+                "色（アッシュ, ベージュ, グレージュ, ピンク, ラベンダー）、"
+                "技術（カット, カラー, パーマ, トリートメント, ハイライト, ブリーチ）を複数組み合わせてください。"
+            )
+            title_examples = """- `大人可愛い透明感グレージュ◎20代美人ヘア` (21文字) - ◎で強調
+- `韓国風レイヤーカット/顔周り/くびれミディ` (20文字) - /で3要素並列
+- `上品韓国ヘア◆グレージュ顔周りカット` (18文字) - ◆で装飾
+- `くびれミディ×艶髪ラベンダーカラー30代` (20文字) - ×で並列
+- `ミディアムレイヤー顔周りカラー韓国ヘア` (19文字) - 記号なしの自然連結
+- `韓国風くびれレイヤー髪質改善透明感` (17文字) - 最小限の要素"""
+            comment_examples = """- `透けるような透明感のミルクティーグレージュ。ブリーチよりも傷まず、ノンカラーよりも圧倒的に透明感がでるので、現状の髪色が暗めの方、いつもオレンジになってしまう方はこちらがおススメです♪` (92文字)
+- `大人気のハイトーンカラー＊綺麗なハイトーンを維持するには2ヶ月半でのリタッチがオススメです＊綺麗なブリーチのベースを作ることで色落ちも気になりにくくなり、ストレスなくハイトーンを続けられます＊ぜひお任せください！` (106文字)
+- `気に入ったスタイルは【ブックマーク】をしていただくと便利です！小顔似合わせカットが大人気。20代30代から40代50代まで幅広い年齢層の方にご来店いただいています。お悩みの方はお気軽にご相談ください♪` (100文字)"""
+            menu_examples = """- `カット+透明感カラー+髪質改善トリートメント+炭酸スパ+前髪カット込み◎ダメージレスで艶髪に` (46文字)
+- `カット+イルミナカラー+TOKIOトリートメント+ヘッドスパ+前髪カット込み◎うる艶カラーで美髪` (48文字)
+- `カット+ダブルカラー+ケアブリーチ+カラーシャンプー付き+毛先トリートメント◎透明感ハイトーン` (47文字)"""
+            symbol_examples = """- 「◎」: キーワードの強調（例: 小顔◎透明感カラー）
+- 「/」: キーワードの並列・区切り（例: レイヤーカット/韓国/前髪カット）
+- 「◆」: 装飾・強調（例: 上品韓国ヘア◆グレージュ）
+- 「×」: スタイルや色の並列（例: 韓国風×くびれミディ）
+- 記号なし: 自然な連結（例: ミディアムレイヤー顔周りカラー韓国ヘア）"""
+            hashtag_examples = '- `["髪質改善", "透明感カラー", "艶髪", "ストレートヘア", "トリートメント", "美髪", "サラサラ", "ダメージケア", "美容室", "ヘアスタイル"]`'
+
         prompt = f"""あなたは日本の{gender_name}美容トレンドに詳しく、魅力的なコピーライティングが得意なマーケターです。
 HotPepper Beautyの人気サロンで使用されている、効果的なタイトルやキャッチコピーの特徴を熟知しています。
-{season_intro}{featured_instruction}
+{featured_instruction}
 ## 参照データ
 以下は、HotPepper Beautyで「{keyword}」と検索して得られた{gender_name}ヘアスタイルタイトルです：
 
@@ -184,27 +242,25 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
 
 ### 最重要: 文字数の厳守
 各要素は上限を**絶対に超えないでください**。超過したテンプレートは無効になります。上限の少し手前を狙ってください。
-- title: **25〜28文字**を目標（上限{config.CHAR_LIMITS['title']}文字。超えたら無効）
+{title_length_rule}（上限{config.CHAR_LIMITS['title']}文字。超えたら無効）
 - menu: **40〜47文字**を目標（上限{config.CHAR_LIMITS['menu']}文字。超えたら無効）
 - comment: **90〜115文字**を目標（上限{config.CHAR_LIMITS['comment']}文字。超えたら無効）
 - hashtag: 各ワード{config.CHAR_LIMITS['hashtag']}文字以内、7個以上
-
+{short_title_note}
 ### 重要: キーワード数の要求
 タイトルには必ずキーワード「{keyword}」を含めてください。
 **文字数制限内に収まる範囲で**、合計3〜5個程度のキーワードを盛り込んでください。
 キーワード数を増やすより、文字数制限を守ることを優先してください。
-（例: ブリーチなし / 20代30代 / 透明感 / 韓国風）
-
-{pv_instruction}
+{keyword_examples}
 
 ### 推奨: 表現の質
 - **掘り下げキーワード:** 一般的な表現から一歩踏み込み、より具体的な表現を使用してください。
     - 例: 「ショートヘア」→「小顔ショート」「ハンサムショート」、「メンズパーマ」→「スパイラルパーマ」「ツイストパーマ」
 - 固有名詞（サロン名、スタイリスト名、商品名、ブランド名）は避け、汎用的な表現を使用してください。
-{season_specific_keywords_prompt}
+
 ## 各要素の生成ガイドライン
-{season_instruction}{mens_note}
-### 【タイトル】（25〜28文字、上限{config.CHAR_LIMITS['title']}文字）
+{mens_note}
+### 【タイトル】（上限{config.CHAR_LIMITS['title']}文字。目標文字数は「最重要: 文字数の厳守」に従ってください）
 
 **構成パターン（参考）:**
 `[印象/願望] + [スタイル/髪型] + [色/技術] + [ターゲット層(任意)]` のような要素を組み合わせるのが基本ですが、**あくまで参考**です。
@@ -214,35 +270,19 @@ HotPepper Beautyの人気サロンで使用されている、効果的なタイ�
 参照データを見ると、上位スタイルでは「◎」「/」「◆」「×」「【】」などの記号が使われたり、記号なしのタイトルも多数あります。
 Gemini側で**参照データのスタイルを参考に、自由に記号を選択**してください（記号なしでも構いません）。
 以下は使用可能な記号の例です:
-- 「◎」: キーワードの強調（例: 小顔◎透明感カラー）
-- 「/」: キーワードの並列・区切り（例: レイヤーカット/韓国/前髪カット）
-- 「◆」: 装飾・強調（例: 上品韓国ヘア◆グレージュ）
-- 「×」: スタイルや色の並列（例: 韓国風×くびれミディ）
-- 記号なし: 自然な連結（例: ミディアムレイヤー顔周りカラー韓国ヘア）
+{symbol_examples}
 
 **キーワード選定の参考（参照データのトレンド分析結果を優先してください）:**
-`大人可愛い`, `小顔`, `美髪`, `艶髪`, `透明感`, `似合わせ`, `イメチェン`, `レイヤー`, `ウルフ`, `くびれ`, `韓国風`, `シースルーバング`, `髪質改善`, `暗髪`, `インナーカラー`, `ハイライト`, `バレイヤージュ`, `縮毛矯正`, `デジタルパーマ` など
+{title_keyword_hints}
 
 **ターゲット層:**
 「20代30代」「30代40代」など年代を入れると検索に効果的ですが、**{config.MAX_TEMPLATES}個中{config.MAX_TEMPLATES // 2}個程度**に留めてください。残りには年代を入れず、スタイルや技術で差別化してください。
 
 **具体性:**
-髪型（ボブ, ミディアム, ロング, ショート, ウルフ, レイヤー）、色（アッシュ, ベージュ, グレージュ, ピンク, ラベンダー）、技術（カット, カラー, パーマ, トリートメント, ハイライト, ブリーチ）を複数組み合わせてください。
+{specificity_hint}
 
-**良いタイトル例（20〜26文字、記号の使い方のバリエーション）:**
-
-レディース:
-- `大人可愛い透明感グレージュ◎20代美人ヘア` (21文字) - ◎で強調
-- `韓国風レイヤーカット/顔周り/くびれミディ` (20文字) - /で3要素並列
-- `上品韓国ヘア◆グレージュ顔周りカット` (18文字) - ◆で装飾
-- `くびれミディ×艶髪ラベンダーカラー30代` (20文字) - ×で並列
-- `ミディアムレイヤー顔周りカラー韓国ヘア` (19文字) - 記号なしの自然連結
-- `韓国風くびれレイヤー髪質改善透明感` (17文字) - 最小限の要素
-
-メンズ:
-- `小顔効果◎メンズパーマ波巻き×センターパート` (22文字) - ◎と×の組み合わせ
-- `韓国風マッシュ/ニュアンスパーマ爽やか` (19文字) - /で区切り
-- `韓国風マッシュニュアンスパーマ爽やか` (18文字) - 記号なし
+**良いタイトル例（記号の使い方のバリエーション）:**
+{title_examples}
 
 ※記号なしや少ない記号でも十分に魅力的なタイトルになります。文字数オーバーするくらいなら要素を減らしてください。
 
@@ -253,36 +293,24 @@ Gemini側で**参照データのスタイルを参考に、自由に記号を選
 - トレンド感のある施術名を使用し、価格やお得感を表現
 
 **良いメニュー例（40〜47文字）:**
-- `カット+透明感カラー+髪質改善トリートメント+炭酸スパ+前髪カット込み◎ダメージレスで艶髪に` (46文字)
-- `カット+イルミナカラー+TOKIOトリートメント+ヘッドスパ+前髪カット込み◎うる艶カラーで美髪` (48文字)
-- `カット+ダブルカラー+ケアブリーチ+カラーシャンプー付き+毛先トリートメント◎透明感ハイトーン` (47文字)
+{menu_examples}
 
 ### 【コメント】（90〜115文字、上限{config.CHAR_LIMITS['comment']}文字）
 - 施術による具体的な効果や変化を詳しく説明
 - お客様の悩みに対する解決策を提示
 - 施術後のイメージを魅力的に描写
-- 季節やトレンドに合わせたアピールポイントを含める
+- トレンドに合わせたアピールポイントを含める
 
 **良いコメント例（90〜115文字）:**
-
-レディース:
-- `透けるような透明感のミルクティーグレージュ。ブリーチよりも傷まず、ノンカラーよりも圧倒的に透明感がでるので、現状の髪色が暗めの方、いつもオレンジになってしまう方はこちらがおススメです♪` (92文字)
-- `大人気のハイトーンカラー＊綺麗なハイトーンを維持するには2ヶ月半でのリタッチがオススメです＊綺麗なブリーチのベースを作ることで色落ちも気になりにくくなり、ストレスなくハイトーンを続けられます＊ぜひお任せください！` (106文字)
-- `気に入ったスタイルは【ブックマーク】をしていただくと便利です！小顔似合わせカットが大人気。20代30代から40代50代まで幅広い年齢層の方にご来店いただいています。お悩みの方はお気軽にご相談ください♪` (100文字)
-
-メンズ:
-- `頭の形が綺麗に見えるよう常に意識をしています！パーマをかけることでより骨格補正効果、スタイリングも簡単！学生はもちろん、社会人の方にもオススメ！黒髪相性良し！誰もが悩む絶壁、ハチ張り一緒に解消しましょう！` (102文字)
-- `ツイストスパイラルパーマで今一番かっこいい髪型です♪ツイスパならではの動きを質感でだしつつ、やり過ぎない動きに仕上げました。ナチュラルでも、ウェットでも、ドライでも質感の好みやその日の気分で雰囲気を変えてもかっこよくキマります☆` (114文字)
-- `マッシュショートの爽やかスタイル！時間のない朝にも時短でできる朝ラクヘア！10代から20代、30代から40代、50代と幅広く人気の王道スタイルです！外国人風の奥行きと骨格補正で似合わせバツグン！` (97文字)
+{comment_examples}
 
 ### 【ハッシュタグ】（各{config.CHAR_LIMITS['hashtag']}文字以内、7個以上）
 - トレンドのキーワード、施術内容、検索されやすい一般タグを網羅
-- 季節やイベント関連、スタイルの特徴を表すタグも含める
+- スタイルの特徴を表すタグも含める
 - `#` は含めず、文字列の配列（リスト）として生成してください
 
 **良いハッシュタグ例（7〜10個）:**
-- `["髪質改善", "透明感カラー", "艶髪", "ストレートヘア", "トリートメント", "美髪", "サラサラ", "ダメージケア", "美容室", "ヘアスタイル"]`
-- `["韓国風", "マッシュ", "ニュアンスパーマ", "無造作", "メンズヘア", "おしゃれ", "トレンド", "ヘアスタイル", "美容院", "カット"]`
+{hashtag_examples}
 
 ## 出力形式
 結果は以下のJSON形式で出力してください。trending_keywordsを先に出力し、その分析結果を反映したtemplatesを生成してください:
@@ -301,7 +329,7 @@ Gemini側で**参照データのスタイルを参考に、自由に記号を選
   ]
 }}
 """
-        logger.debug(f"プロンプト作成: 入力タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}'")
+        logger.debug(f"プロンプト作成: 入力タイトル数: {len(titles)}, キーワード: '{keyword}', 季節・カラー選択: {selected_seasons}, 性別: '{gender}'")
         return prompt
         
     def _parse_response(self, response_text: str) -> Tuple[List[Dict], List[Dict]]:
@@ -424,8 +452,91 @@ Gemini側で**参照データのスタイルを参考に、自由に記号を選
         except (KeyError, AttributeError) as e:
             logger.error(f"テンプレート検証エラー: {str(e)}")
             return False
-    
-    async def generate_templates_async(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> Tuple[List[Dict[str, str]], List[Dict]]:
+
+    @staticmethod
+    def _pick_separator(title: str, rotation_index: int) -> Tuple[str, int]:
+        """タイトルに付ける区切り記号と、次のローテーション位置を返す"""
+        # タイトルがすでに使っている区切り記号に合わせる（複数あれば末尾に近いもの）
+        matched = max(
+            (d for d in config.SEASON_APPEND_DELIMITERS if d in title),
+            key=title.rfind,
+            default=None
+        )
+        if matched is not None:
+            return matched, rotation_index
+
+        # 記号なしのタイトルには記号を順番に割り当てる（すでに含む記号は避ける）
+        rotation = config.SEASON_APPEND_SEPARATORS
+        separator = rotation[rotation_index % len(rotation)]
+        for _ in range(len(rotation)):
+            separator = rotation[rotation_index % len(rotation)]
+            rotation_index += 1
+            if separator not in title:
+                break
+        return separator, rotation_index
+
+    def _apply_season_keywords(self, templates: List[Dict[str, str]], seasons: List[str]) -> None:
+        """選択された季節・カラーキーワードをタイトルへ付加する（テンプレートを直接書き換える）
+
+        - SEASON_APPEND_THRESHOLD 文字未満のタイトルのみが対象
+        - 付加後に上限文字数を超える場合は付加しない
+        - 複数選択時は対象タイトルへ均等に配分する
+        - 各キーワードには、収まる範囲で最も長いタイトル＝上限文字数に最も近づくものを割り当てる
+        - 区切り記号はタイトルが使っている記号に合わせ、記号がなければローテーションする
+        """
+        if not seasons or not templates:
+            return
+
+        # 重複があると割り当てループのキーワード集合が空になりうるため、ここでも重複を除く
+        seasons = list(dict.fromkeys(seasons))
+
+        title_limit = config.CHAR_LIMITS['title']
+        # 区切り記号は全て1文字だが、将来増えても破綻しないよう最長で見積もる
+        separator_length = max(
+            len(s) for s in config.SEASON_APPEND_SEPARATORS + config.SEASON_APPEND_DELIMITERS
+        )
+        keywords = {key: config.SEASON_COLOR_CHOICES[key] for key in seasons}
+        counts = {key: 0 for key in seasons}
+        priority = {key: i for i, key in enumerate(seasons)}
+        rotation_index = 0
+
+        # 付加対象を長い順に並べる。キーワードごとに「収まる中で最も長いタイトル」を取れるようにするため
+        remaining = sorted(
+            (t for t in templates if len(t.get('title', '')) < config.SEASON_APPEND_THRESHOLD),
+            key=lambda t: len(t.get('title', '')),
+            reverse=True
+        )
+
+        # タイトル側ではなくキーワード側から割り当てる。
+        # 付加済み件数が最少のキーワードから順に処理することで均等配分になり、
+        # かつ各キーワードが上限文字数に最も近づくタイトルを選べる
+        exhausted = set()
+        while remaining and len(exhausted) < len(seasons):
+            key = min(
+                (k for k in seasons if k not in exhausted),
+                key=lambda k: (counts[k], priority[k])
+            )
+            keyword = keywords[key]
+            target = next(
+                (t for t in remaining
+                 if keyword not in t['title']
+                 and len(t['title']) + separator_length + len(keyword) <= title_limit),
+                None
+            )
+            if target is None:
+                # このキーワードを付加できるタイトルはもう残っていない
+                exhausted.add(key)
+                continue
+
+            remaining.remove(target)
+            separator, rotation_index = self._pick_separator(target['title'], rotation_index)
+            target['title'] = f"{target['title']}{separator}{keyword}"
+            counts[key] += 1
+
+        applied = sum(counts.values())
+        logger.info(f"季節・カラーキーワードを {applied} 件のタイトルに付加しました: {counts}")
+
+    async def generate_templates_async(self, titles: List[str], keyword: str, seasons: List[str] = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> Tuple[List[Dict[str, str]], List[Dict]]:
         """テンプレートの非同期生成
 
         Returns:
@@ -444,8 +555,10 @@ Gemini側で**参照データのスタイルを参考に、自由に記号を選
         keyword_type = context.get('keyword_type', 'normal')
         processing_mode = context.get('processing_mode', 'standard')
         
-        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}', 特集対応: {featured_info is not None}, キーワードタイプ: {keyword_type}, 処理モード: {processing_mode}")
-        prompt = self._create_prompt(titles, keyword, season, gender, featured_info, generation_context)
+        selected_seasons = self._normalize_seasons(seasons, gender)
+
+        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', 季節・カラー選択: {selected_seasons}, 性別: '{gender}', 特集対応: {featured_info is not None}, キーワードタイプ: {keyword_type}, 処理モード: {processing_mode}")
+        prompt = self._create_prompt(titles, keyword, selected_seasons, gender, featured_info, generation_context)
         
         try:
             logger.debug(f"生成されたプロンプト全体:\n{prompt}")
@@ -489,8 +602,13 @@ Gemini側で**参照データのスタイルを参考に、自由に記号を選
                 logger.error("有効なテンプレートがありません")
                 raise ValueError("No valid templates generated")
                 
-            logger.info(f"テンプレート生成完了: {len(valid_templates)} 件の有効なテンプレート")
-            return valid_templates[:config.MAX_TEMPLATES], trending_keywords
+            result_templates = valid_templates[:config.MAX_TEMPLATES]
+
+            # 選択された季節・カラーキーワードを後処理で付加する
+            self._apply_season_keywords(result_templates, selected_seasons)
+
+            logger.info(f"テンプレート生成完了: {len(result_templates)} 件の有効なテンプレート")
+            return result_templates, trending_keywords
             
         except Exception as e:
             if isinstance(e, ValueError):
@@ -499,13 +617,13 @@ Gemini側で**参照データのスタイルを参考に、自由に記号を選
             logger.error(f"テンプレート生成エラー: {str(e)}")
             raise Exception(f"Template generation failed: {str(e)}")
         
-    def generate_templates(self, titles: List[str], keyword: str, season: str = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> Tuple[List[Dict[str, str]], List[Dict]]:
+    def generate_templates(self, titles: List[str], keyword: str, seasons: List[str] = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> Tuple[List[Dict[str, str]], List[Dict]]:
         """テンプレートの生成（同期版ラッパー）"""
         context = generation_context or {}
-        logger.info(f"同期版 generate_templates が呼び出されました - キーワード: '{keyword}', シーズン: '{season}', 性別: '{gender}', 特集対応: {featured_info is not None}, コンテキスト: {context.get('keyword_type', 'normal')} - 内部で非同期処理を実行します")
+        logger.info(f"同期版 generate_templates が呼び出されました - キーワード: '{keyword}', 季節・カラー選択: {seasons}, 性別: '{gender}', 特集対応: {featured_info is not None}, コンテキスト: {context.get('keyword_type', 'normal')} - 内部で非同期処理を実行します")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            return loop.run_until_complete(self.generate_templates_async(titles, keyword, season, gender, featured_info, generation_context))
+            return loop.run_until_complete(self.generate_templates_async(titles, keyword, seasons, gender, featured_info, generation_context))
         finally:
             loop.close()

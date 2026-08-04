@@ -79,15 +79,16 @@ The application is configured for Render deployment:
 **Configuration Management** (`/app/config.py`):
 - Environment-based configuration with dotenv support
 - Separate settings for scraping, AI generation, and deployment
-- Season-specific keywords for prompt engineering
+- Season/color choices (`SEASON_COLOR_CHOICES`) and the post-processing append rules
 - Character limits for each template component
 
 ### Data Flow
-1. User submits keyword + gender + optional season via web form (model automatically set to Gemini 3 Flash Preview)
+1. User submits keyword + gender + optional season/color checkboxes (ladies only) via web form (model automatically set to the default Gemini model)
 2. `HotPepperScraper.scrape_titles_async()` scrapes relevant hairstyle titles
-3. `TemplateGenerator.generate_templates_async()` sends titles + context to Gemini 3 Flash Preview API
+3. `TemplateGenerator.generate_templates_async()` sends titles + context to the Gemini API
 4. Generated templates are validated against character limits and requirements
-5. Results returned as JSON to frontend
+5. `TemplateGenerator._apply_season_keywords()` appends the selected season/color keywords to short titles (ladies only)
+6. Results returned as JSON to frontend
 
 ### Key Design Patterns
 - **Async Context Managers**: Both scraper and session management use `async with`
@@ -155,7 +156,8 @@ The application uses async extensively throughout the entire pipeline:
 ### Japanese Text Handling
 - All templates and content are in Japanese
 - Character counting is critical for social media compliance
-- Season-specific Japanese keywords are used for prompt engineering
+- Season/color keywords are never injected into the prompt; they are appended in Python after generation (`_apply_season_keywords`), and only for ladies
+- Prompt vocabulary, title/menu/comment/hashtag examples are branched by gender so that ladies-oriented color words never reach the mens prompt
 
 ### Production Deployment Notes
 

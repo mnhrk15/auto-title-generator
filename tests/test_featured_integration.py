@@ -314,7 +314,7 @@ class TestTemplateGenerationAPI:
                                  json={
                                      'keyword': 'くびれヘア',
                                      'gender': 'ladies',
-                                     'season': None,
+                                     'seasons': [],
                                      'model': 'gemini-3-flash-preview'
                                  })
             
@@ -381,7 +381,7 @@ class TestTemplateGenerationAPI:
                                  json={
                                      'keyword': 'ボブ',
                                      'gender': 'ladies',
-                                     'season': None,
+                                     'seasons': [],
                                      'model': 'gemini-3-flash-preview'
                                  })
             
@@ -461,7 +461,7 @@ class TestTemplateGenerationAPI:
                                  json={
                                      'keyword': 'くびれヘア ボブ',
                                      'gender': 'ladies',
-                                     'season': None,
+                                     'seasons': [],
                                      'model': 'gemini-3-flash-preview'
                                  })
             

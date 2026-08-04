@@ -814,7 +814,7 @@ document.addEventListener('DOMContentLoaded', () => {
     generateBtn.addEventListener('click', async () => {
         const keyword = keywordInput.value.trim();
         const gender = document.querySelector('input[name="gender"]:checked').value;
-        const season = document.getElementById('season').value;
+        const seasons = Array.from(document.querySelectorAll('input[name="season"]:checked')).map(cb => cb.value);
         const model = 'gemini-3.1-flash-lite'; // デフォルトでGemini 3.1 Flash Liteを使用
         
         if (!keyword) {
@@ -847,7 +847,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ keyword, gender, season, model }),
+                body: JSON.stringify({ keyword, gender, seasons, model }),
                 signal: controller.signal
             });
             
@@ -890,7 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     showSuccessToast('テンプレートを生成しました');
                 }
                 
-                displayTemplates(data.templates);
+                displayTemplates(data.templates, gender);
                 showResults();
                 
                 // 結果表示領域までスクロール
@@ -1206,14 +1206,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // テンプレート表示関数の更新
-    function displayTemplates(templates) {
+    function displayTemplates(templates, gender = 'ladies') {
         // テンプレートを状態に保存
         paginationState.allTemplates = templates;
-        
+
         // ページネーション設定
         paginationState.totalPages = Math.ceil(templates.length / paginationState.itemsPerPage);
         paginationState.currentPage = 1;
-        
+
+        // メンズ生成時のみ注釈バナーを表示
+        updateMensNotice(gender);
+
         // ページネーションUIを更新
         updatePaginationUI();
         
@@ -2031,12 +2034,57 @@ ${hashtagTextarea.value}`;
         });
     }
     
-    // 初期表示時に性別選択のスタイルを適用
+    // 季節・カラー選択の視認性向上対応（性別選択と同じ作法）
+    function updateSeasonSelectionStyles() {
+        document.querySelectorAll('.season-option').forEach(option => {
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            option.classList.toggle('season-option-active', checkbox.checked);
+        });
+    }
+
+    // メンズでは季節・カラー選択を非表示にする（選択済みの内容も解除する）
+    function updateSeasonVisibility() {
+        const seasonSelection = document.getElementById('season-selection');
+        if (!seasonSelection) return;
+
+        const checkedGender = document.querySelector('input[name="gender"]:checked');
+        const isMens = checkedGender && checkedGender.value === 'mens';
+
+        seasonSelection.classList.toggle('hidden', isMens);
+        if (isMens) {
+            seasonSelection.querySelectorAll('input[name="season"]').forEach(cb => {
+                cb.checked = false;
+            });
+        }
+        updateSeasonSelectionStyles();
+    }
+
+    // メンズ生成時のみ結果画面に注釈バナーを表示する
+    function updateMensNotice(gender) {
+        const notice = document.getElementById('mens-title-notice');
+        if (!notice) return;
+
+        const isMens = gender === 'mens';
+        notice.classList.toggle('hidden', !isMens);
+        if (!isMens) {
+            const details = notice.querySelector('details');
+            if (details) details.open = false;
+        }
+    }
+
+    // 初期表示時に性別・季節選択のスタイルを適用
     updateGenderSelectionStyles();
-    
+    updateSeasonVisibility();
+
     // 性別選択変更時のイベントリスナー
     genderRadios.forEach(radio => {
         radio.addEventListener('change', updateGenderSelectionStyles);
+        radio.addEventListener('change', updateSeasonVisibility);
+    });
+
+    // 季節・カラー選択変更時のイベントリスナー
+    document.querySelectorAll('input[name="season"]').forEach(checkbox => {
+        checkbox.addEventListener('change', updateSeasonSelectionStyles);
     });
 
     // テキストエリアの初期化関数
