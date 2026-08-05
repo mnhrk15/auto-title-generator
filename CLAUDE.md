@@ -274,6 +274,21 @@ All tests use pytest with async support (`@pytest.mark.asyncio` for async functi
 - Always verify existing functionality before implementing new features to prevent duplication
 - Maintain consistency in naming conventions and directory structure
 - UI/UX changes require explicit approval - do not modify layouts, colors, fonts, or spacing without permission
+
+### CSS
+
+`app/static/css/style.css` (3010 lines) is the one file that was never split. Sections are stacked
+in historical order, so **several selectors have more than one base definition and the final
+appearance is decided by "last one wins"** (`.featured-keyword-btn` has five). Before touching it,
+read the "既知の技術的負債" section of README.md — in particular:
+
+- Merge duplicate base definitions **at the first occurrence**, not the last. Moving them later
+  makes properties that only existed in the early definition win over `@media` blocks in between.
+- Do not reorder `@media` blocks before collapsing the duplicates. Some `@media` rules are
+  currently dead because a later base definition overrides them; reordering revives them.
+- New state classes should use the `is-` prefix (`.is-focused`, `.is-priority`). The existing mix
+  of `.active` / `.show` / `.copied` / `.hidden` / `.gender-option-active` is historical. Renaming
+  them means auditing 20+ string references in JS, which is not worth it — leave them alone.
 - Do not change specified technology stack versions without approval
 - Follow the existing async patterns when adding new functionality
 
