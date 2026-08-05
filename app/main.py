@@ -1,80 +1,52 @@
-import os
-import logging
-# import asyncio # Removed as run_async_task is deleted
-from datetime import datetime
-from typing import List, Dict, Tuple
-from logging.handlers import RotatingFileHandler
 from flask import Blueprint, render_template, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
-from .scraping import HotPepperScraper
-from .generator import TemplateGenerator
-from .config import GEMINI_API_KEY, JST, MAINTENANCE_NOTICE, SEASON_COLOR_CHOICES
-from .featured_keywords import FeaturedKeywordsManager
+from .config import DEFAULT_MODEL, GENDERS, normalize_seasons
+from .errors import (
+    AppError,
+    ErrorCode,
+    InvalidJsonError,
+    NoResultsError,
+    ValidationError,
+    error_payload,
+)
+from .featured_keywords import get_featured_repository
 from . import featured_keywords
+from .services.template_service import generate_templates_for_request
 
 # Blueprintの作成
 main_bp = Blueprint('main', __name__)
 
-# FeaturedKeywordsManagerのインスタンス作成
-featured_manager = FeaturedKeywordsManager()
-
-# ロガーの設定
-# def setup_logging(app): # app/__init__.py で実行されるため不要
-#     if not os.path.exists('logs'):
-#         os.makedirs('logs')
-#     
-#     file_handler = RotatingFileHandler(
-#         'logs/app.log',
-#         maxBytes=1024 * 1024,  # 1MB
-#         backupCount=10
-#     )
-#     
-#     formatter = logging.Formatter(
-#         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     file_handler.setFormatter(formatter)
-#     
-#     # 開発環境ではDEBUG、本番環境ではINFO
-#     if app.debug:
-#         file_handler.setLevel(logging.DEBUG)
-#     else:
-#         file_handler.setLevel(logging.INFO)
-#     
-#     app.logger.addHandler(file_handler)
-#     
-#     # 他のモジュールのロガー設定
-#     logging.getLogger('werkzeug').addHandler(file_handler)
-
-# app = Flask(__name__) # ここで app を再定義しない
-# app.config['GEMINI_API_KEY'] = GEMINI_API_KEY # config は app/__init__.py で読み込まれる
-
-# ロギングの設定
-# setup_logging(app) # app/__init__.py で実行されるため不要
-
 # エラーハンドラー
+@main_bp.app_errorhandler(AppError)
+def app_error(error: AppError):
+    """AppError を統一フォーマットの JSON レスポンスに変換する"""
+    if error.status_code >= 500:
+        current_app.logger.error(f'{error.code}: {error.message}', exc_info=True)
+    else:
+        current_app.logger.warning(f'{error.code}: {error.message}')
+
+    payload, status = error.to_payload()
+    return jsonify(payload), status
+
 @main_bp.app_errorhandler(500)
 def internal_error(error):
     current_app.logger.error(f'サーバーエラー: {str(error)}')
-    return jsonify({
-        'success': False,
-        'error': {
-            'message': 'サーバー内部でエラーが発生しました。しばらく時間をおいて再度お試しください。',
-            'code': 'INTERNAL_SERVER_ERROR'
-        },
-        'status': 500
-    }), 500
+    payload, status = error_payload(
+        'サーバー内部でエラーが発生しました。しばらく時間をおいて再度お試しください。',
+        ErrorCode.INTERNAL_SERVER_ERROR,
+        500,
+    )
+    return jsonify(payload), status
 
 @main_bp.app_errorhandler(404)
 def not_found_error(error):
     current_app.logger.info(f'ページが見つかりません: {request.url}')
-    return jsonify({
-        'success': False,
-        'error': {
-            'message': 'リクエストされたページが見つかりません。',
-            'code': 'NOT_FOUND'
-        },
-        'status': 404
-    }), 404
+    payload, status = error_payload(
+        'リクエストされたページが見つかりません。',
+        ErrorCode.NOT_FOUND,
+        404,
+    )
+    return jsonify(payload), status
 
 @main_bp.app_errorhandler(400)
 def bad_request_error(error):
@@ -83,35 +55,25 @@ def bad_request_error(error):
     message = str(error)
     if hasattr(error, 'description') and error.description:
         message = error.description
-        
+
     current_app.logger.warning(f'不正なリクエスト: {message}')
-    return jsonify({
-        'success': False,
-        'error': {
-            'message': f'不正なリクエストです: {message}',
-            'code': 'BAD_REQUEST'
-        },
-        'status': 400
-    }), 400
+    payload, status = error_payload(
+        f'不正なリクエストです: {message}',
+        ErrorCode.BAD_REQUEST,
+        400,
+    )
+    return jsonify(payload), status
 
 @main_bp.route('/favicon.ico')
 def favicon():
     """faviconのルート"""
     return current_app.send_static_file('favicon.ico')
 
-def get_maintenance_notice():
-    """メンテナンス告知の文言を返す。期間終了後・未設定の場合は None。"""
-    if not MAINTENANCE_NOTICE:
-        return None
-    if datetime.now(JST) >= MAINTENANCE_NOTICE['end']:
-        return None
-    return MAINTENANCE_NOTICE['message']
-
 @main_bp.route('/')
 def index():
     """トップページのルート"""
     current_app.logger.info('トップページにアクセスがありました')
-    return render_template('index.html', maintenance_notice=get_maintenance_notice())
+    return render_template('index.html')
 
 @main_bp.route('/api/featured-keywords', methods=['GET'])
 def get_featured_keywords():
@@ -119,18 +81,20 @@ def get_featured_keywords():
     try:
         # リクエストパラメータから性別を取得
         gender = request.args.get('gender', 'ladies')  # デフォルトはレディース
-        if gender not in ['ladies', 'mens']:
+        if gender not in GENDERS:
             gender = 'ladies'  # 無効な場合はレディースにフォールバック
             
         current_app.logger.info(f'特集キーワード取得リクエストを受信しました (性別: {gender})')
-        
+
+        repository = get_featured_repository()
+
         # 特集キーワード機能の健全性チェック
-        health_status = featured_manager.get_health_status()
+        health_status = repository.get_health_status()
         current_app.logger.debug(f'特集キーワード機能の状態: {health_status}')
-        
+
         # 特集キーワード機能が利用可能かチェック
-        if not featured_manager.is_available():
-            last_error = featured_manager.get_last_error()
+        if not repository.is_available():
+            last_error = repository.get_last_error()
             if last_error:
                 current_app.logger.warning(f'特集キーワード機能が利用できません: {last_error}')
                 # エラーの種類に応じてメッセージを調整
@@ -143,7 +107,9 @@ def get_featured_keywords():
             else:
                 current_app.logger.warning('特集キーワードが設定されていません')
                 message = '現在、特集キーワードが設定されていません。'
-            
+
+            # 「リクエスト自体は成功したが機能が降格している」状態なので success は True。
+            # フロントエンドはこれを受けて通常のテンプレート生成を継続できる。
             return jsonify({
                 'success': True,
                 'keywords': [],
@@ -153,7 +119,7 @@ def get_featured_keywords():
             }), 200
         
         # 特集キーワード一覧を取得
-        all_keywords = featured_manager.get_all_keywords()
+        all_keywords = repository.get_all_keywords()
         current_app.logger.info(f'特集キーワードを取得しました: {len(all_keywords)}件（全性別）')
         
         # 指定された性別でフィルタリング
@@ -191,265 +157,16 @@ def get_featured_keywords():
         
     except Exception as e:
         current_app.logger.error(f'特集キーワード取得中に予期しないエラーが発生しました: {str(e)}', exc_info=True)
-        
-        # フォールバック: 空のキーワードリストを返して通常機能を継続
-        return jsonify({
-            'success': True,  # フォールバックなのでsuccessはTrue
-            'keywords': [],
-            'message': '特集キーワードの取得に失敗しましたが、通常の機能は利用できます。',
-            'fallback': True,
-            'error': {
-                'message': '特集キーワードの取得に失敗しました。',
-                'code': 'FEATURED_KEYWORDS_ERROR'
-            },
-            'status': 200
-        }), 200
 
-# スクレイピングと生成を非同期で行う関数
-async def process_template_generation(keyword: str, gender: str, seasons: List[str] = None, model: str = 'gemini-3.1-flash-lite') -> Tuple[List[Dict], List[Dict]]:
-    """スクレイピングとテンプレート生成を非同期で処理する
-
-    Returns:
-        (templates, trending_keywords) のタプル
-    """
-    current_app.logger.info(f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", 季節・カラー選択: {seasons}, モデル: "{model}"')
-    
-    # 混在キーワード処理の実装（特集キーワードと通常キーワードの適切な判定処理）
-    is_featured = False
-    featured_info = None
-    keyword_type = "normal"  # "featured", "normal", "mixed", "error"
-    processing_mode = "standard"  # "featured", "standard", "fallback"
-    
-    try:
-        # キーワードの前処理（空白の除去、正規化、複数キーワード対応）
-        normalized_keyword = keyword.strip() if keyword else ""
-        
-        if not normalized_keyword:
-            current_app.logger.warning('空のキーワードが入力されました - 通常処理を継続')
-            keyword_type = "normal"
-            processing_mode = "standard"
-        else:
-            # 複数キーワードの検出（スペース、カンマ、スラッシュで区切られた場合）
-            keyword_separators = [' ', '　', ',', '、', '/', '＋', '+']
-            multiple_keywords = [normalized_keyword]  # デフォルトは単一キーワード
-            
-            for separator in keyword_separators:
-                if separator in normalized_keyword:
-                    multiple_keywords = [kw.strip() for kw in normalized_keyword.split(separator) if kw.strip()]
-                    current_app.logger.info(f'複数キーワードを検出しました: {multiple_keywords}')
-                    break
-            
-            # 特集キーワード機能が利用可能かチェック
-            if featured_manager.is_available():
-                featured_keywords_found = []
-                normal_keywords_found = []
-                
-                # 各キーワードを個別に判定
-                for kw in multiple_keywords:
-                    kw_normalized = kw.strip()
-                    if not kw_normalized:
-                        continue
-                        
-                    if featured_manager.is_featured_keyword(kw_normalized):
-                        kw_info = featured_manager.get_keyword_info(kw_normalized)
-                        if kw_info:
-                            featured_keywords_found.append({
-                                'keyword': kw_normalized,
-                                'info': kw_info
-                            })
-                            current_app.logger.info(f'特集キーワードを検出: "{kw_normalized}" -> "{kw_info["name"]}" (性別: {kw_info["gender"]})')
-                        else:
-                            current_app.logger.warning(f'特集キーワード "{kw_normalized}" の詳細情報取得に失敗')
-                            normal_keywords_found.append(kw_normalized)
-                    else:
-                        normal_keywords_found.append(kw_normalized)
-                        current_app.logger.debug(f'通常キーワード: "{kw_normalized}"')
-                
-                # 混在キーワード処理の分岐ロジック
-                if featured_keywords_found and normal_keywords_found:
-                    # 混在ケース: 特集キーワードと通常キーワードが混在
-                    keyword_type = "mixed"
-                    processing_mode = "featured"  # 特集キーワードを優先
-                    
-                    # 最初の特集キーワードを使用（複数ある場合は最初のものを優先）
-                    primary_featured = featured_keywords_found[0]
-                    is_featured = True
-                    featured_info = primary_featured['info']
-                    
-                    current_app.logger.info(f'混在キーワード処理: 特集キーワード "{primary_featured["keyword"]}" を優先使用')
-                    current_app.logger.info(f'併用される通常キーワード: {normal_keywords_found}')
-                    
-                    # 性別整合性チェック（混在時は特集キーワードの性別を優先）
-                    if featured_info["gender"] != gender:
-                        current_app.logger.warning(f'混在処理: 特集キーワード "{primary_featured["keyword"]}" の対象性別 ({featured_info["gender"]}) と入力された性別 ({gender}) が一致しません')
-                        current_app.logger.info(f'混在処理: 特集キーワードの性別設定を優先して処理を継続します')
-                
-                elif featured_keywords_found and not normal_keywords_found:
-                    # 純粋な特集キーワードケース
-                    keyword_type = "featured"
-                    processing_mode = "featured"
-                    
-                    # 複数の特集キーワードがある場合は最初のものを使用
-                    primary_featured = featured_keywords_found[0]
-                    is_featured = True
-                    featured_info = primary_featured['info']
-                    
-                    current_app.logger.info(f'純粋特集キーワード処理: "{primary_featured["keyword"]}" -> "{featured_info["name"]}" (性別: {featured_info["gender"]})')
-                    
-                    if len(featured_keywords_found) > 1:
-                        other_featured = [f['keyword'] for f in featured_keywords_found[1:]]
-                        current_app.logger.info(f'その他の特集キーワード（参考情報として記録）: {other_featured}')
-                    
-                    # 性別整合性チェック
-                    if featured_info["gender"] != gender:
-                        current_app.logger.warning(f'特集キーワード "{primary_featured["keyword"]}" の対象性別 ({featured_info["gender"]}) と入力された性別 ({gender}) が一致しません')
-                        # 性別が一致しない場合でも特集キーワードとして処理を継続（要件に基づく）
-                
-                elif not featured_keywords_found and normal_keywords_found:
-                    # 純粋な通常キーワードケース
-                    keyword_type = "normal"
-                    processing_mode = "standard"
-                    is_featured = False
-                    featured_info = None
-                    
-                    current_app.logger.info(f'純粋通常キーワード処理: {normal_keywords_found}')
-                
-                else:
-                    # 有効なキーワードが見つからない場合
-                    keyword_type = "error"
-                    processing_mode = "fallback"
-                    is_featured = False
-                    featured_info = None
-                    
-                    current_app.logger.warning(f'有効なキーワードが見つかりませんでした: "{normalized_keyword}"')
-                    
-            else:
-                # 特集キーワード機能が利用できない場合
-                keyword_type = "normal"
-                processing_mode = "standard"
-                is_featured = False
-                featured_info = None
-                
-                current_app.logger.info(f'特集キーワード機能が利用できません - 通常キーワードとして処理: "{normalized_keyword}"')
-                
-    except Exception as e:
-        current_app.logger.error(f'キーワード判定中にエラー: {str(e)} - 通常処理にフォールバック')
-        keyword_type = "error"
-        processing_mode = "fallback"
-        is_featured = False
-        featured_info = None
-    
-    # 処理分岐ロジックの実装と動作保証
-    current_app.logger.info(f'キーワード処理結果: タイプ={keyword_type}, モード={processing_mode}, 特集対応={is_featured}')
-    
-    # 両方のケースでの適切な動作を保証するための詳細ログ
-    if processing_mode == "featured":
-        if keyword_type == "mixed":
-            current_app.logger.info(f'混在キーワード処理パス: 特集キーワード優先で強化プロンプトを使用')
-            current_app.logger.info(f'使用する特集情報: {featured_info["name"]} (条件: {featured_info["condition"][:50]}...)')
-        else:
-            current_app.logger.info(f'特集キーワード処理パス: 強化プロンプトを使用してテンプレート生成を実行')
-            current_app.logger.info(f'特集情報: {featured_info["name"]} (条件: {featured_info["condition"][:50]}...)')
-    elif processing_mode == "standard":
-        current_app.logger.info(f'通常キーワード処理パス: 標準プロンプトを使用してテンプレート生成を実行')
-    elif processing_mode == "fallback":
-        current_app.logger.info(f'フォールバック処理パス: エラー回復のため標準プロンプトを使用')
-    
-    # 処理モードの妥当性確認
-    if processing_mode not in ["featured", "standard", "fallback"]:
-        current_app.logger.error(f'不正な処理モード: {processing_mode} - 標準モードにフォールバック')
-        processing_mode = "standard"
-        is_featured = False
-        featured_info = None
-    
-    # 非同期でスクレイピングを実行
-    async with HotPepperScraper() as scraper:
-        current_app.logger.info(f'スクレイピング開始: キーワード: "{keyword}", 性別: "{gender}"')
-        titles = await scraper.scrape_titles_async(keyword, gender)
-        current_app.logger.info(f'スクレイピング結果: {len(titles)} 件のタイトルを取得')
-    
-    # スクレイピング結果をログに記録
-    if titles:
-        current_app.logger.debug(f"スクレイピングで取得した全タイトルリスト: {titles}")
-        current_app.logger.info(f'スクレイピング結果のタイトル例 (最大10件):')
-        for i, title_text in enumerate(titles[:10]):
-            current_app.logger.info(f'  {i+1}: {title_text}')
-        
-        if len(titles) > 10:
-            current_app.logger.info(f'  ... 他 {len(titles) - 10} 件')
-    
-    if not titles:
-        current_app.logger.warning(f'キーワード "{keyword}" に一致するヘアスタイルが見つかりませんでした')
-        return [], []
-        
-    # 非同期でテンプレート生成を実行（特集情報と処理モード情報を渡す）
-    current_app.logger.info(f'テンプレート生成開始: キーワード: "{keyword}", タイトル数: {len(titles)}, 季節・カラー選択: {seasons}, モデル: "{model}", 特集対応: {is_featured}, 処理モード: {processing_mode}')
-    generator = TemplateGenerator(model_name=model)
-    
-    # 混在キーワード処理のための追加情報を準備
-    generation_context = {
-        'keyword_type': keyword_type,
-        'processing_mode': processing_mode,
-        'original_keyword': keyword,
-        'normalized_keyword': normalized_keyword if 'normalized_keyword' in locals() else keyword
-    }
-    
-    templates, trending_keywords = await generator.generate_templates_async(
-        titles,
-        keyword,
-        seasons,
-        gender,
-        featured_info=featured_info,
-        generation_context=generation_context
-    )
-
-    current_app.logger.info(f'テンプレート生成成功 - {len(templates)}件のテンプレートを生成')
-    if trending_keywords:
-        current_app.logger.info(f'トレンドキーワード: {[kw.get("keyword", "") for kw in trending_keywords if isinstance(kw, dict)]}')
-    
-    # 生成されたテンプレートをログに記録
-    for i, template in enumerate(templates):
-        current_app.logger.info(f'生成テンプレート {i+1}:')
-        current_app.logger.info(f'  タイトル: {template.get("title", "不明")}')
-        current_app.logger.info(f'  メニュー: {template.get("menu", "不明")}')
-        current_app.logger.info(f'  ハッシュタグ: {template.get("hashtag", "不明")}')
-        
-        # キーワードチェック
-        if keyword.lower() in template.get("title", "").lower():
-            current_app.logger.info(f'  ✅ タイトルにキーワード "{keyword}" が含まれています')
-        else:
-            current_app.logger.warning(f'  ❌ タイトルにキーワード "{keyword}" が含まれていません: "{template.get("title", "")}"')
-    
-    # 特集対応テンプレート識別機能の実装（混在キーワード処理対応）
-    # 生成されたテンプレートが特集対応かを示すフラグを追加
-    for template in templates:
-        template['is_featured'] = is_featured
-        template['keyword_type'] = keyword_type
-        template['processing_mode'] = processing_mode
-        template['original_keyword'] = keyword
-        
-        # 特集キーワード情報も含める（デバッグ用）
-        if is_featured and featured_info:
-            template['featured_keyword_name'] = featured_info.get('name', '')
-            template['featured_condition'] = featured_info.get('condition', '')
-            template['featured_gender'] = featured_info.get('gender', '')
-        
-        # 混在キーワード処理の場合の追加情報
-        if keyword_type == "mixed":
-            template['is_mixed_keyword'] = True
-            template['mixed_processing_note'] = '特集キーワードと通常キーワードが混在しています'
-        else:
-            template['is_mixed_keyword'] = False
-    
-    # 混在処理の結果をログに記録
-    if keyword_type == "mixed":
-        current_app.logger.info(f'混在キーワードテンプレート生成完了: {len(templates)}件 (元キーワード: "{keyword}", 優先特集: "{featured_info.get("name", "不明")}", 処理モード: {processing_mode})')
-    elif is_featured:
-        current_app.logger.info(f'特集対応テンプレート生成完了: {len(templates)}件 (キーワード: "{keyword}" -> "{featured_info.get("name", "不明")}", 処理モード: {processing_mode})')
-    else:
-        current_app.logger.info(f'通常テンプレート生成完了: {len(templates)}件 (キーワード: "{keyword}", 処理モード: {processing_mode})')
-    
-    return templates, trending_keywords
+        # 以前は success: True と error オブジェクトを同時に返していたが、
+        # 「成功」と「エラー」が同時に成立するのは矛盾しており、フロントエンドは
+        # success だけを見て成功扱いしていた。失敗は失敗として返す。
+        payload, status = error_payload(
+            '特集キーワードの取得に失敗しました。通常のテンプレート生成はご利用いただけます。',
+            ErrorCode.FEATURED_KEYWORDS_ERROR,
+            503,
+        )
+        return jsonify(payload), status
 
 @main_bp.route('/api/generate', methods=['POST'])
 async def generate():
@@ -457,86 +174,47 @@ async def generate():
     try:
         # 不正なJSONリクエストの場合は400エラーを返す
         if request.is_json is False and request.data:
-            current_app.logger.warning('不正なJSONリクエストを受信しました (Content-Typeが正しくないか、JSON形式ではありません)')
-            return jsonify({
-                'success': False,
-                'error': {
-                    'message': 'リクエストの形式が正しくありません。Content-Typeがapplication/jsonであること、有効なJSONであることを確認してください。',
-                    'code': 'INVALID_JSON'
-                },
-                'status': 400
-            }), 400
-            
+            raise InvalidJsonError()
+
         data = request.get_json() # ここで BadRequest が発生する可能性があり、app_errorhandler(400) で処理される
         if data is None: # request.get_json() はパース失敗時にNoneを返すことがある (force=Falseの場合など)。通常はBadRequest。
-            current_app.logger.warning('リクエストボディが空か、JSONとしてパースできませんでした。')
-            return jsonify({
-                'success': False,
-                'error': {
-                    'message': 'リクエストボディが空か、JSONとしてパースできませんでした。',
-                    'code': 'INVALID_JSON'
-                },
-                'status': 400
-            }), 400
-        
+            raise InvalidJsonError('リクエストボディが空か、JSONとしてパースできませんでした。')
+
         keyword = data.get('keyword')
         gender = data.get('gender', 'ladies')
         seasons = data.get('seasons', []) # 季節・カラーのチェックボックス選択（複数可・省略可）
-        model = data.get('model', 'gemini-3.1-flash-lite') # モデル選択（デフォルト）
-        num_templates = int(data.get('num_templates', 5)) # この変数は現在 process_template_generation で使われていないが、将来のために残す
+        model = data.get('model', DEFAULT_MODEL) # モデル選択（デフォルト）
 
         if seasons is None:
             seasons = []
         if not isinstance(seasons, list):
-            current_app.logger.warning(f'seasons がリスト形式ではありません: {type(seasons)}')
-            return jsonify({
-                'success': False,
-                'error': {
-                    'message': '季節・カラーの指定形式が正しくありません。配列で指定してください。',
-                    'code': 'VALIDATION_ERROR'
-                },
-                'status': 400
-            }), 400
+            raise ValidationError('季節・カラーの指定形式が正しくありません。配列で指定してください。')
 
-        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", 季節・カラー選択: {seasons}, モデル: "{model}", テンプレート数: {num_templates}')
+        current_app.logger.info(f'テンプレート生成リクエスト - キーワード: "{keyword}", 性別: "{gender}", 季節・カラー選択: {seasons}, モデル: "{model}"')
 
         if not keyword:
-            return jsonify({
-                'success': False,
-                'error': {
-                    'message': 'キーワードを入力してください。',
-                    'code': 'VALIDATION_ERROR'
-                },
-                'status': 400
-            }), 400
-            
-        if gender not in ['ladies', 'mens']:
-            return jsonify({
-                'success': False,
-                'error': {
-                    'message': '無効な性別が指定されました。ladies または mens を指定してください。',
-                    'code': 'VALIDATION_ERROR'
-                },
-                'status': 400
-            }), 400
+            raise ValidationError('キーワードを入力してください。')
+
+        if gender not in GENDERS:
+            raise ValidationError('無効な性別が指定されました。ladies または mens を指定してください。')
 
         # 季節・カラー選択の正規化（未知の値と重複を除去し、config の定義順に揃える）
         # メンズでは季節カラー／ブリーチなしカラーを扱わないため常に無効化する
-        seasons = [] if gender == 'mens' else [key for key in SEASON_COLOR_CHOICES if key in seasons]
+        seasons = normalize_seasons(seasons, gender)
 
         # 非同期処理を直接 await
-        templates, trending_keywords = await process_template_generation(keyword, gender, seasons, model)
+        templates, trending_keywords = await generate_templates_for_request(
+            keyword,
+            gender,
+            repository=get_featured_repository(),
+            seasons=seasons,
+            model=model,
+        )
 
         if not templates:
-            return jsonify({
-                'success': False,
-                'error': {
-                    'message': '一致するヘアスタイルが見つかりませんでした。別のキーワードをお試しください。',
-                    'code': 'NO_RESULTS_FOUND'
-                },
-                'status': 404 # 該当なしなので404
-            }), 404
-        
+            raise NoResultsError()
+
+
         # 混在キーワード処理情報を含むレスポンス
         template_metadata = templates[0] if templates else {}
         response_keyword_type = template_metadata.get('keyword_type', 'normal')
@@ -572,45 +250,22 @@ async def generate():
             'status': 200
         })
         
-    except BadRequest as e:
-        current_app.logger.warning(f'不正なJSONリクエスト (BadRequest例外): {str(e)}')
-        # この例外は app_errorhandler(400) で処理されるので、ここでは再raiseするか、
-        # もし app_errorhandler が期待通りに動作しない場合のフォールバックとして残す
-        # 今回は app_errorhandler に処理を委ねるため、このブロックは理論上到達しないはず
-        # ただし、より具体的なエラーコードを返したい場合はここで処理する
-        return jsonify({
-            'success': False,
-            'error': {
-                'message': f'リクエストの解析に失敗しました: {e.description if hasattr(e, "description") else str(e)}',
-                'code': 'INVALID_JSON' # BadRequest は大抵JSON関連なので
-            },
-            'status': 400
-        }), 400
-        
-    except ValueError as e:
-        current_app.logger.warning(f'不正なリクエスト (ValueError): {str(e)}')
-        return jsonify({
-            'success': False,
-            'error': {
-                'message': f'リクエストデータが不正です: {str(e)}',
-                'code': 'VALIDATION_ERROR' # ValueErrorは主にバリデーションエラーとして扱う
-            },
-            'status': 400
-        }), 400
-        
-    except Exception as e:
-        current_app.logger.error(f'テンプレート生成中に予期せぬエラー: {str(e)}', exc_info=True)
-        # この例外は app_errorhandler(500) で処理されるので、ここでは再raiseするか、
-        # もし app_errorhandler が期待通りに動作しない場合のフォールバックとして残す
-        # 通常は app_errorhandler に任せる
-        return jsonify({
-            'success': False,
-            'error': {
-                'message': 'テンプレート生成中に予期せぬエラーが発生しました。',
-                'code': 'INTERNAL_SERVER_ERROR'
-            },
-            'status': 500
-        }), 500
+    except AppError:
+        # app_errorhandler(AppError) が統一フォーマットに変換する
+        raise
 
-# if __name__ == '__main__':
-#     app.run(debug=True) # run.py から実行するため不要
+    except BadRequest as e:
+        # request.get_json() のパース失敗。JSON 関連なので INVALID_JSON として返す
+        description = e.description if hasattr(e, 'description') else str(e)
+        raise InvalidJsonError(f'リクエストの解析に失敗しました: {description}') from e
+
+    except Exception as e:
+        # ValueError を一律 400 に丸めると、サーバー設定の不備までユーザー入力エラーとして
+        # 返してしまうため、想定外の例外はすべて 500 として扱う
+        current_app.logger.error(f'テンプレート生成中に予期せぬエラー: {str(e)}', exc_info=True)
+        payload, status = error_payload(
+            'テンプレート生成中に予期せぬエラーが発生しました。',
+            ErrorCode.INTERNAL_SERVER_ERROR,
+            500,
+        )
+        return jsonify(payload), status

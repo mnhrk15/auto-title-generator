@@ -1,6 +1,9 @@
+import asyncio
+
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 from app.scraping import HotPepperScraper
+from app.errors import ScrapingError
 import aiohttp
 
 @pytest.mark.asyncio
@@ -78,8 +81,12 @@ class TestHotPepperScraper:
 
         assert len(titles) == 0
 
-    async def test_scrape_titles_http_error(self, scraper):
-        """異常系: HTTPエラーの場合"""
+    async def test_scrape_titles_http_error_on_first_page_raises(self, scraper):
+        """異常系: 1ページ目の取得に失敗したら ScrapingError を送出する
+
+        以前は空リストを返していたため、通信障害が「該当なし」として
+        ユーザーに表示されていた。障害と該当なしは区別する必要がある。
+        """
         mock_response = AsyncMock(spec=aiohttp.ClientResponse)
         mock_response.status = 404
         # raise_for_statusが呼び出されたときにエラーを発生させる
@@ -91,10 +98,24 @@ class TestHotPepperScraper:
 
         with patch('aiohttp.ClientSession.get', MagicMock(return_value=mock_cm)):
             async with scraper:
-                titles = await scraper.scrape_titles_async("test", max_pages=1)
+                with pytest.raises(ScrapingError):
+                    await scraper.scrape_titles_async("test", max_pages=1)
 
-        # エラーが発生しても空のリストが返ることを期待
-        assert len(titles) == 0
+    async def test_scrape_titles_timeout_on_first_page_raises(self, scraper):
+        """異常系: 1ページ目がタイムアウトしたら ScrapingError を送出する
+
+        ClientTimeout(total=...) の超過は asyncio.TimeoutError（= 組み込みの
+        TimeoutError）で送出され、aiohttp.ClientError のサブクラスではない。
+        捕捉し漏れると「サイトが遅い」が 502 ではなく 500 になってしまう。
+        """
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_cm.__aexit__ = AsyncMock(return_value=False)
+
+        with patch('aiohttp.ClientSession.get', MagicMock(return_value=mock_cm)):
+            async with scraper:
+                with pytest.raises(ScrapingError):
+                    await scraper.scrape_titles_async("test", max_pages=1)
 
     async def test_async_context_manager(self):
         """非同期コンテキストマネージャの動作確認"""

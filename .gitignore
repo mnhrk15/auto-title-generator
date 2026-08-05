@@ -1,8 +1,7 @@
 # Environment
 .env
-.venv/
-env/
-venv/
+# But keep the example
+!.env.example
 
 # Python
 __pycache__/
@@ -26,13 +25,21 @@ wheels/
 .installed.cfg
 *.egg
 
-# Webdrivers
-chromedriver
-geckodriver
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
 
-# IDE
+# Testing
+.pytest_cache/
+
+# IDE / tooling
 .idea/
 .vscode/
+.cursor/
+.cursorignore
+.specstory/
 *.swp
 *.swo
 
@@ -45,52 +52,5 @@ logs/
 *.log
 !logs/.gitkeep
 
-.cursor/
-.cursorignore
-.pytest_cache/
-.specstory/
-
+# Local artifacts
 template.csv
-
-# Render specific
-__pycache__/
-*.py[cod]
-*$py.class
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Logs
-logs/
-*.log
-
-# .env file containing API keys
-.env
-
-# But keep the example and production templates
-!.env.example
-!.env.production
-
-# Virtual Environment
-.venv/
-venv/
-ENV/
-
-# IDE specific files
-.idea/
-.vscode/
-*.swp
-*.swo

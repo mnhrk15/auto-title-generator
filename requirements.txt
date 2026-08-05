@@ -4,6 +4,7 @@ Flask[async]==3.0.2          # ASGI-enabled Flask for async support
 # Web Scraping
 beautifulsoup4==4.12.3       # HTML parsing for HotPepper Beauty scraping
 aiohttp==3.9.3               # Async HTTP client for fast scraping
+certifi>=2024.2.2            # CA bundle for scraper SSL verification (OS store is unreliable)
 
 # Google Gemini AI Integration
 google-genai==1.70.0         # Google GenAI SDK with Gemini 3 and thinkingLevel support
@@ -14,10 +15,6 @@ python-dotenv==1.0.1         # Environment variable management
 # Testing Framework
 pytest>=8.0                 # Testing framework
 pytest-asyncio>=0.23        # Async test support for pytest
-responses==0.24.1            # HTTP request mocking for tests
-
-# HTTP Utilities
-requests==2.31.0            # Synchronous HTTP library
 
 # Production Server
 gunicorn==21.2.0             # WSGI/ASGI server for production

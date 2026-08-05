@@ -9,14 +9,21 @@ API拡張機能の統合テスト
 
 import pytest
 import json
-import os
-import tempfile
-import shutil
+from contextlib import contextmanager
 from unittest.mock import patch, MagicMock, AsyncMock
 from app import create_app
-from app.featured_keywords import FeaturedKeywordsManager
-from app.generator import TemplateGenerator
-from app.scraping import HotPepperScraper
+
+
+@contextmanager
+def patch_featured_repository():
+    """app.main が参照する特集キーワードリポジトリをモックに差し替える。
+
+    リポジトリは app.extensions 経由で解決されるため、
+    アクセサ関数を差し替えるのが最も素直なモック方法になる。
+    """
+    repository = MagicMock()
+    with patch('app.main.get_featured_repository', return_value=repository):
+        yield repository
 
 
 class TestFeaturedKeywordsAPI:
@@ -34,42 +41,9 @@ class TestFeaturedKeywordsAPI:
         """テスト用クライアントを作成"""
         return app.test_client()
     
-    @pytest.fixture
-    def temp_dir(self):
-        """テスト用の一時ディレクトリを作成"""
-        temp_dir = tempfile.mkdtemp()
-        yield temp_dir
-        shutil.rmtree(temp_dir)
-    
-    @pytest.fixture
-    def valid_keywords_data(self):
-        """有効な特集キーワードデータ"""
-        return [
-            {
-                "name": "テスト用くびれヘア",
-                "keyword": "くびれヘア",
-                "gender": "ladies",
-                "condition": "テスト用の掲載条件です。スタイル名に『くびれヘア』を含めること。"
-            },
-            {
-                "name": "テスト用韓国風マッシュ",
-                "keyword": "韓国風マッシュ",
-                "gender": "mens",
-                "condition": "テスト用のメンズ掲載条件です。『韓国風マッシュ』を含めること。"
-            }
-        ]
-    
-    @pytest.fixture
-    def valid_keywords_file(self, temp_dir, valid_keywords_data):
-        """有効な特集キーワードJSONファイルを作成"""
-        file_path = os.path.join(temp_dir, 'test_keywords.json')
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(valid_keywords_data, f, ensure_ascii=False, indent=2)
-        return file_path
-    
-    def test_get_featured_keywords_success(self, client, valid_keywords_file):
+    def test_get_featured_keywords_success(self, client):
         """特集キーワード取得API - 正常ケース"""
-        with patch('app.main.featured_manager') as mock_manager:
+        with patch_featured_repository() as mock_manager:
             # モックの設定
             mock_manager.is_available.return_value = True
             mock_manager.get_all_keywords.return_value = [
@@ -106,7 +80,7 @@ class TestFeaturedKeywordsAPI:
     
     def test_get_featured_keywords_unavailable(self, client):
         """特集キーワード取得API - 機能利用不可ケース"""
-        with patch('app.main.featured_manager') as mock_manager:
+        with patch_featured_repository() as mock_manager:
             # モックの設定（機能利用不可）
             mock_manager.is_available.return_value = False
             mock_manager.get_last_error.return_value = None
@@ -136,7 +110,7 @@ class TestFeaturedKeywordsAPI:
         """特集キーワード取得API - エラーケース"""
         from app.featured_keywords import FeaturedKeywordsLoadError
         
-        with patch('app.main.featured_manager') as mock_manager:
+        with patch_featured_repository() as mock_manager:
             # モックの設定（エラー状態）
             mock_manager.is_available.return_value = False
             mock_manager.get_last_error.return_value = FeaturedKeywordsLoadError("ファイル読み込みエラー")
@@ -161,28 +135,32 @@ class TestFeaturedKeywordsAPI:
             assert 'message' in data
             assert '特集キーワードファイルの読み込みに問題があります' in data['message']
     
-    def test_get_featured_keywords_exception_fallback(self, client):
-        """特集キーワード取得API - 例外発生時のフォールバック"""
-        with patch('app.main.featured_manager') as mock_manager:
+    def test_get_featured_keywords_exception_returns_error(self, client):
+        """特集キーワード取得API - 例外発生時はエラーとして返す
+
+        以前は success: True と error オブジェクトを同時に返していたため、
+        success だけを見るフロントエンドでは失敗が成功として扱われていた。
+        """
+        with patch_featured_repository() as mock_manager:
             # モックの設定（例外発生）
             mock_manager.is_available.side_effect = Exception("予期しないエラー")
-            
+
             # APIリクエスト実行
             response = client.get('/api/featured-keywords')
-            
+
             # レスポンス検証
-            assert response.status_code == 200
+            assert response.status_code == 503
             data = json.loads(response.data)
-            
-            assert data['success'] is True
-            assert data['keywords'] == []
-            assert 'fallback' in data
-            assert data['fallback'] is True
+
+            assert data['success'] is False
+            assert data['error']['code'] == 'FEATURED_KEYWORDS_ERROR'
             assert 'error' in data
+            # success と error が同時に成立しないこと
+            assert data['success'] is not True
     
     def test_get_featured_keywords_data_sanitization(self, client):
         """特集キーワード取得API - データサニタイゼーション"""
-        with patch('app.main.featured_manager') as mock_manager:
+        with patch_featured_repository() as mock_manager:
             # モックの設定（不完全なデータを含む）
             mock_manager.is_available.return_value = True
             mock_manager.get_all_keywords.return_value = [
@@ -269,9 +247,9 @@ class TestTemplateGenerationAPI:
     
     def test_generate_with_featured_keyword(self, client, mock_scraper_results, mock_template_results):
         """テンプレート生成API - 特集キーワードでの生成テスト"""
-        with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.main.HotPepperScraper') as mock_scraper_class, \
-             patch('app.main.TemplateGenerator') as mock_generator_class:
+        with patch_featured_repository() as mock_featured_manager, \
+             patch('app.services.template_service.HotPepperScraper') as mock_scraper_class, \
+             patch('app.services.template_service.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定
             mock_featured_manager.is_available.return_value = True
@@ -344,9 +322,9 @@ class TestTemplateGenerationAPI:
     
     def test_generate_with_normal_keyword(self, client, mock_scraper_results, mock_template_results):
         """テンプレート生成API - 通常キーワードでの生成テスト"""
-        with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.main.HotPepperScraper') as mock_scraper_class, \
-             patch('app.main.TemplateGenerator') as mock_generator_class:
+        with patch_featured_repository() as mock_featured_manager, \
+             patch('app.services.template_service.HotPepperScraper') as mock_scraper_class, \
+             patch('app.services.template_service.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（通常キーワード）
             mock_featured_manager.is_available.return_value = True
@@ -406,9 +384,9 @@ class TestTemplateGenerationAPI:
     
     def test_generate_with_mixed_keywords(self, client, mock_scraper_results, mock_template_results):
         """テンプレート生成API - 混在キーワードでの生成テスト"""
-        with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.main.HotPepperScraper') as mock_scraper_class, \
-             patch('app.main.TemplateGenerator') as mock_generator_class:
+        with patch_featured_repository() as mock_featured_manager, \
+             patch('app.services.template_service.HotPepperScraper') as mock_scraper_class, \
+             patch('app.services.template_service.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（混在キーワード）
             mock_featured_manager.is_available.return_value = True
@@ -527,8 +505,8 @@ class TestTemplateGenerationAPI:
     
     def test_generate_no_results_found(self, client):
         """テンプレート生成API - 結果が見つからない場合のテスト"""
-        with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.main.HotPepperScraper') as mock_scraper_class:
+        with patch_featured_repository() as mock_featured_manager, \
+             patch('app.services.template_service.HotPepperScraper') as mock_scraper_class:
             
             # FeaturedKeywordsManagerのモック設定
             mock_featured_manager.is_available.return_value = True
@@ -574,7 +552,7 @@ class TestEndToEndIntegration:
     def test_featured_keywords_to_template_generation_flow(self, client):
         """特集キーワード取得からテンプレート生成までの完全フロー"""
         # Step 1: 特集キーワード一覧を取得
-        with patch('app.main.featured_manager') as mock_featured_manager:
+        with patch_featured_repository() as mock_featured_manager:
             mock_featured_manager.is_available.return_value = True
             mock_featured_manager.get_all_keywords.return_value = [
                 {
@@ -604,9 +582,9 @@ class TestEndToEndIntegration:
             assert featured_keyword == 'くびれヘア'
         
         # Step 2: 取得した特集キーワードでテンプレート生成
-        with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.main.HotPepperScraper') as mock_scraper_class, \
-             patch('app.main.TemplateGenerator') as mock_generator_class:
+        with patch_featured_repository() as mock_featured_manager, \
+             patch('app.services.template_service.HotPepperScraper') as mock_scraper_class, \
+             patch('app.services.template_service.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定
             mock_featured_manager.is_available.return_value = True
@@ -667,9 +645,9 @@ class TestEndToEndIntegration:
     
     def test_fallback_behavior_when_featured_unavailable(self, client):
         """特集キーワード機能が利用できない場合のフォールバック動作テスト"""
-        with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.main.HotPepperScraper') as mock_scraper_class, \
-             patch('app.main.TemplateGenerator') as mock_generator_class:
+        with patch_featured_repository() as mock_featured_manager, \
+             patch('app.services.template_service.HotPepperScraper') as mock_scraper_class, \
+             patch('app.services.template_service.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（機能利用不可）
             mock_featured_manager.is_available.return_value = False
@@ -721,9 +699,9 @@ class TestEndToEndIntegration:
     
     def test_error_recovery_and_logging(self, client):
         """エラー回復とログ記録のテスト"""
-        with patch('app.main.featured_manager') as mock_featured_manager, \
-             patch('app.main.HotPepperScraper') as mock_scraper_class, \
-             patch('app.main.TemplateGenerator') as mock_generator_class:
+        with patch_featured_repository() as mock_featured_manager, \
+             patch('app.services.template_service.HotPepperScraper') as mock_scraper_class, \
+             patch('app.services.template_service.TemplateGenerator') as mock_generator_class:
             
             # FeaturedKeywordsManagerのモック設定（エラー発生）
             mock_featured_manager.is_available.side_effect = Exception("特集キーワード機能エラー")

@@ -1,9 +1,12 @@
-from app import app
-from app.config import Config
+from app import create_app
+from app.config import get_settings
+
+app = create_app()
 
 if __name__ == '__main__':
+    settings = get_settings()
     app.run(
-        host=Config.HOST,
-        port=Config.PORT,
-        debug=Config.DEBUG
-    ) 
+        host=settings.host,
+        port=settings.port,
+        debug=settings.debug
+    )

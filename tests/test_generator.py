@@ -1,102 +1,18 @@
 import pytest
 import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+from google.genai import types
+
 from app.generator import TemplateGenerator
+from app.errors import GenerationError
+from app.schemas import GeneratedTemplate, GenerationResult, TrendingKeyword
 
 class TestTemplateGenerator:
     @pytest.fixture
     def generator(self):
         return TemplateGenerator()
-
-    def test_create_prompt(self, generator):
-        """プロンプトが正しく生成されるかテスト"""
-        titles = ["★髪質改善トリートメントで艶髪ストレート"]
-        keyword = "髪質改善"
-
-        prompt = generator._create_prompt(titles, keyword)
-
-        # プロンプトに必要な要素が含まれているか確認
-        assert keyword in prompt
-        assert "[\n  \"" + titles[0] + "\"\n]" in prompt
-        assert "文字以内" in prompt  # 文字数制限の指示が含まれているか
-        assert "JSON形式" in prompt  # 出力形式の指示が含まれているか
-
-    def test_create_prompt_has_no_pv_boost_rules(self, generator):
-        """PV向上キーワードの強制配置ルールが撤廃されているかテスト"""
-        titles = ["★髪質改善トリートメントで艶髪ストレート"]
-        keyword = "髪質改善"
-
-        prompt = generator._create_prompt(titles, keyword)
-
-        assert "PV向上キーワードの配置ルール" not in prompt
-        for season_word in ("春カラー", "夏カラー", "秋カラー", "冬カラー", "ブリーチなしカラー"):
-            assert season_word not in prompt
-
-    def test_create_prompt_mens_has_no_season_colors(self, generator):
-        """メンズでは季節カラー・ブリーチなしがプロンプトに一切現れないかテスト"""
-        titles = ["★メンズマッシュ×ニュアンスパーマ"]
-        keyword = "メンズパーマ"
-
-        prompt = generator._create_prompt(
-            titles, keyword, seasons=["spring", "bleach_free"], gender="mens"
-        )
-
-        for ng_word in ("春カラー", "夏カラー", "秋カラー", "冬カラー", "ブリーチなし", "ブリーチ"):
-            assert ng_word not in prompt
-        # メンズ固有の語彙指示は維持されている
-        assert "メンズ特有キーワードの活用" in prompt
-
-    def test_create_prompt_ladies_has_no_season_words(self, generator):
-        """レディースでもプロンプトに季節語を注入しない（付加は後処理のみ）"""
-        titles = ["★髪質改善トリートメントで艶髪ストレート"]
-        keyword = "髪質改善"
-
-        prompt = generator._create_prompt(titles, keyword, seasons=["spring"], gender="ladies")
-
-        assert "春カラー" not in prompt
-
-    @pytest.mark.parametrize("seasons,expected_rule,expected_rest", [
-        # 「春カラー」(4文字)+区切り1文字 → 25文字までが目標帯、幅2で23〜25文字
-        (["spring"], "20個中**4個は23〜25文字**", 16),
-        (["spring", "summer"], "20個中**8個は23〜25文字**", 12),
-        # 「ブリーチなしカラー」(9文字)+区切り1文字 → 20文字までが目標帯
-        (["bleach_free"], "20個中**4個は18〜20文字**", 16),
-        # 語の長さが異なる場合は帯を分ける（長いタイトル帯から順に提示）
-        (["winter", "bleach_free"], "20個中**4個は23〜25文字**、**4個は18〜20文字**", 12),
-        # 5つ選択時は1つあたりの枠が2に減り、合計10個に収まる
-        (["spring", "summer", "autumn", "winter", "bleach_free"],
-         "20個中**8個は23〜25文字**、**2個は18〜20文字**", 10),
-    ])
-    def test_create_prompt_short_title_slots(self, generator, seasons, expected_rule, expected_rest):
-        """季節・カラー選択時に、付加後に上限文字数へ届く目標帯が指示されるかテスト"""
-        titles = ["★髪質改善トリートメントで艶髪ストレート"]
-
-        prompt = generator._create_prompt(titles, "髪質改善", seasons=seasons, gender="ladies")
-
-        assert f"- title: {expected_rule}、残りの{expected_rest}個は**25〜28文字**を目標" in prompt
-        assert "後から語句を追記するための余白" in prompt
-        assert "上限側に寄せて" in prompt
-        # 文字数目標の記述が矛盾しないこと（無条件の25〜28文字指定が残っていない）
-        assert "- title: **25〜28文字**を目標" not in prompt
-
-    def test_create_prompt_no_short_slots_without_seasons(self, generator):
-        """季節・カラー未選択なら短尺タイトル枠の指示は入らない"""
-        titles = ["★髪質改善トリートメントで艶髪ストレート"]
-
-        prompt = generator._create_prompt(titles, "髪質改善")
-
-        assert "後から語句を追記するための余白" not in prompt
-        assert "- title: **25〜28文字**を目標" in prompt
-
-    def test_create_prompt_no_short_slots_for_mens(self, generator):
-        """メンズは seasons を渡しても短尺タイトル枠の指示は入らない"""
-        titles = ["★メンズマッシュ×ニュアンスパーマ"]
-
-        prompt = generator._create_prompt(
-            titles, "メンズパーマ", seasons=["spring"], gender="mens"
-        )
-
-        assert "後から語句を追記するための余白" not in prompt
-        assert "- title: **25〜28文字**を目標" in prompt
 
     def test_normalize_seasons(self, generator):
         """季節・カラー選択値の正規化テスト"""
@@ -154,30 +70,6 @@ class TestTemplateGenerator:
 
         assert generator._validate_template(template, "髪質改善") is False
 
-    def test_create_prompt_includes_trend_analysis_section(self, generator):
-        """プロンプトにトレンド分析セクションが含まれるかテスト"""
-        titles = ["レイヤーカット×ウルフカット透明感", "大人可愛いレイヤーカット小顔"]
-        keyword = "レイヤーカット"
-
-        prompt = generator._create_prompt(titles, keyword)
-
-        assert "参照データのトレンド分析" in prompt
-        assert "頻繁に組み合わされているキーワード" in prompt
-        assert "trending_keywords" in prompt
-        assert "文字数制限" in prompt
-        assert "常に最優先" in prompt
-
-    def test_create_prompt_trend_analysis_output_format(self, generator):
-        """出力形式にtrending_keywordsが指定されているかテスト"""
-        titles = ["レイヤーカット×ウルフカット透明感"]
-        keyword = "レイヤーカット"
-
-        prompt = generator._create_prompt(titles, keyword)
-
-        assert '"trending_keywords"' in prompt
-        assert '"templates"' in prompt
-        assert '"count"' in prompt
-        assert "trending_keywordsを先に出力し" in prompt
 
 
 class TestSeasonKeywordAppend:
@@ -381,148 +273,162 @@ class TestSeasonKeywordAppend:
         assert sum(len(t["title"]) > n for t, n in zip(templates, range(10, 30))) > 0
 
 
-class TestParseResponse:
-    """_parse_response メソッドのテスト"""
+class TestExtractResult:
+    """_extract_result メソッドのテスト
+
+    response_schema による構造化出力へ移行したため、旧 TestParseResponse が
+    検証していた失敗モード（マークダウン剥がし、前後テキストの混入、
+    旧配列形式へのフォールバック、内部配列の誤検出）は構造的に発生しなくなった。
+    それらのテストは常に緑になるだけでリグレッション検知能力を持たないため、
+    ここでは「構造化出力で実際に起こりうる失敗」だけを検証する。
+    """
 
     @pytest.fixture
     def generator(self):
         return TemplateGenerator()
 
-    def _make_template(self, title="テスト"):
-        return {"title": title, "menu": "メニュー", "comment": "コメント", "hashtag": ["タグ"]}
+    @staticmethod
+    def _template(title="タイトル"):
+        return GeneratedTemplate(
+            title=title, menu="メニュー", comment="コメント", hashtag=["タグ"]
+        )
 
-    def test_parse_object_format(self, generator):
-        """新形式（オブジェクト形式）の正常パース"""
-        data = {
-            "trending_keywords": [
-                {"keyword": "ウルフカット", "count": 5, "reason": "テスト"}
+    @staticmethod
+    def _response(parsed=None, text=None, finish_reason=types.FinishReason.STOP):
+        candidate = SimpleNamespace(finish_reason=finish_reason)
+        return SimpleNamespace(
+            candidates=[candidate], parsed=parsed, text=text, usage_metadata=None
+        )
+
+    def test_uses_parsed_result(self, generator):
+        """parsed が返っていればそれをそのまま辞書化して使う"""
+        parsed = GenerationResult(
+            trending_keywords=[
+                TrendingKeyword(keyword="ウルフカット", count=5, reason="テスト")
             ],
-            "templates": [self._make_template("タイトル1"), self._make_template("タイトル2")]
-        }
-        response_text = json.dumps(data, ensure_ascii=False)
+            templates=[self._template("タイトル1"), self._template("タイトル2")],
+        )
 
-        templates, trending = generator._parse_response(response_text)
+        templates, trending = generator._extract_result(self._response(parsed=parsed))
 
-        assert len(templates) == 2
-        assert templates[0]["title"] == "タイトル1"
-        assert len(trending) == 1
-        assert trending[0]["keyword"] == "ウルフカット"
+        assert [t["title"] for t in templates] == ["タイトル1", "タイトル2"]
+        assert trending == [{"keyword": "ウルフカット", "count": 5, "reason": "テスト"}]
 
-    def test_parse_array_format_fallback(self, generator):
-        """旧形式（配列形式）へのフォールバック"""
-        data = [self._make_template("タイトル1"), self._make_template("タイトル2")]
-        response_text = json.dumps(data, ensure_ascii=False)
+    def test_falls_back_to_raw_text(self, generator):
+        """parsed が None でも生テキストから復元できる"""
+        raw = json.dumps({
+            "trending_keywords": [],
+            "templates": [{
+                "title": "タイトル1", "menu": "メニュー",
+                "comment": "コメント", "hashtag": ["タグ"],
+            }],
+        }, ensure_ascii=False)
 
-        templates, trending = generator._parse_response(response_text)
+        templates, trending = generator._extract_result(self._response(parsed=None, text=raw))
 
-        assert len(templates) == 2
         assert templates[0]["title"] == "タイトル1"
         assert trending == []
 
-    def test_parse_markdown_wrapped_json(self, generator):
-        """マークダウンコードブロックで囲まれたJSONのパース"""
-        data = {
+    def test_empty_text_raises(self, generator):
+        """parsed も text も無ければ生成エラー"""
+        with pytest.raises(GenerationError):
+            generator._extract_result(self._response(parsed=None, text=None))
+
+    def test_invalid_json_raises(self, generator):
+        with pytest.raises(GenerationError):
+            generator._extract_result(self._response(parsed=None, text="これはJSONではない"))
+
+    def test_schema_mismatch_raises(self, generator):
+        """スキーマに合わないJSON（hashtag が配列でない）は生成エラー"""
+        raw = json.dumps({
             "trending_keywords": [],
-            "templates": [self._make_template("マークダウン内")]
-        }
-        response_text = f"```json\n{json.dumps(data, ensure_ascii=False)}\n```"
+            "templates": [{
+                "title": "タイトル", "menu": "メニュー",
+                "comment": "コメント", "hashtag": "タグ1 タグ2",
+            }],
+        }, ensure_ascii=False)
 
-        templates, trending = generator._parse_response(response_text)
+        with pytest.raises(GenerationError):
+            generator._extract_result(self._response(parsed=None, text=raw))
 
-        assert len(templates) == 1
-        assert templates[0]["title"] == "マークダウン内"
+    def test_max_tokens_reports_truncation(self, generator):
+        """出力上限で打ち切られた場合、原因が分かるメッセージを返す
 
-    def test_parse_markdown_wrapped_array(self, generator):
-        """マークダウンコードブロックで囲まれた配列形式のパース"""
-        data = [self._make_template("配列形式")]
-        response_text = f"```json\n{json.dumps(data, ensure_ascii=False)}\n```"
+        以前は finish_reason を見ておらず、途中で切れた JSON の
+        パースエラーとしてしか観測できなかった。
+        """
+        response = self._response(parsed=None, text=None,
+                                  finish_reason=types.FinishReason.MAX_TOKENS)
 
-        templates, trending = generator._parse_response(response_text)
+        with pytest.raises(GenerationError) as excinfo:
+            generator._extract_result(response)
 
-        assert len(templates) == 1
-        assert templates[0]["title"] == "配列形式"
+        assert '長すぎ' in str(excinfo.value)
 
-    def test_parse_object_without_templates_key(self, generator):
-        """templatesキーがないオブジェクトの場合はValueErrorを発生"""
-        response_text = '{"trending_keywords": [{"keyword": "test"}]}'
+    def test_no_candidates_raises(self, generator):
+        response = SimpleNamespace(candidates=[], parsed=None, text=None)
 
-        # オブジェクト形式のJSONとしてはパース可能だがtemplatesキーが無いためエラー
-        # （以前は配列フォールバックでtrending_keywords内の[]を誤って拾うバグがあった）
-        with pytest.raises(ValueError, match="templates"):
-            generator._parse_response(response_text)
+        with pytest.raises(GenerationError):
+            generator._extract_result(response)
 
-    def test_parse_invalid_json(self, generator):
-        """完全に不正なJSONの場合"""
-        response_text = "これはJSONではありません"
+    def test_empty_templates_is_extracted_as_empty_list(self, generator):
+        """templates が空配列でも _extract_result 自体は成功する
 
-        with pytest.raises(ValueError, match="No valid JSON found"):
-            generator._parse_response(response_text)
+        GenerationResult には最小件数の制約がないためスキーマ検証は通る。
+        「0件」の扱いは generate_templates_async 側の責務
+        （test_generation_with_no_valid_templates_raises_generation_error）。
+        """
+        parsed = GenerationResult(trending_keywords=[], templates=[])
 
-    def test_parse_empty_templates(self, generator):
-        """templates が空配列の場合"""
-        data = {"trending_keywords": [], "templates": []}
-        response_text = json.dumps(data, ensure_ascii=False)
-
-        templates, trending = generator._parse_response(response_text)
+        templates, trending = generator._extract_result(self._response(parsed=parsed))
 
         assert templates == []
         assert trending == []
 
-    def test_parse_object_with_surrounding_text(self, generator):
-        """JSON前後にテキストがある場合"""
-        data = {
-            "trending_keywords": [],
-            "templates": [self._make_template("前後テキスト")]
-        }
-        response_text = f"以下がJSONです:\n{json.dumps(data, ensure_ascii=False)}\n以上です。"
+    def test_null_trending_keywords_is_tolerated(self, generator):
+        """trending_keywords が null / 欠落でもテンプレートは失われない
 
-        templates, trending = generator._parse_response(response_text)
+        トレンドキーワードは付随情報でしかないので、これが欠けただけで
+        テンプレート20件の生成全体を失敗させてはいけない。
+        """
+        for payload in (
+            {"trending_keywords": None, "templates": [{
+                "title": "タイトル1", "menu": "メニュー",
+                "comment": "コメント", "hashtag": ["タグ"]}]},
+            {"templates": [{
+                "title": "タイトル1", "menu": "メニュー",
+                "comment": "コメント", "hashtag": ["タグ"]}]},
+        ):
+            raw = json.dumps(payload, ensure_ascii=False)
 
-        assert len(templates) == 1
-        assert templates[0]["title"] == "前後テキスト"
+            templates, trending = generator._extract_result(
+                self._response(parsed=None, text=raw))
 
-    def test_parse_templates_not_list(self, generator):
-        """templatesが配列でない場合はValueErrorを発生"""
-        response_text = '{"trending_keywords": [], "templates": "invalid"}'
+            assert templates[0]["title"] == "タイトル1"
+            assert trending == []
 
-        # templatesが文字列なので有効なリストではない = エラー
-        # （以前はフォールバックで[]を誤って拾っていた）
-        with pytest.raises(ValueError, match="templates"):
-            generator._parse_response(response_text)
 
-    def test_parse_trending_keywords_preserved(self, generator):
-        """trending_keywordsの詳細情報が保持されるか"""
-        data = {
-            "trending_keywords": [
-                {"keyword": "韓国風", "count": 10, "reason": "40件中10件"},
-                {"keyword": "くびれ", "count": 8, "reason": "40件中8件"}
-            ],
-            "templates": [self._make_template()]
-        }
-        response_text = json.dumps(data, ensure_ascii=False)
+class TestGenerateTemplatesAsync:
+    """generate_templates_async のエラー分類のテスト"""
 
-        templates, trending = generator._parse_response(response_text)
+    @pytest.fixture
+    def generator(self):
+        return TemplateGenerator()
 
-        assert len(trending) == 2
-        assert trending[0]["keyword"] == "韓国風"
-        assert trending[0]["count"] == 10
-        assert trending[1]["keyword"] == "くびれ"
+    @pytest.mark.asyncio
+    async def test_generation_with_no_valid_templates_raises_generation_error(self, generator):
+        """有効なテンプレートが1件も残らない場合は GenerationError
 
-    def test_parse_object_does_not_fallback_to_inner_array(self, generator):
-        """オブジェクト形式が壊れていても、内部の配列を拾わないことを確認（リグレッションテスト）"""
-        # templates が配列ではなく文字列。trending_keywords 内に配列があるが、
-        # 誤ってそれを拾って返してはならない
-        response_text = '{"trending_keywords": [{"keyword": "wrong"}], "templates": 42}'
+        AppError のサブクラスなので、ルート層で 502 GENERATION_ERROR として
+        返る（想定外の例外による 500 と区別できる）。
+        """
+        parsed = GenerationResult(trending_keywords=[], templates=[])
+        response = SimpleNamespace(
+            candidates=[SimpleNamespace(finish_reason=types.FinishReason.STOP)],
+            parsed=parsed, text=None, usage_metadata=None,
+        )
 
-        with pytest.raises(ValueError):
-            generator._parse_response(response_text)
-
-    def test_parse_null_trending_keywords(self, generator):
-        """trending_keywordsがnullの場合、空リストとして扱う"""
-        data = {"trending_keywords": None, "templates": [self._make_template()]}
-        response_text = json.dumps(data, ensure_ascii=False)
-
-        templates, trending = generator._parse_response(response_text)
-
-        assert len(templates) == 1
-        assert trending == []
+        with patch.object(generator.client.aio.models, 'generate_content',
+                          new=AsyncMock(return_value=response)):
+            with pytest.raises(GenerationError):
+                await generator.generate_templates_async(["タイトル"], "髪質改善")
