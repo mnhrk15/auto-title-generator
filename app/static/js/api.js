@@ -6,6 +6,11 @@
 export const TIMEOUT_FEATURED_KEYWORDS_MS = 10000;
 export const TIMEOUT_GENERATE_MS = 120000;
 
+// timeoutMs を省略して呼ばれたときの既定。
+// 既定値がないと setTimeout(fn, undefined) が 0ms 扱いになり、
+// リクエストが即座に abort される（呼び出し側が必ず渡していたため表に出ていなかった）。
+const DEFAULT_TIMEOUT_MS = 30000;
+
 /**
  * API 呼び出しの失敗。
  * kind: 'timeout' | 'network' | 'server' | 'app'
@@ -29,7 +34,10 @@ export class ApiError extends Error {
  * サーバーが返すエラーコード（NO_RESULTS_FOUND 等）に応じた案内が
  * 一度もユーザーに表示されていなかった。
  */
-export async function requestJson(url, { method = 'GET', body = null, timeoutMs } = {}) {
+export async function requestJson(
+    url,
+    { method = 'GET', body = null, timeoutMs = DEFAULT_TIMEOUT_MS } = {},
+) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -84,4 +92,14 @@ export async function requestJson(url, { method = 'GET', body = null, timeoutMs 
     }
 
     return data;
+}
+
+/**
+ * エラーの種別を返す。ApiError でないものは 'app' 扱い。
+ *
+ * 呼び出し側は kind をキーにしたメッセージ辞書を持っており、
+ * `TABLE[errorKind(e)] ?? TABLE.app` の形で使う。
+ */
+export function errorKind(error) {
+    return error instanceof ApiError ? error.kind : 'app';
 }

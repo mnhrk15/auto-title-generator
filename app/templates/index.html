@@ -270,11 +270,14 @@
             <i class="fas fa-copy" aria-hidden="true"></i> 全てコピー
         </button>
     </div>
-        
-    <!-- コピー完了トースト -->
+    </div>
+
+    <!-- コピー完了トースト。
+         #results の内側に置くと、結果セクションの fadeInUp アニメーション中は
+         transform が position:fixed の包含ブロックになって表示位置がずれ、
+         再生成時の hideResults() で表示途中のまま消えてしまう。 -->
     <div id="copied-toast" class="copied-toast" role="status" aria-live="polite">
         クリップボードにコピーしました
-    </div>
     </div>
 </main>
 

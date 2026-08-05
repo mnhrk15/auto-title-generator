@@ -1,5 +1,11 @@
 // ページ内の主要な要素をここで一度だけ引く。
-// セレクタ文字列を各モジュールに散らさないための単一の出入口。
+//
+// 何をここに載せるかの規約:
+//   1. el に載せるのは「index.html に最初から存在し、生存期間がページと同じ」要素だけ。
+//   2. 動的に生成した要素は、それを生成したモジュールが自分のスコープで引く。
+//      （template-card.js が card.querySelector で閉じる、toast.js が自分で作った
+//        .toast を引く、など）これは違反ではない。
+//   3. 同じセレクタ文字列が 2 つ以上のモジュールに現れたら、必ずここへ寄せる。
 
 export const el = {
     generateBtn: document.getElementById('generate-button'),
@@ -39,6 +45,17 @@ export const el = {
     mensNotice: document.getElementById('mens-title-notice'),
     featuredContainer: document.getElementById('featured-keywords-container'),
 };
+
+// 上のセレクタと index.html は文字列一致でしか結ばれていない。id や class を
+// 変えると静かに null になり、実行時に初めて TypeError で落ちる。
+// 起動時に一度だけ検査して、取り違えをその場で分かるようにする。
+// （null を ?. で握りつぶす方針にすると「何も起きない」不具合になり原因を追えない）
+const missingElements = Object.entries(el)
+    .filter(([, node]) => node === null || (node instanceof NodeList && node.length === 0))
+    .map(([key]) => key);
+if (missingElements.length > 0) {
+    console.error('[dom] index.html に見つからない要素:', missingElements.join(', '));
+}
 
 /** 現在選択されている性別を返す */
 export function getSelectedGender() {
