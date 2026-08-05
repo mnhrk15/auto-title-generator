@@ -1,0 +1,83 @@
+{#- index.html で繰り返されるマークアップ。
+
+    ページが 1 枚しかないのでファイルも 1 枚に収めている。
+    呼び出し側は `{% from "_macros.html" import ... %}` で必要なものだけを持ち込む。
+-#}
+
+{#- 性別選択のラジオ 1 個 -#}
+{%- macro gender_option(value, label, icon, checked=false) -%}
+<div class="gender-option-wrapper">
+    <label class="gender-option">
+        <input type="radio" name="gender" value="{{ value }}"{% if checked %} checked{% endif %}>
+        <span class="radio-label"><i class="fas {{ icon }}" aria-hidden="true"></i> {{ label }}</span>
+    </label>
+</div>
+{%- endmacro -%}
+
+
+{#- 季節・カラー選択のチェックボックス 1 個 -#}
+{%- macro season_option(value, label) -%}
+<label class="season-option">
+    <input type="checkbox" name="season" value="{{ value }}">
+    <span class="checkbox-label">{{ label }}</span>
+</label>
+{%- endmacro -%}
+
+
+{#- 使い方ガイドの 1 ステップ -#}
+{%- macro guide_step(number, icon, text) -%}
+<div class="guide-step">
+    <div class="guide-step-number">{{ number }}</div>
+    <div class="guide-step-text">
+        <i class="fas {{ icon }}" aria-hidden="true"></i>
+        <span>{{ text }}</span>
+    </div>
+</div>
+{%- endmacro -%}
+
+
+{#- テンプレートカードの 1 フィールド。
+
+    name        … CSS クラス / data-field / char-count クラスの接頭辞
+                  （title|menu|comment|hashtag）
+    maxlength   … textarea の maxlength。template-card.js が文字数上限の唯一の出典として
+                  これを読む。ハッシュタグだけは「全体長」ではなく「タグ 1 個あたりの長さ」
+                  なので maxlength は付けず、data-max-length で伝える。
+    info        … 「（30文字以内）」の中身。省略時は maxlength から作る。
+    count_init  … 文字数カウンタの初期表示。省略時は "0/{maxlength}"。
+    data_max_length … data-max-length 属性の値（ハッシュタグ用）
+-#}
+{%- macro card_field(name, label, icon, placeholder, maxlength=none, info=none, rows=2,
+                     count_init=none, data_max_length=none) -%}
+<div class="field">
+    <div class="field-label">
+        <div class="field-label-group">
+            <i class="fas {{ icon }}" aria-hidden="true"></i>
+            <span>{{ label }}</span>
+            <span class="field-info">（{{ info if info is not none else '%d文字以内'|format(maxlength) }}）</span>
+        </div>
+        <span class="char-count {{ name }}-count">{{ count_init if count_init is not none else '0/%d'|format(maxlength) }}</span>
+    </div>
+    <div class="textarea-container">
+        <textarea class="{{ name }}" data-field="{{ name }}" aria-label="{{ label }}"{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if data_max_length %} data-max-length="{{ data_max_length }}"{% endif %} rows="{{ rows }}" placeholder="{{ placeholder }}"></textarea>
+        <button type="button" class="field-copy-btn" data-field="{{ name }}" title="{{ label }}をコピー">
+            <i class="fas fa-copy" aria-hidden="true"></i>
+        </button>
+    </div>
+</div>
+{%- endmacro -%}
+
+
+{#- メンズ注釈の語群。title を渡すと優先グループになる -#}
+{%- macro mens_word_group(words, title=none) -%}
+<div class="mens-word-group{% if title %} is-priority{% endif %}">
+    {%- if title %}
+    <span class="mens-word-group-title">{{ title }}</span>
+    {%- endif %}
+    <ul class="mens-word-list">
+        {%- for word in words %}
+        <li>{{ word }}</li>
+        {%- endfor %}
+    </ul>
+</div>
+{%- endmacro -%}

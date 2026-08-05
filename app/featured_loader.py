@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import traceback
-from typing import Dict, List, NamedTuple, Optional
+from typing import NamedTuple
 
 from . import config
 from .errors import FeaturedKeywordsLoadError, FeaturedKeywordsValidationError
@@ -28,11 +28,11 @@ class LoadResult(NamedTuple):
     keywords が空でも error が None のことがある（ファイルが空配列の場合など）。
     """
 
-    keywords: List[Dict]
-    error: Optional[Exception]
+    keywords: list[dict]
+    error: Exception | None
 
 
-def _validate_item(item, index: int) -> Optional[str]:
+def _validate_item(item, index: int) -> str | None:
     """1件分のキーワードを検証する。
 
     Returns:
@@ -62,14 +62,13 @@ def _validate_item(item, index: int) -> Optional[str]:
     for field, label, limit in length_limits:
         if len(item[field]) > limit:
             return (
-                f"特集キーワード[{index}]: {label}が長すぎます "
-                f"({len(item[field])} > {limit}文字)"
+                f"特集キーワード[{index}]: {label}が長すぎます ({len(item[field])} > {limit}文字)"
             )
 
     return None
 
 
-def _read_file(path) -> List:
+def _read_file(path) -> list:
     """JSON ファイルを読み込む。事前にサイズと存在を検証する。"""
     if not os.path.exists(path):
         raise FeaturedKeywordsLoadError(f"特集キーワードファイルが見つかりません: {path}")
@@ -81,7 +80,7 @@ def _read_file(path) -> List:
     if file_size > config.FEATURED_FILE_MAX_BYTES:
         raise FeaturedKeywordsLoadError(f"特集キーワードファイルが大きすぎます: {file_size} bytes")
 
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -103,11 +102,15 @@ def load_featured_keywords(path) -> LoadResult:
         logger.debug(f"JSONDecodeError詳細: {traceback.format_exc()}")
         return LoadResult([], error)
     except PermissionError as e:
-        error = FeaturedKeywordsLoadError(f"特集キーワードファイルの読み込み権限がありません: {str(e)}")
+        error = FeaturedKeywordsLoadError(
+            f"特集キーワードファイルの読み込み権限がありません: {str(e)}"
+        )
         logger.error(str(error))
         return LoadResult([], error)
     except UnicodeDecodeError as e:
-        error = FeaturedKeywordsLoadError(f"特集キーワードファイルの文字エンコーディングエラー: {str(e)}")
+        error = FeaturedKeywordsLoadError(
+            f"特集キーワードファイルの文字エンコーディングエラー: {str(e)}"
+        )
         logger.error(str(error))
         return LoadResult([], error)
     except Exception as e:
@@ -128,9 +131,9 @@ def load_featured_keywords(path) -> LoadResult:
         logger.warning("特集キーワードファイルに有効なデータがありません")
         return LoadResult([], None)
 
-    validated: List[Dict] = []
+    validated: list[dict] = []
     seen_keywords = set()
-    validation_errors: List[str] = []
+    validation_errors: list[str] = []
 
     for index, item in enumerate(data):
         # 検証中の想定外の例外で読み込み全体を落とさない（該当の1件だけスキップする）。

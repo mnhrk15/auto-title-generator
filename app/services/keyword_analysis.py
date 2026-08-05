@@ -5,10 +5,15 @@ I/O を持たない純粋なロジックなので、Flask コンテキストな�
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from .. import config
+
+if TYPE_CHECKING:
+    # 実行時に import すると flask 依存が入り、このモジュールの
+    # 「Flask コンテキスト不要」という性質が壊れる。
+    from ..featured_keywords import FeaturedKeywordRepository
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +27,6 @@ KEYWORD_TYPE_ERROR = 'error'
 MODE_FEATURED = 'featured'
 MODE_STANDARD = 'standard'
 MODE_FALLBACK = 'fallback'
-
-VALID_MODES = (MODE_FEATURED, MODE_STANDARD, MODE_FALLBACK)
 
 
 @dataclass(frozen=True)
@@ -39,10 +42,9 @@ class KeywordAnalysis:
     keyword_type: str
     processing_mode: str
     is_featured: bool
-    featured_info: Optional[Dict] = None
-    normal_keywords: List[str] = field(default_factory=list)
+    featured_info: dict | None = None
 
-    def to_generation_context(self) -> Dict:
+    def to_generation_context(self) -> dict:
         """TemplateGenerator に渡すコンテキスト情報。"""
         return {
             'keyword_type': self.keyword_type,
@@ -52,7 +54,7 @@ class KeywordAnalysis:
         }
 
 
-def split_keywords(keyword: str) -> List[str]:
+def split_keywords(keyword: str) -> list[str]:
     """複合キーワードを個々のキーワードに分割する。
 
     最初に見つかった区切り文字1種類だけで分割する（既存挙動を維持）。
@@ -65,18 +67,19 @@ def split_keywords(keyword: str) -> List[str]:
     return [keyword]
 
 
-def _standard(original: str, normalized: str, normal_keywords: List[str]) -> KeywordAnalysis:
+def _standard(original: str, normalized: str) -> KeywordAnalysis:
     return KeywordAnalysis(
         original_keyword=original,
         normalized_keyword=normalized,
         keyword_type=KEYWORD_TYPE_NORMAL,
         processing_mode=MODE_STANDARD,
         is_featured=False,
-        normal_keywords=normal_keywords,
     )
 
 
-def analyze_keyword(keyword: str, gender: str, repository) -> KeywordAnalysis:
+def analyze_keyword(
+    keyword: str, gender: str, repository: 'FeaturedKeywordRepository'
+) -> KeywordAnalysis:
     """入力キーワードを解析して処理方針を決める。
 
     Args:
@@ -92,12 +95,14 @@ def analyze_keyword(keyword: str, gender: str, repository) -> KeywordAnalysis:
 
     if not normalized:
         logger.warning('空のキーワードが入力されました - 通常処理を継続')
-        return _standard(original, normalized, [])
+        return _standard(original, normalized)
 
     try:
         if not repository.is_available():
-            logger.info(f'特集キーワード機能が利用できません - 通常キーワードとして処理: "{normalized}"')
-            return _standard(original, normalized, [normalized])
+            logger.info(
+                f'特集キーワード機能が利用できません - 通常キーワードとして処理: "{normalized}"'
+            )
+            return _standard(original, normalized)
 
         featured_found = []
         normal_found = []
@@ -129,7 +134,7 @@ def analyze_keyword(keyword: str, gender: str, repository) -> KeywordAnalysis:
 
         if not featured_found:
             logger.info(f'純粋通常キーワード処理: {normal_found}')
-            return _standard(original, normalized, normal_found)
+            return _standard(original, normalized)
 
         # 複数の特集キーワードがある場合は最初のものを優先する
         primary = featured_found[0]
@@ -162,11 +167,14 @@ def analyze_keyword(keyword: str, gender: str, repository) -> KeywordAnalysis:
             processing_mode=MODE_FEATURED,
             is_featured=True,
             featured_info=featured_info,
-            normal_keywords=normal_found,
         )
 
     except Exception as e:
-        logger.error(f'キーワード判定中にエラー: {str(e)} - 通常処理にフォールバック')
+        # 意図的に広い。特集キーワード機能の障害でテンプレート生成全体を
+        # 落とさないための境界（フォールバックして生成は続行する）。
+        logger.error(
+            f'キーワード判定中にエラー: {str(e)} - 通常処理にフォールバック', exc_info=True
+        )
         return KeywordAnalysis(
             original_keyword=original,
             normalized_keyword=normalized,

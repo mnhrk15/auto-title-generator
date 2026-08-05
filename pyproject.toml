@@ -1,0 +1,23 @@
+# lint / formatter の設定。ruff のみを使う（mypy などの型検査器は導入していない）。
+[tool.ruff]
+line-length = 100
+# 本番は runtime.txt の python-3.11.8。ローカルの .venv が 3.12 でも本番基準に合わせる。
+target-version = "py311"
+# ruff 0.16 は Markdown 内のコードブロックも整形する。ドキュメントのコード例は
+# 説明のための断片であり実コードと一致している必要がないので、対象から外す。
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+# ruff 既定 (E4, E7, E9, F) に、このリポジトリで実際に効く4カテゴリだけを足す。
+#   I  … import 順
+#   W  … 末尾空白・改行まわり
+#   UP … 3.11 で書ける新しい構文（List[str] -> list[str] など）
+#   B  … bugbear（zip の strict= 忘れなど）
+# E501（行長）は入れない。フォーマッタは文字列を折らないため、日本語の f-string ログが
+# 「直しようのない違反」として大量に残るだけになる。
+select = ["E4", "E7", "E9", "F", "I", "W", "UP", "B"]
+
+[tool.ruff.format]
+# ' と " の混在は既存コードの実態なので、フォーマッタに統一させない。
+# 統一すると初回の差分が 1000 行以上増え、リファクタ本体の差分が埋もれる。
+quote-style = "preserve"

@@ -1,6 +1,11 @@
 // 特集キーワードの取得・表示・選択。
+//
+// 「性別の変更がユーザー操作なのか、特集キーワード選択に伴う自動変更なのか」を
+// 区別する必要がある。以前は Date.now() のしきい値で推測しており、
+// 判定が実際の因果と一致していなかった（初回選択でボタンが active にならない、
+// 性別に触れていないのに確認ダイアログが出る）。フラグで明示的に表す。
 
-import { ApiError, TIMEOUT_FEATURED_KEYWORDS_MS, requestJson } from './api.js';
+import { TIMEOUT_FEATURED_KEYWORDS_MS, errorKind, requestJson } from './api.js';
 import { el, getSelectedGender } from './dom.js';
 import { showNotification, showToast } from './toast.js';
 
@@ -9,17 +14,22 @@ const GENDER_LABELS = {
     mens: 'メンズ',
 };
 
-// 特集キーワードの選択で性別を自動変更した直後は、その change を
-// 「ユーザーの手動変更」と誤判定しないための猶予
-const AUTO_SELECTION_GRACE_MS = 1000;
-// これ以上経っていれば、性別はユーザーが自分で選んだとみなす
-const MANUAL_SELECTION_THRESHOLD_MS = 3000;
+const RETRY_FEEDBACK_DELAY_MS = 500;   // 再試行ボタンを押した手応えのための待ち
+const BUTTON_LOCK_MS = 500;            // 連続クリック防止
+const WARNING_DURATION_MS = 5000;
 
 const ERROR_MESSAGES = {
     timeout: '特集キーワードの読み込みがタイムアウトしました',
     network: 'ネットワークエラーが発生しました',
     server: 'サーバーで問題が発生しています',
     app: '特集キーワードの読み込みに失敗しました',
+};
+
+const RELOAD_ERROR_MESSAGES = {
+    timeout: '特集キーワードの更新がタイムアウトしました',
+    network: 'ネットワークエラーが発生しました',
+    server: 'サーバーで問題が発生しています',
+    app: '特集キーワードの更新に失敗しました',
 };
 
 const RETRY_ERROR_MESSAGES = {
@@ -29,325 +39,304 @@ const RETRY_ERROR_MESSAGES = {
     app: '再試行に失敗しました',
 };
 
-class FeaturedKeywordsManager {
-    constructor() {
-        this.keywords = [];
-        this.selectedKeyword = null;
-        this.lastSelectionTime = null;
-        // サーバーが返した降格メッセージ。描画で container を空にするため、
-        // 読み込み時点では保持だけして renderFeaturedKeywords() の最後に表示する
-        this.fallbackMessage = null;
-        this.container = el.featuredContainer;
-        this.keywordInput = el.keywordInput;
-        this.genderRadios = el.genderRadios;
+const state = {
+    keywords: [],
+    selectedKeyword: null,
+    // サーバーが返した降格メッセージ。描画で container を空にするため、
+    // 読み込み時点では保持だけして renderFeaturedKeywords() の最後に表示する
+    fallbackMessage: null,
+    // 特集キーワード選択に伴って性別を書き換えている最中か。
+    // dispatchEvent は同期なので、このフラグの寿命は同一コールスタックに閉じる。
+    isApplyingGender: false,
+    // ユーザーが自分で性別ラジオを操作したか。
+    // 「選択の解除」とは別概念なので clearSelection() ではリセットしない。
+    genderTouchedByUser: false,
+};
+
+/** 現在選択されている特集キーワード（未選択なら null） */
+export function getSelectedKeyword() {
+    return state.selectedKeyword;
+}
+
+// ---------------------------------------------------------------- 読み込み
+
+async function loadFeaturedKeywords(gender = null) {
+    const target = gender || getSelectedGender();
+    const data = await requestJson(`/api/featured-keywords?gender=${target}`, {
+        timeoutMs: TIMEOUT_FEATURED_KEYWORDS_MS,
+    });
+
+    state.keywords = Array.isArray(data.keywords) ? data.keywords : [];
+
+    // 機能が降格している場合（設定なし・読み込み失敗）はメッセージだけ出して継続する。
+    // ここで DOM に入れても直後の描画で消えてしまうので、保持だけしておく。
+    state.fallbackMessage = data.message || null;
+}
+
+// 進行中の読み込みの世代。読み込み中に性別を切り替えると 2 本のリクエストが並走し、
+// 応答順によっては古い方が後着して一覧を上書きしてしまう（ラジオと一覧が食い違い、
+// 以後どちらも自動では直らない）。自分が最新でなければ描画しない。
+let loadSeq = 0;
+
+/**
+ * 読み込み → 描画。失敗したらエラー状態を描く。
+ *
+ * @returns {Promise<boolean>} 呼び出し側がフォールバック通知を出す必要がないか。
+ *   追い越された場合は描画も通知もせず true を返す（最新の読み込みが結果を決める）。
+ */
+async function loadAndRender(gender, errorMessages) {
+    const seq = ++loadSeq;
+    try {
+        renderLoadingState();
+        await loadFeaturedKeywords(gender);
+        if (seq !== loadSeq) return true;
+        renderFeaturedKeywords();
+        return true;
+    } catch (error) {
+        if (seq !== loadSeq) return true;
+        console.error('特集キーワードの読み込みに失敗:', error);
+        // サーバー起因（503）も一過性のことがあり、再読み込み以外に復帰手段が
+        // なくなってしまうため、種別によらず再試行ボタンを出す
+        renderErrorState(errorMessages[errorKind(error)] ?? errorMessages.app);
+        return false;
+    }
+}
+
+async function retry() {
+    renderLoadingState();
+    // 押した手応えを出すために少し待つ
+    await new Promise((resolve) => { setTimeout(resolve, RETRY_FEEDBACK_DELAY_MS); });
+
+    if (await loadAndRender(null, RETRY_ERROR_MESSAGES)) {
+        showToast({
+            message: '特集キーワードを正常に読み込みました',
+            icon: 'fa-check-circle',
+            variant: 'success',
+        });
+    }
+}
+
+// ---------------------------------------------------------------- 描画
+
+function renderLoadingState() {
+    el.featuredContainer.innerHTML = `
+        <div class="featured-keywords-loading">
+            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+            <span>特集キーワードを読み込み中...</span>
+        </div>
+    `;
+}
+
+function renderFeaturedKeywords() {
+    const container = el.featuredContainer;
+    container.innerHTML = '';
+
+    if (state.keywords.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'featured-keywords-empty';
+        empty.innerHTML = '<i class="fas fa-info-circle" aria-hidden="true"></i>';
+        empty.append('現在、特集キーワードはありません');
+        container.appendChild(empty);
+    } else {
+        state.keywords.forEach((keyword) => {
+            container.appendChild(createKeywordButton(keyword));
+        });
     }
 
-    async init() {
+    if (state.fallbackMessage) {
+        showFallbackMessage(state.fallbackMessage);
+        state.fallbackMessage = null;
+    }
+}
+
+function createKeywordButton(keyword) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'featured-keyword-btn';
+    button.dataset.keyword = keyword.keyword;
+    button.dataset.name = keyword.name;
+    button.dataset.gender = keyword.gender;
+    button.setAttribute('aria-pressed', 'false');
+
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-star';
+    icon.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    // JSON 由来の文字列なので textContent で入れる
+    label.textContent = keyword.name;
+    button.append(icon, label);
+
+    button.addEventListener('click', () => {
+        button.disabled = true;
         try {
-            this.renderLoadingState();
-            await this.loadFeaturedKeywords();
-            this.renderFeaturedKeywords();
-            this.setupGenderChangeListeners();
+            selectFeaturedKeyword(keyword);
         } catch (error) {
-            console.error('特集キーワードの初期化に失敗:', error);
-            const kind = error instanceof ApiError ? error.kind : 'app';
-            // サーバー起因（503）も一過性のことがあり、再読み込み以外に復帰手段が
-            // なくなってしまうため、種別によらず再試行ボタンを出す
-            this.renderErrorState(ERROR_MESSAGES[kind], true);
-            this.showFallbackNotification();
-        }
-    }
-
-    setupGenderChangeListeners() {
-        this.genderRadios.forEach((radio) => {
-            radio.addEventListener('change', (event) => {
-                // 特集キーワード選択による自動変更なら何もしない
-                if (this.lastSelectionTime
-                    && Date.now() - this.lastSelectionTime < AUTO_SELECTION_GRACE_MS) {
-                    return;
-                }
-
-                this.reloadKeywordsForGender(event.target.value);
-
-                if (this.selectedKeyword) {
-                    this.clearSelection();
-                    showToast({
-                        message: `性別を手動で「${GENDER_LABELS[event.target.value]}」に変更しました`,
-                        icon: 'fa-hand-pointer',
-                        variant: 'accent',
-                        duration: 2000,
-                    });
-                }
-            });
-        });
-    }
-
-    async loadFeaturedKeywords(gender = null) {
-        const target = gender || getSelectedGender();
-        const data = await requestJson(`/api/featured-keywords?gender=${target}`, {
-            timeoutMs: TIMEOUT_FEATURED_KEYWORDS_MS,
-        });
-
-        this.keywords = Array.isArray(data.keywords) ? data.keywords : [];
-
-        // 機能が降格している場合（設定なし・読み込み失敗）はメッセージだけ出して継続する。
-        // ここで DOM に入れても直後の描画で消えてしまうので、保持だけしておく。
-        this.fallbackMessage = data.message || null;
-    }
-
-    renderFeaturedKeywords() {
-        if (!this.container) return;
-
-        this.container.innerHTML = '';
-
-        if (this.keywords.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'featured-keywords-empty';
-            empty.innerHTML = '<i class="fas fa-info-circle" aria-hidden="true"></i>';
-            empty.append('現在、特集キーワードはありません');
-            this.container.appendChild(empty);
-        } else {
-            this.keywords.forEach((keyword) => {
-                this.container.appendChild(this.createKeywordButton(keyword));
-            });
-        }
-
-        if (this.fallbackMessage) {
-            this.showFallbackMessage(this.fallbackMessage);
-            this.fallbackMessage = null;
-        }
-    }
-
-    createKeywordButton(keyword) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'featured-keyword-btn';
-        button.dataset.keyword = keyword.keyword;
-        button.dataset.name = keyword.name;
-        button.dataset.gender = keyword.gender;
-        button.setAttribute('aria-pressed', 'false');
-
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-star';
-        icon.setAttribute('aria-hidden', 'true');
-        const label = document.createElement('span');
-        // JSON 由来の文字列なので textContent で入れる
-        label.textContent = keyword.name;
-        button.append(icon, label);
-
-        button.addEventListener('click', () => {
-            button.disabled = true;   // 連続クリック防止
-            try {
-                this.selectFeaturedKeyword(keyword);
-            } catch (error) {
-                console.error('特集キーワード選択エラー:', error);
-                showToast({
-                    message: 'キーワードの選択に失敗しました',
-                    icon: 'fa-exclamation-triangle',
-                    variant: 'error',
-                    duration: 2500,
-                });
-            } finally {
-                setTimeout(() => { button.disabled = false; }, 500);
-            }
-        });
-
-        return button;
-    }
-
-    selectFeaturedKeyword(keyword) {
-        // 同じキーワードを再度押したら選択解除
-        if (this.selectedKeyword && this.selectedKeyword.keyword === keyword.keyword) {
-            this.deselectFeaturedKeyword();
-            return;
-        }
-
-        this.clearSelection();
-
-        if (this.keywordInput) {
-            this.keywordInput.value = keyword.keyword;
-            this.keywordInput.focus();
-            this.keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-
-        this.selectGender(keyword.gender);
-        this.updateButtonState(keyword);
-
-        this.selectedKeyword = keyword;
-        this.lastSelectionTime = Date.now();
-    }
-
-    deselectFeaturedKeyword() {
-        if (this.selectedKeyword) {
+            console.error('特集キーワード選択エラー:', error);
             showToast({
-                message: `特集キーワード「${this.selectedKeyword.name}」の選択を解除しました`,
-                icon: 'fa-times-circle',
-                variant: 'info',
-                duration: 2000,
+                message: 'キーワードの選択に失敗しました',
+                icon: 'fa-exclamation-triangle',
+                variant: 'error',
+                duration: 2500,
             });
+        } finally {
+            setTimeout(() => { button.disabled = false; }, BUTTON_LOCK_MS);
         }
+    });
 
-        if (this.keywordInput) {
-            this.keywordInput.value = '';
-            this.keywordInput.focus();
-            this.keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+    return button;
+}
 
-        this.clearSelection();
+function renderErrorState(message) {
+    const container = el.featuredContainer;
+    container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'featured-keywords-error';
+
+    const content = document.createElement('div');
+    content.className = 'error-content';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-exclamation-triangle';
+    icon.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    // グローバルエラー用の .error-message とクラス名が衝突していたため改名
+    text.className = 'featured-keywords-error-text';
+    text.textContent = message;
+    content.append(icon, text);
+    wrapper.appendChild(content);
+
+    const retryButton = document.createElement('button');
+    retryButton.type = 'button';
+    retryButton.className = 'featured-keywords-retry-btn';
+    retryButton.innerHTML = '<i class="fas fa-redo" aria-hidden="true"></i>';
+    retryButton.append('再試行');
+    // インライン onclick はモジュールスコープの変数を参照できず動かないため
+    // addEventListener で結線する
+    retryButton.addEventListener('click', retry);
+    wrapper.appendChild(retryButton);
+
+    container.appendChild(wrapper);
+}
+
+function showFallbackMessage(message) {
+    const warning = document.createElement('div');
+    warning.className = 'featured-keywords-warning';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-info-circle';
+    icon.setAttribute('aria-hidden', 'true');
+    const span = document.createElement('span');
+    span.textContent = message;
+    warning.append(icon, span);
+
+    el.featuredContainer.insertBefore(warning, el.featuredContainer.firstChild);
+    setTimeout(() => warning.remove(), WARNING_DURATION_MS);
+}
+
+// ---------------------------------------------------------------- 選択
+
+function selectFeaturedKeyword(keyword) {
+    // 同じキーワードを再度押したら選択解除
+    if (state.selectedKeyword && state.selectedKeyword.keyword === keyword.keyword) {
+        deselectFeaturedKeyword();
+        return;
     }
 
-    selectGender(gender) {
-        const currentGender = getSelectedGender();
-        if (currentGender === gender) return;
+    // 性別の書き換えを先に試す。ユーザーが確認ダイアログで拒否したらこの選択は
+    // 成立しないので、既存の選択には手を触れずに抜ける
+    // （先に clearSelection すると、拒否したのに直前の選択だけが消える）。
+    if (!applyGender(keyword.gender)) return;
 
-        // ユーザーが自分で選んだ設定を黙って上書きしない
-        if (this.wasGenderManuallySelected()) {
-            const message = `現在の性別設定「${GENDER_LABELS[currentGender]}」を`
-                + `「${GENDER_LABELS[gender]}」に変更しますか？`;
-            if (!window.confirm(message)) return;
-        }
+    clearSelection();
 
-        this.genderRadios.forEach((radio) => {
+    el.keywordInput.value = keyword.keyword;
+    el.keywordInput.focus();
+    el.keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    state.selectedKeyword = keyword;
+    updateButtonState(keyword);
+}
+
+function deselectFeaturedKeyword() {
+    if (state.selectedKeyword) {
+        showToast({
+            message: `特集キーワード「${state.selectedKeyword.name}」の選択を解除しました`,
+            icon: 'fa-times-circle',
+            variant: 'info',
+            duration: 2000,
+        });
+    }
+
+    el.keywordInput.value = '';
+    el.keywordInput.focus();
+    el.keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    clearSelection();
+}
+
+/**
+ * 性別ラジオを書き換える。
+ *
+ * @returns {boolean} 書き換えた（または既にその性別だった）か。
+ *                    ユーザーが確認ダイアログで拒否した場合だけ false。
+ */
+function applyGender(gender) {
+    if (getSelectedGender() === gender) return true;
+
+    // ユーザーが自分で選んだ設定を黙って上書きしない
+    if (state.genderTouchedByUser) {
+        const message = `現在の性別設定「${GENDER_LABELS[getSelectedGender()]}」を`
+            + `「${GENDER_LABELS[gender]}」に変更しますか？`;
+        if (!window.confirm(message)) return false;
+    }
+
+    // dispatchEvent は同期なので、change ハンドラはこの try の中で走り切る。
+    state.isApplyingGender = true;
+    try {
+        el.genderRadios.forEach((radio) => {
             radio.checked = radio.value === gender;
             if (radio.checked) {
                 radio.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
-
-        showToast({
-            message: `性別を「${GENDER_LABELS[gender]}」に設定しました`,
-            icon: gender === 'ladies' ? 'fa-female' : 'fa-male',
-            variant: 'primary',
-            duration: 1500,
-        });
+    } finally {
+        state.isApplyingGender = false;
     }
 
-    wasGenderManuallySelected() {
-        if (!this.lastSelectionTime) return true;
-        return Date.now() - this.lastSelectionTime > MANUAL_SELECTION_THRESHOLD_MS;
-    }
-
-    updateButtonState(selectedKeyword) {
-        this.container.querySelectorAll('.featured-keyword-btn').forEach((button) => {
-            // 表示名ではなく data 属性で同定する（表示名を変えても壊れない）
-            const isActive = button.dataset.keyword === selectedKeyword.keyword;
-            button.classList.toggle('active', isActive);
-            button.setAttribute('aria-pressed', String(isActive));
-        });
-    }
-
-    async reloadKeywordsForGender(gender) {
-        try {
-            this.renderLoadingState();
-            this.clearSelection();
-            await this.loadFeaturedKeywords(gender);
-            this.renderFeaturedKeywords();
-        } catch (error) {
-            console.error('特集キーワードの再読み込みに失敗:', error);
-            this.renderErrorState('特集キーワードの更新に失敗しました', true);
-        }
-    }
-
-    clearSelection() {
-        this.container?.querySelectorAll('.featured-keyword-btn').forEach((button) => {
-            button.classList.remove('active');
-            button.setAttribute('aria-pressed', 'false');
-        });
-        this.selectedKeyword = null;
-        this.lastSelectionTime = null;
-    }
-
-    renderLoadingState() {
-        if (!this.container) return;
-        this.container.innerHTML = `
-            <div class="featured-keywords-loading">
-                <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-                <span>特集キーワードを読み込み中...</span>
-            </div>
-        `;
-    }
-
-    renderErrorState(message, showRetryButton = true) {
-        if (!this.container) return;
-
-        this.container.innerHTML = '';
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'featured-keywords-error';
-
-        const content = document.createElement('div');
-        content.className = 'error-content';
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-exclamation-triangle';
-        icon.setAttribute('aria-hidden', 'true');
-        const text = document.createElement('span');
-        // グローバルエラー用の .error-message とクラス名が衝突していたため改名
-        text.className = 'featured-keywords-error-text';
-        text.textContent = message;
-        content.append(icon, text);
-        wrapper.appendChild(content);
-
-        if (showRetryButton) {
-            const retry = document.createElement('button');
-            retry.type = 'button';
-            retry.className = 'featured-keywords-retry-btn';
-            retry.innerHTML = '<i class="fas fa-redo" aria-hidden="true"></i>';
-            retry.append('再試行');
-            // インライン onclick はモジュールスコープの変数を参照できず動かないため
-            // addEventListener で結線する
-            retry.addEventListener('click', () => this.retry());
-            wrapper.appendChild(retry);
-        }
-
-        this.container.appendChild(wrapper);
-    }
-
-    showFallbackMessage(message) {
-        if (!this.container) return;
-
-        const warning = document.createElement('div');
-        warning.className = 'featured-keywords-warning';
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-info-circle';
-        icon.setAttribute('aria-hidden', 'true');
-        const span = document.createElement('span');
-        span.textContent = message;
-        warning.append(icon, span);
-
-        this.container.insertBefore(warning, this.container.firstChild);
-        setTimeout(() => warning.remove(), 5000);
-    }
-
-    showFallbackNotification() {
-        showNotification({
-            title: '特集キーワード機能が利用できません',
-            body: '通常のテンプレート生成機能は引き続きご利用いただけます。',
-        });
-    }
-
-    async retry() {
-        try {
-            this.renderLoadingState();
-            // 押した手応えを出すために少し待つ
-            await new Promise((resolve) => { setTimeout(resolve, 500); });
-
-            await this.loadFeaturedKeywords();
-            this.renderFeaturedKeywords();
-
-            showToast({
-                message: '特集キーワードを正常に読み込みました',
-                icon: 'fa-check-circle',
-                variant: 'success',
-            });
-        } catch (error) {
-            console.error('特集キーワードの再試行に失敗:', error);
-            const kind = error instanceof ApiError ? error.kind : 'app';
-            this.renderErrorState(RETRY_ERROR_MESSAGES[kind], true);
-        }
-    }
+    showToast({
+        message: `性別を「${GENDER_LABELS[gender]}」に設定しました`,
+        icon: gender === 'ladies' ? 'fa-female' : 'fa-male',
+        variant: 'primary',
+        duration: 1500,
+    });
+    return true;
 }
 
-export const featuredKeywords = new FeaturedKeywordsManager();
+function updateButtonState(selectedKeyword) {
+    el.featuredContainer.querySelectorAll('.featured-keyword-btn').forEach((button) => {
+        // 表示名ではなく data 属性で同定する（表示名を変えても壊れない）
+        const isActive = button.dataset.keyword === selectedKeyword.keyword;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+    });
+}
+
+/** 特集キーワードの選択状態を解除する */
+export function clearSelection() {
+    el.featuredContainer.querySelectorAll('.featured-keyword-btn').forEach((button) => {
+        button.classList.remove('active');
+        button.setAttribute('aria-pressed', 'false');
+    });
+    state.selectedKeyword = null;
+}
+
+// ---------------------------------------------------------------- 通知
+
+function showFallbackNotification() {
+    showNotification({
+        title: '特集キーワード機能が利用できません',
+        body: '通常のテンプレート生成機能は引き続きご利用いただけます。',
+    });
+}
 
 /** 特集キーワード関連のエラー時に、選択解除を促す通知を出す */
 export function showFeaturedErrorFallbackNotification() {
@@ -359,19 +348,54 @@ export function showFeaturedErrorFallbackNotification() {
         actions: [{
             label: '選択を解除',
             icon: 'fa-times-circle',
-            onClick: () => featuredKeywords.clearSelection(),
+            onClick: clearSelection,
         }],
     });
 }
 
+// ---------------------------------------------------------------- 初期化
+
+function setupGenderChangeListeners() {
+    el.genderRadios.forEach((radio) => {
+        radio.addEventListener('change', (event) => {
+            // 特集キーワード選択に伴う自動変更なら、ユーザー操作として扱わない
+            if (state.isApplyingGender) return;
+
+            state.genderTouchedByUser = true;
+
+            // この直後に clearSelection() するので、選択の有無は先に確定させる
+            const hadSelection = Boolean(state.selectedKeyword);
+
+            clearSelection();
+            loadAndRender(event.target.value, RELOAD_ERROR_MESSAGES);
+
+            if (hadSelection) {
+                showToast({
+                    message: `性別を手動で「${GENDER_LABELS[event.target.value]}」に変更しました`,
+                    icon: 'fa-hand-pointer',
+                    variant: 'accent',
+                    duration: 2000,
+                });
+            }
+        });
+    });
+}
+
 export function initFeaturedKeywords() {
-    featuredKeywords.init();
+    // 読み込みの成否に関わらずリスナーを張る。以前は読み込み成功後に張っていたため、
+    // 初回ロードが失敗すると性別を切り替えても一覧が更新されなくなっていた
+    // （再試行で成功しても同じ）。
+    setupGenderChangeListeners();
 
     // 入力欄を直接編集したら特集キーワードの選択状態を解除する
     el.keywordInput.addEventListener('input', () => {
-        if (!featuredKeywords.selectedKeyword) return;
-        if (el.keywordInput.value.trim() !== featuredKeywords.selectedKeyword.keyword) {
-            featuredKeywords.clearSelection();
+        if (!state.selectedKeyword) return;
+        if (el.keywordInput.value.trim() !== state.selectedKeyword.keyword) {
+            clearSelection();
         }
+    });
+
+    loadAndRender(null, ERROR_MESSAGES).then((ok) => {
+        if (!ok) showFallbackNotification();
     });
 }

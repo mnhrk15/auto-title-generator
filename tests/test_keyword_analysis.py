@@ -46,16 +46,19 @@ class BrokenRepository:
 
 
 class TestSplitKeywords:
-    @pytest.mark.parametrize('raw,expected', [
-        ('くびれヘア', ['くびれヘア']),
-        ('くびれヘア 髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア　髪質改善', ['くびれヘア', '髪質改善']),  # 全角スペース
-        ('くびれヘア,髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア、髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア/髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア+髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア＋髪質改善', ['くびれヘア', '髪質改善']),
-    ])
+    @pytest.mark.parametrize(
+        'raw,expected',
+        [
+            ('くびれヘア', ['くびれヘア']),
+            ('くびれヘア 髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア　髪質改善', ['くびれヘア', '髪質改善']),  # 全角スペース
+            ('くびれヘア,髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア、髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア/髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア+髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア＋髪質改善', ['くびれヘア', '髪質改善']),
+        ],
+    )
     def test_splits_on_each_separator(self, raw, expected):
         assert split_keywords(raw) == expected
 
@@ -73,7 +76,6 @@ class TestAnalyzeKeyword:
         assert result.processing_mode == MODE_FEATURED
         assert result.is_featured is True
         assert result.featured_info == LADIES_FEATURED
-        assert result.normal_keywords == []
 
     def test_pure_normal_keyword(self):
         repo = FakeRepository([LADIES_FEATURED])
@@ -84,7 +86,7 @@ class TestAnalyzeKeyword:
         assert result.processing_mode == MODE_STANDARD
         assert result.is_featured is False
         assert result.featured_info is None
-        assert result.normal_keywords == ['髪質改善']
+        assert result.normalized_keyword == '髪質改善'
 
     def test_mixed_keywords_prioritize_featured(self):
         repo = FakeRepository([LADIES_FEATURED])
@@ -95,7 +97,6 @@ class TestAnalyzeKeyword:
         assert result.processing_mode == MODE_FEATURED
         assert result.is_featured is True
         assert result.featured_info == LADIES_FEATURED
-        assert result.normal_keywords == ['髪質改善']
 
     def test_gender_mismatch_still_uses_featured(self):
         """性別が一致しなくても特集キーワードとして処理を継続する（仕様）"""
@@ -137,7 +138,10 @@ class TestAnalyzeKeyword:
         """
         repo = FakeRepository([LADIES_FEATURED])
         expected_keys = {
-            'keyword_type', 'processing_mode', 'original_keyword', 'normalized_keyword',
+            'keyword_type',
+            'processing_mode',
+            'original_keyword',
+            'normalized_keyword',
         }
 
         for keyword, repository in [

@@ -16,18 +16,18 @@
   - 特集掲載条件を満たした高品質テンプレート生成
 
 ## 技術スタック
-- **バックエンド**: Python 3.12, Flask 3.0.2 (ASGI対応)
+- **バックエンド**: Python 3.11, Flask 3.0.2 (ASGI対応)
 - **AI**: Google Gemini 3.1 Flash Lite (`gemini-3.1-flash-lite`、thinkingLevel=MINIMALで高速化、構造化出力)
 - **SDK**: google-genai 1.70.0
 - **フロントエンド**: HTML, CSS, JavaScript
 - **スクレイピング**: BeautifulSoup4 4.12.3, aiohttp 3.9.3 (完全非同期処理)
 - **本番環境**: Gunicorn 21.2.0 + Uvicorn 0.29.0 (ASGI対応)
-- **テスト**: pytest 8.1.1 (非同期テスト対応)
+- **テスト**: pytest（非同期テスト対応）/ **Lint・整形**: ruff
 
 ## セットアップ方法
 
 ### 前提条件
-- **Python 3.12以上** (推奨バージョン)
+- **Python 3.11** (本番は `runtime.txt` の `python-3.11.8`)
 - pip (Pythonパッケージマネージャー)
 - **Google Gemini API キー** ([Google AI Studio](https://makersuite.google.com/app/apikey)で取得)
 
@@ -63,9 +63,15 @@ GEMINI_API_KEY=your_gemini_api_key_here
 FLASK_SECRET_KEY=your_secret_key_here
 FLASK_DEBUG=True
 SCRAPING_DELAY_MIN=1
-SCRAPING_DELAY_MAX=3
-MAX_PAGES=3
+SCRAPING_DELAY_MAX=2
+MAX_PAGES=1
 ```
+
+`MAX_PAGES` を増やすときは注意してください。gunicorn のワーカータイムアウトと
+フロントエンドの中断はどちらも 120 秒で、これはスクレイピングと生成の合計に効きます。
+`MAX_PAGES=3` にすると合計が 120 秒を超えうるため、`gunicorn.conf.py` の `timeout` と
+`app/static/js/api.js` の `TIMEOUT_GENERATE_MS` も一緒に見直す必要があります
+（詳細は `app/config.py` のタイムアウト予算のコメント）。
 
 **重要**: Google Gemini APIキーが必須です。[Google AI Studio](https://makersuite.google.com/app/apikey)で取得してください。
 
@@ -223,20 +229,17 @@ GET /api/featured-keywords?gender={ladies|mens}
     {
       "name": "くびれヘア",
       "keyword": "くびれヘア",
-      "gender": "ladies"
+      "gender": "ladies",
+      "condition": "スタイル名に『くびれヘア』を含めること。"
     }
   ],
-  "gender": "ladies",
-  "total_keywords": 10,
-  "filtered_keywords": 5,
-  "health_status": {
-    "is_available": true,
-    "keywords_count": 10,
-    "file_exists": true
-  },
-  "status": 200
+  "message": null
 }
 ```
+
+`message` は、特集キーワードが未設定・読み込み失敗などで機能が降格しているときだけ
+文言が入ります（`success` は `true` のまま）。フロントエンドはこれを表示したうえで
+通常のテンプレート生成を継続します。
 
 #### テンプレート生成API
 ```
@@ -269,40 +272,49 @@ POST /api/generate
 {
   "success": true,
   "is_featured": true,
-  "keyword_type": "featured",
-  "processing_mode": "featured",
   "featured_keyword_info": {
     "name": "くびれヘア",
-    "condition": "スタイル名に『くびれヘア』を含めること。"
+    "condition": "スタイル名に『くびれヘア』を含めること。",
+    "gender": "ladies"
   },
   "templates": [
     {
       "title": "大人可愛いくびれヘアスタイル",
       "menu": "カット + カラー",
       "comment": "トレンドのくびれヘアで素敵にイメチェン",
-      "hashtag": "#くびれヘア #大人可愛い #ヘアスタイル",
-      "is_featured": true
+      "hashtag": ["#くびれヘア", "#大人可愛い", "#ヘアスタイル"],
+      "is_featured": true,
+      "featured_keyword_name": "くびれヘア"
     }
   ]
 }
 ```
+
+`hashtag` は文字列ではなく配列です（`app/schemas.py` の `list[str]`）。
+特集キーワードでない場合は `is_featured` が `false`、`featured_keyword_info` は
+`null` になり、テンプレート側の `featured_keyword_name` も付きません。
 
 ## プロジェクト構造
 ```
 auto-title-generator/
 ├── app/
 │   ├── __init__.py           # create_app()（アプリ生成・ロギング設定）
-│   ├── main.py               # ルートとエラーハンドラのみ
+│   ├── main.py               # ルート定義とリクエストのパース
+│   ├── error_handlers.py     # アプリ全体のエラーハンドラ（全て JSON で返す）
 │   ├── config.py             # 静的定数 + Settings（環境変数由来の設定）
 │   ├── errors.py             # AppError 階層・エラーコード・レスポンス組み立て
 │   ├── prompts.py            # Gemini プロンプトの組み立て（純関数）
 │   ├── schemas.py            # 構造化出力（response_schema）の pydantic モデル
-│   ├── generator.py          # Gemini 呼び出し・結果検証・季節カラー付加
+│   ├── generator.py          # Gemini クライアントの初期化とリクエスト送信
+│   ├── gemini_response.py    # Gemini レスポンスの解釈
+│   ├── template_validation.py# 生成結果の検証（文字数・ハッシュタグ）
+│   ├── seasons.py            # 季節カラーの正規化とタイトルへの付加
 │   ├── scraping.py           # HotPepper Beauty の非同期スクレイピング
 │   ├── featured_loader.py    # 特集キーワード JSON の読み込みと検証
 │   ├── featured_keywords.py  # 特集キーワードの参照リポジトリ
-│   ├── services/
+│   ├── services/             # Flask に依存しない協調層
 │   │   ├── keyword_analysis.py   # キーワード解析（特集/通常/混在の判定）
+│   │   ├── featured_service.py   # 特集キーワード一覧の組み立て
 │   │   └── template_service.py   # スクレイピングと生成の協調
 │   ├── data/
 │   │   └── featured_keywords.json
@@ -315,6 +327,8 @@ auto-title-generator/
 │   │       ├── toast.js          # トースト・通知
 │   │       ├── status.js         # ローディング/エラー/結果の表示制御
 │   │       ├── progress.js       # 疑似進捗バー
+│   │       ├── clipboard.js      # クリップボード操作と完了表示
+│   │       ├── template-format.js# テンプレートのテキスト整形
 │   │       ├── featured-keywords.js
 │   │       ├── template-card.js  # カード1枚の生成
 │   │       ├── template-list.js  # 一覧とページネーション
@@ -322,11 +336,16 @@ auto-title-generator/
 │   │       ├── form-controls.js  # 性別・季節カラーの選択制御
 │   │       └── generate.js       # 生成ボタンのフロー
 │   └── templates/
+│       ├── base.html
+│       ├── index.html
+│       └── _macros.html      # 繰り返しマークアップの Jinja マクロ
 ├── tests/
+├── pyproject.toml            # ruff（lint + format）の設定
 ├── pytest.ini                # テスト設定（integration マーカー等）
 ├── requirements.txt
 ├── asgi.py                   # 本番の ASGI エントリポイント
 └── run.py                    # 開発サーバー起動
+```
 
 ## 主要コンポーネントの説明
 
@@ -405,6 +424,16 @@ pytest tests/test_generator.py -v
 pytest tests/test_featured_keywords.py tests/test_featured_integration.py -v
 ```
 
+### Lint と整形
+
+設定は `pyproject.toml` にあります。
+
+```bash
+ruff check .          # lint
+ruff check . --fix    # 自動修正できるものを直す
+ruff format .         # 整形
+```
+
 ## パフォーマンス特性
 
 ### AI生成速度
@@ -427,6 +456,55 @@ pytest tests/test_featured_keywords.py tests/test_featured_integration.py -v
 - 生成されたテンプレートは必ず内容を確認してから使用してください
 - 文字数制限に注意してください（プラットフォームごとに異なる場合があります）
 - **重要**: Gemini APIキーは機密情報です。環境変数で管理し、リポジトリにコミットしないでください
+
+## 既知の技術的負債
+
+次に手を入れるときの参考として、把握しているものを記録します。
+
+### CSS（`app/static/css/style.css`、3010 行）
+
+このファイルだけが分割されておらず、セクションが論理順ではなく歴史順に積まれています。
+**同じセレクタのベース定義が複数箇所にあり、最終的な見た目は「後勝ち」で決まります。**
+
+| セレクタ | ベース定義の数 |
+|---|---|
+| `.featured-keyword-btn` | 5 |
+| `.featured-keywords-error` | 3 |
+| `.copy-btn` / `.template-card` / `.template-container` / `.search-box` ほか | 各 2 |
+
+触るときの注意:
+
+- **ベース定義を統合するときは、統合先を「最初の出現位置」にすること。** 最後の位置へ
+  まとめると、早い定義にしかなかったプロパティが後ろへ移動し、その間の `@media` に
+  勝ってしまいます。実際に `.featured-keyword-btn` の `min-width` がこの状態です。
+- **重複を潰す前に `@media` を動かさないこと。** 現在、後発のベース定義に負けて
+  効いていない `@media` が実在します（`.template-container` の 3 件、`.search-box` の
+  1 件）。順序を変えると、それらが生き返って見た目が変わります。
+- `.copy-btn` は同一ルール内で `background-color: var(--success-color)` の直後に
+  `background: none` があり、緑の背景は一度も効いていません。現在の見た目は
+  「透明背景・親幅いっぱい・緑の外側グローだけ」です。緑を復活させるのは
+  見た目の変更にあたります。
+- `.featured-keyword-btn` の `::after` は、`.active::after`（チェックマーク）と
+  `::after`（リップル）の両方が同じ擬似要素に効いており、プロパティ単位で詳細度が
+  解決された結果チェックマークは右上ではなく上辺中央に出ています。意図した配置では
+  ありませんが、現状の見た目です。
+- `@media` はレスポンシブが 4 グループに分裂しており、`(max-width: 576px)` が 6 回、
+  `(max-width: 768px)` が 4 回出現します。加えてブレークポイントが 2 系統
+  （576/768/1024 と 480/768）混在していて境界が食い違うため、モバイルファーストへの
+  書き換えは 1px 単位のズレを生みます。
+
+見た目を変えずに整理するには、変更前後で計算済みスタイル（`getComputedStyle` +
+`getBoundingClientRect`）を全要素ぶん採取して差分ゼロを確認する必要があります。
+375 / 480 / 481 / 576 / 577 / 768 / 769 / 1024 / 1025 / 1440px の 10 通りと、
+hover 状態は DevTools の Force element state での個別確認が要ります。
+
+### その他
+
+- `Procfile` と `runtime.txt` は Heroku 由来で、`render.yaml` の `startCommand` と
+  内容が重複しています。デプロイ先が Render だけなら整理できます。
+- `render.yaml` の `env: python` は Render の旧構文です（現行は `runtime:`）。
+- `.env.example` とコードの既定値が一部食い違っています
+  （`FLASK_HOST` が `127.0.0.1` と `0.0.0.0`）。
 
 ## ライセンス
 未設定です（LICENSE ファイルは配置されていません）。

@@ -4,7 +4,8 @@
 // DOM の構築完了後・DOMContentLoaded の前に実行される。
 // したがって DOMContentLoaded で包む必要はない。
 
-import { autoResizeTextarea } from './template-card.js';
+import { el } from './dom.js';
+import { resizeAllTextareas } from './template-card.js';
 import { initExport } from './export.js';
 import { initFeaturedKeywords } from './featured-keywords.js';
 import { initFormControls } from './form-controls.js';
@@ -20,7 +21,8 @@ function initResizeHandler() {
         clearTimeout(timer);
         timer = setTimeout(() => {
             // 結果が出ていないときは走らせない（毎回の全走査は強制リフローを招く）
-            document.querySelectorAll('.template-card textarea').forEach(autoResizeTextarea);
+            if (el.results.classList.contains('hidden')) return;
+            resizeAllTextareas();
         }, RESIZE_DEBOUNCE_MS);
     });
 }

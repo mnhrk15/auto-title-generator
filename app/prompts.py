@@ -10,7 +10,6 @@ API キーなしでテストでき、文言の変更が generator の変更と�
 import json
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 from . import config
 
@@ -116,30 +115,26 @@ GENDER_VOCABULARY = {
 }
 
 
-def _target_range(target: Tuple[int, int]) -> str:
+def _target_range(target: tuple[int, int]) -> str:
     """(25, 28) -> '25〜28文字'"""
     return f"{target[0]}〜{target[1]}文字"
 
 
 def short_title_slots_per_keyword(selected_count: int) -> int:
     """季節・カラー1つあたりに割り当てる短尺タイトル枠の数"""
-    return max(1, min(
-        config.SHORT_TITLE_SLOTS_PER_CHOICE,
-        config.SHORT_TITLE_SLOTS_MAX // selected_count
-    ))
+    return max(
+        1, min(config.SHORT_TITLE_SLOTS_PER_CHOICE, config.SHORT_TITLE_SLOTS_MAX // selected_count)
+    )
 
 
 def short_title_band_max(keyword: str) -> int:
     """このキーワードを付加してちょうど上限文字数に収まる、付加前のタイトル文字数"""
     # 区切り記号1文字ぶんを差し引く。付加対象にならない長さを指示しないよう閾値未満に抑える
-    return min(
-        config.CHAR_LIMITS['title'] - 1 - len(keyword),
-        config.SEASON_APPEND_THRESHOLD - 1
-    )
+    return min(config.CHAR_LIMITS['title'] - 1 - len(keyword), config.SEASON_APPEND_THRESHOLD - 1)
 
 
 def build_featured_instruction(
-    featured_info: Optional[Dict],
+    featured_info: dict | None,
     keyword: str,
     keyword_type: str,
     original_keyword: str,
@@ -153,7 +148,9 @@ def build_featured_instruction(
 
     try:
         if not isinstance(featured_info, dict):
-            logger.warning(f"特集情報が辞書形式ではありません: {type(featured_info)} - 特集機能をスキップ")
+            logger.warning(
+                f"特集情報が辞書形式ではありません: {type(featured_info)} - 特集機能をスキップ"
+            )
             return ""
 
         if 'condition' not in featured_info or not featured_info['condition']:
@@ -167,7 +164,7 @@ def build_featured_instruction(
                 f"特集条件文が長すぎます "
                 f"({len(condition)} > {config.FEATURED_CONDITION_MAX}文字) - 切り詰めます"
             )
-            condition = condition[:config.FEATURED_CONDITION_MAX] + "..."
+            condition = condition[: config.FEATURED_CONDITION_MAX] + "..."
 
         logger.debug(f"特集プロンプト強化を適用: キーワード '{keyword}', タイプ: {keyword_type}")
 
@@ -200,12 +197,15 @@ def build_featured_instruction(
 指定されたキーワードや表現を必ず含めるようにしてください。
 
 """
-    except Exception as e:
+    except (KeyError, TypeError, AttributeError) as e:
+        # featured_info は外部 JSON 由来なので形が崩れうる。特集の指示を落としても
+        # 通常のテンプレート生成は続けられるので、ここは握りつぶしてよい。
+        # ただし except Exception にすると組み立てロジックのバグまで隠れるため広げない。
         logger.error(f"特集プロンプト生成中にエラー: {str(e)} - 特集機能をスキップ")
         return ""
 
 
-def build_title_length_rule(selected_seasons: List[str]) -> Tuple[str, str]:
+def build_title_length_rule(selected_seasons: list[str]) -> tuple[str, str]:
     """タイトルの目標文字数ルールと補足を組み立てる。
 
     季節・カラーが選択されている場合、後処理で語句を付加する余白を確保するため
@@ -246,12 +246,12 @@ def build_title_length_rule(selected_seasons: List[str]) -> Tuple[str, str]:
 
 
 def build_generation_prompt(
-    titles: List[str],
+    titles: list[str],
     keyword: str,
-    seasons: Optional[List[str]] = None,
+    seasons: list[str] | None = None,
     gender: str = 'ladies',
-    featured_info: Optional[Dict] = None,
-    generation_context: Optional[Dict] = None,
+    featured_info: dict | None = None,
+    generation_context: dict | None = None,
 ) -> str:
     """テンプレート生成用のプロンプトを組み立てる。"""
     titles_json = json.dumps(titles, ensure_ascii=False, indent=2)
@@ -259,7 +259,7 @@ def build_generation_prompt(
     vocabulary = GENDER_VOCABULARY.get(gender, LADIES_VOCABULARY)
     gender_name = vocabulary.display_name
 
-    selected_seasons = config.normalize_seasons(seasons, gender)
+    selected_seasons = seasons or []
 
     # 混在キーワード処理のための生成コンテキスト解析
     context = generation_context or {}

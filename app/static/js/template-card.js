@@ -1,8 +1,8 @@
 // テンプレートカード1枚の生成と、カード内の入力・コピー操作。
 
+import { copyToClipboard, flashCopyFeedback } from './clipboard.js';
 import { el } from './dom.js';
-import { showError } from './status.js';
-import { showCopyToast } from './toast.js';
+import { formatTemplateFields } from './template-format.js';
 
 const FIELD_LABELS = {
     title: 'タイトル',
@@ -11,9 +11,13 @@ const FIELD_LABELS = {
     hashtag: 'ハッシュタグ',
 };
 
-const HASHTAG_MAX_LENGTH = 20;
-const COPY_FEEDBACK_MS = 1500;
-const COPY_ALL_FEEDBACK_MS = 2000;
+// ハッシュタグの上限はタグ 1 個あたり。textarea 全体を制限する maxlength は使えないので、
+// サーバーが data-max-length で渡す（出典は app/config.py の CHAR_LIMITS）。
+const HASHTAG_MAX_LENGTH_FALLBACK = 20;
+
+function hashtagMaxLength(textarea) {
+    return Number(textarea.dataset.maxLength) || HASHTAG_MAX_LENGTH_FALLBACK;
+}
 
 /** 文字数カウンターを更新する。上限は textarea 自身の maxlength を唯一の出典にする */
 export function updateCharCount(textarea, countElement) {
@@ -31,11 +35,12 @@ export function updateCharCount(textarea, countElement) {
 
 /** ハッシュタグは「タグ個数と各タグ長」で管理するので、全体文字数ではなく個数を出す */
 export function updateHashtagCount(textarea, countElement) {
+    const maxLength = hashtagMaxLength(textarea);
     const hashtags = textarea.value.split(',').map((tag) => tag.trim()).filter(Boolean);
-    const longTags = hashtags.filter((tag) => tag.length > HASHTAG_MAX_LENGTH);
+    const longTags = hashtags.filter((tag) => tag.length > maxLength);
 
     if (longTags.length > 0) {
-        countElement.textContent = `${longTags.length}個のタグが${HASHTAG_MAX_LENGTH}文字を超えています`;
+        countElement.textContent = `${longTags.length}個のタグが${maxLength}文字を超えています`;
         countElement.classList.add('error');
     } else {
         countElement.textContent = `${hashtags.length}個のタグ`;
@@ -66,33 +71,22 @@ export function autoResizeTextarea(textarea) {
     textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
 }
 
+/** 表示中のすべてのカード内 textarea を返す */
+function allCardTextareas() {
+    return document.querySelectorAll('.template-card textarea');
+}
+
 /** 表示中のすべての textarea を初期化する */
 export function initializeTextareas() {
-    document.querySelectorAll('.template-card textarea').forEach((textarea) => {
+    allCardTextareas().forEach((textarea) => {
         autoResizeTextarea(textarea);
         refreshCount(textarea);
     });
 }
 
-function formatTemplateForCopy(values) {
-    return [
-        `【タイトル】\n${values.title}`,
-        `【メニュー】\n${values.menu}`,
-        `【コメント】\n${values.comment}`,
-        `【ハッシュタグ】\n${values.hashtag}`,
-    ].join('\n\n');
-}
-
-async function copyText(text, label) {
-    try {
-        await navigator.clipboard.writeText(text);
-        showCopyToast(label);
-        return true;
-    } catch (error) {
-        showError('コピーに失敗しました');
-        console.error('コピーに失敗:', error);
-        return false;
-    }
+/** 表示中のすべての textarea の高さを取り直す（画面幅の変化時に使う） */
+export function resizeAllTextareas() {
+    allCardTextareas().forEach(autoResizeTextarea);
 }
 
 /**
@@ -157,14 +151,8 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
             const textarea = card.querySelector(`textarea[data-field="${field}"]`);
             if (!textarea) return;
 
-            const originalIcon = btn.innerHTML;
-            if (await copyText(textarea.value, FIELD_LABELS[field])) {
-                btn.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i>';
-                btn.classList.add('copied');
-                setTimeout(() => {
-                    btn.innerHTML = originalIcon;
-                    btn.classList.remove('copied');
-                }, COPY_FEEDBACK_MS);
+            if (await copyToClipboard(textarea.value, FIELD_LABELS[field])) {
+                flashCopyFeedback(btn, '<i class="fas fa-check" aria-hidden="true"></i>');
             }
         });
     });
@@ -174,13 +162,8 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
         const values = {};
         textareas.forEach((textarea) => { values[textarea.dataset.field] = textarea.value; });
 
-        if (await copyText(formatTemplateForCopy(values), 'テンプレート全体')) {
-            copyBtn.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i> コピー完了';
-            copyBtn.classList.add('copied');
-            setTimeout(() => {
-                copyBtn.innerHTML = '<i class="fas fa-copy" aria-hidden="true"></i> コピー';
-                copyBtn.classList.remove('copied');
-            }, COPY_ALL_FEEDBACK_MS);
+        if (await copyToClipboard(formatTemplateFields(values), 'テンプレート全体')) {
+            flashCopyFeedback(copyBtn, '<i class="fas fa-check" aria-hidden="true"></i> コピー完了');
         }
     });
 

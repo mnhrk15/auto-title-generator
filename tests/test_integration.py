@@ -1,7 +1,10 @@
-import pytest
 import os
-from app.generator import TemplateGenerator
+
+import pytest
+
 from app import config
+from app.errors import ValidationError
+from app.generator import TemplateGenerator
 
 # 実 Gemini API を呼び出すため、デフォルトの pytest 実行からは除外される。
 # 実行するには `pytest -m integration`（GEMINI_API_KEY が必要）。
@@ -15,7 +18,7 @@ class TestTemplateGeneratorIntegration:
         if not os.getenv("GEMINI_API_KEY"):
             pytest.skip("GEMINI_API_KEY not set in environment")
         return TemplateGenerator()
-    
+
     @pytest.mark.asyncio
     async def test_generate_templates_with_real_api(self, generator):
         """実際のGemini APIを使用してテンプレートを生成"""
@@ -23,37 +26,37 @@ class TestTemplateGeneratorIntegration:
         keyword = "髪質改善"
 
         templates, _trending = await generator.generate_templates_async(titles, keyword)
-        
+
         # 基本的な検証
         assert isinstance(templates, list)
         assert len(templates) <= config.MAX_TEMPLATES
-        
+
         # 各テンプレートの構造と制約を検証
         for template in templates:
             assert isinstance(template, dict)
             assert all(key in template for key in ["title", "menu", "comment", "hashtag"])
-            
+
             # キーワードが含まれているか確認
             assert keyword in template["title"]
-            
+
             # 文字数制限の検証
             assert len(template["title"]) <= config.CHAR_LIMITS["title"]
             assert len(template["menu"]) <= config.CHAR_LIMITS["menu"]
             assert len(template["comment"]) <= config.CHAR_LIMITS["comment"]
-            
+
             # ハッシュタグの検証
             assert isinstance(template["hashtag"], list)
             assert all(isinstance(tag, str) for tag in template["hashtag"])
             assert all(len(tag) <= config.CHAR_LIMITS["hashtag"] for tag in template["hashtag"])
             assert len(template["hashtag"]) >= 7
-            
+
     @pytest.mark.asyncio
     async def test_generate_templates_with_multiple_titles(self, generator):
         """複数のタイトルを入力として使用した場合のテスト"""
         titles = [
             "★髪質改善トリートメントで艶髪ストレート",
             "【髪質改善】憧れの艶髪ストレートヘア",
-            "髪質改善×うる艶カラー"
+            "髪質改善×うる艶カラー",
         ]
         keyword = "髪質改善"
 
@@ -65,13 +68,13 @@ class TestTemplateGeneratorIntegration:
         # 生成されたテンプレートが入力タイトルと完全に同じでないことを確認
         generated_titles = [template["title"] for template in templates]
         assert not any(title in titles for title in generated_titles)
-        
+
     @pytest.mark.asyncio
     async def test_generate_templates_with_different_keywords(self, generator):
         """異なるキーワードでの生成テスト"""
         titles = ["★髪質改善トリートメントで艶髪ストレート"]
         keywords = ["髪質改善", "透明感カラー", "艶髪"]
-        
+
         for keyword in keywords:
             templates, _trending = await generator.generate_templates_async(titles, keyword)
 
@@ -81,10 +84,11 @@ class TestTemplateGeneratorIntegration:
             # 各テンプレートにキーワードが含まれているか確認
             for template in templates:
                 assert keyword in template["title"]
-                
+
     @pytest.mark.asyncio
     async def test_api_error_handling(self, generator):
         """APIエラー時の処理をテスト"""
-        # 無効な入力を使用してエラーを発生させる
-        with pytest.raises(ValueError):
-            await generator.generate_templates_async([], "")  # 空のタイトルリストと空のキーワード 
+        # 入力検証は ValidationError（AppError のサブクラス）。
+        # 以前は生の ValueError を送出していた。
+        with pytest.raises(ValidationError):
+            await generator.generate_templates_async([], "")  # 空のタイトルリストと空のキーワード

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import card_field, gender_option, guide_step, mens_word_group, season_option %}
 
 {% block content %}
 <header class="app-header">
@@ -15,18 +16,8 @@
     <div class="search-section">
         <div class="search-container">
             <div class="gender-selection">
-                <div class="gender-option-wrapper">
-                    <label class="gender-option">
-                        <input type="radio" name="gender" value="ladies" checked>
-                        <span class="radio-label"><i class="fas fa-female" aria-hidden="true"></i> レディース</span>
-                    </label>
-                </div>
-                <div class="gender-option-wrapper">
-                    <label class="gender-option">
-                        <input type="radio" name="gender" value="mens">
-                        <span class="radio-label"><i class="fas fa-male" aria-hidden="true"></i> メンズ</span>
-                    </label>
-                </div>
+                {{ gender_option('ladies', 'レディース', 'fa-female', checked=true) }}
+                {{ gender_option('mens', 'メンズ', 'fa-male') }}
             </div>
             <div class="search-box">
                 <div class="input-wrapper">
@@ -43,26 +34,9 @@
                     <i class="fas fa-palette" aria-hidden="true"></i> 季節・カラー<small>（複数選択可・任意）</small>
                 </span>
                 <div class="season-options">
-                    <label class="season-option">
-                        <input type="checkbox" name="season" value="spring">
-                        <span class="checkbox-label">春</span>
-                    </label>
-                    <label class="season-option">
-                        <input type="checkbox" name="season" value="summer">
-                        <span class="checkbox-label">夏</span>
-                    </label>
-                    <label class="season-option">
-                        <input type="checkbox" name="season" value="autumn">
-                        <span class="checkbox-label">秋</span>
-                    </label>
-                    <label class="season-option">
-                        <input type="checkbox" name="season" value="winter">
-                        <span class="checkbox-label">冬</span>
-                    </label>
-                    <label class="season-option">
-                        <input type="checkbox" name="season" value="bleach_free">
-                        <span class="checkbox-label">ブリーチなしカラー</span>
-                    </label>
+                    {%- for value, label in season_labels.items() %}
+                    {{ season_option(value, label) }}
+                    {%- endfor %}
                 </div>
             </div>
         </div>
@@ -89,27 +63,9 @@
             <span>使い方</span>
         </summary>
         <div class="guide-content">
-            <div class="guide-step">
-                <div class="guide-step-number">1</div>
-                <div class="guide-step-text">
-                    <i class="fas fa-keyboard" aria-hidden="true"></i> 
-                    <span>検索したいキーワードを入力してください</span>
-                </div>
-            </div>
-            <div class="guide-step">
-                <div class="guide-step-number">2</div>
-                <div class="guide-step-text">
-                    <i class="fas fa-search" aria-hidden="true"></i> 
-                    <span>「生成」ボタンを押すと、HotPepper Beautyから関連タイトルを取得し、新しいテンプレート案を生成します</span>
-                </div>
-            </div>
-            <div class="guide-step">
-                <div class="guide-step-number">3</div>
-                <div class="guide-step-text">
-                    <i class="fas fa-clipboard" aria-hidden="true"></i> 
-                    <span>結果が表示されたら、内容を編集したり、コピーやファイル出力ができます</span>
-                </div>
-            </div>
+            {{ guide_step(1, 'fa-keyboard', '検索したいキーワードを入力してください') }}
+            {{ guide_step(2, 'fa-search', '「生成」ボタンを押すと、HotPepper Beautyから関連タイトルを取得し、新しいテンプレート案を生成します') }}
+            {{ guide_step(3, 'fa-clipboard', '結果が表示されたら、内容を編集したり、コピーやファイル出力ができます') }}
         </div>
     </details>
 
@@ -132,10 +88,6 @@
                 <div class="step-indicator" data-step="3">
                     <div class="step-dot"></div>
                     <span class="step-label">テンプレート生成</span>
-                </div>
-                <div class="step-indicator" data-step="4">
-                    <div class="step-dot"></div>
-                    <span class="step-label">完了</span>
                 </div>
             </div>
             <div class="progress-bar" role="progressbar"
@@ -176,68 +128,20 @@
                 <details class="mens-notice-collapsible">
                     <summary class="mens-notice-summary"><span>足す語の例</span></summary>
                     <div class="mens-notice-content">
-                        <div class="mens-word-group is-priority">
-                            <span class="mens-word-group-title">優先</span>
-                            <ul class="mens-word-list">
-                                <li>シースルーセンターパート</li>
-                                <li>シースルーマッシュ</li>
-                                <li>シースルーマッシュウルフ</li>
-                                <li>シースルーラウンドマッシュ</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>フェイスレイヤー</li>
-                                <li>ラウンドマッシュ</li>
-                                <li>マッシュウルフ</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>韓国ヘア</li>
-                                <li>韓国風ウルフ</li>
-                                <li>コンマヘア</li>
-                                <li>カルマヘア</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>ツーブロック</li>
-                                <li>アップバング</li>
-                                <li>フェード</li>
-                                <li>スキンフェード</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>フェザーパーマ</li>
-                                <li>フェザーカット</li>
-                                <li>刈り上げショート</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>ニュアンスパーマ</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>サーフカール</li>
-                                <li>スペインカール</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>ツイストスパイラルパーマ</li>
-                            </ul>
-                        </div>
-                        <div class="mens-word-group">
-                            <ul class="mens-word-list">
-                                <li>スーツ髪型</li>
-                                <li>スーツ黒髪</li>
-                                <li>メンズビジネス</li>
-                            </ul>
-                        </div>
+    {%- set mens_word_groups = [
+        {'title': '優先', 'words': ['シースルーセンターパート', 'シースルーマッシュ', 'シースルーマッシュウルフ', 'シースルーラウンドマッシュ']},
+        {'words': ['フェイスレイヤー', 'ラウンドマッシュ', 'マッシュウルフ']},
+        {'words': ['韓国ヘア', '韓国風ウルフ', 'コンマヘア', 'カルマヘア']},
+        {'words': ['ツーブロック', 'アップバング', 'フェード', 'スキンフェード']},
+        {'words': ['フェザーパーマ', 'フェザーカット', '刈り上げショート']},
+        {'words': ['ニュアンスパーマ']},
+        {'words': ['サーフカール', 'スペインカール']},
+        {'words': ['ツイストスパイラルパーマ']},
+        {'words': ['スーツ髪型', 'スーツ黒髪', 'メンズビジネス']},
+    ] %}
+                        {%- for group in mens_word_groups %}
+                        {{ mens_word_group(group.words, group.get('title')) }}
+                        {%- endfor %}
                     </div>
                 </details>
             </div>
@@ -270,11 +174,14 @@
             <i class="fas fa-copy" aria-hidden="true"></i> 全てコピー
         </button>
     </div>
-        
-    <!-- コピー完了トースト -->
+    </div>
+
+    <!-- コピー完了トースト。
+         #results の内側に置くと、結果セクションの fadeInUp アニメーション中は
+         transform が position:fixed の包含ブロックになって表示位置がずれ、
+         再生成時の hideResults() で表示途中のまま消えてしまう。 -->
     <div id="copied-toast" class="copied-toast" role="status" aria-live="polite">
         クリップボードにコピーしました
-    </div>
     </div>
 </main>
 
@@ -302,70 +209,19 @@
             </div>
         </div>
         <div class="card-content">
-            <div class="field">
-                <div class="field-label">
-                    <div class="field-label-group">
-                        <i class="fas fa-heading" aria-hidden="true"></i>
-                        <span>タイトル</span>
-                        <span class="field-info">（30文字以内）</span>
-                    </div>
-                    <span class="char-count title-count">0/30</span>
-                </div>
-                <div class="textarea-container">
-                    <textarea class="title" data-field="title" aria-label="タイトル" maxlength="30" rows="2" placeholder="タイトルを入力してください"></textarea>
-                    <button type="button" class="field-copy-btn" data-field="title" title="タイトルをコピー">
-                        <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="field">
-                <div class="field-label">
-                    <div class="field-label-group">
-                        <i class="fas fa-list" aria-hidden="true"></i>
-                        <span>メニュー</span>
-                        <span class="field-info">（50文字以内）</span>
-                    </div>
-                    <span class="char-count menu-count">0/50</span>
-                </div>
-                <div class="textarea-container">
-                    <textarea class="menu" data-field="menu" aria-label="メニュー" maxlength="50" rows="2" placeholder="メニューを入力してください"></textarea>
-                    <button type="button" class="field-copy-btn" data-field="menu" title="メニューをコピー">
-                        <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="field">
-                <div class="field-label">
-                    <div class="field-label-group">
-                        <i class="fas fa-comment" aria-hidden="true"></i>
-                        <span>コメント</span>
-                        <span class="field-info">（120文字以内）</span>
-                    </div>
-                    <span class="char-count comment-count">0/120</span>
-                </div>
-                <div class="textarea-container">
-                    <textarea class="comment" data-field="comment" aria-label="コメント" maxlength="120" rows="3" placeholder="コメントを入力してください"></textarea>
-                    <button type="button" class="field-copy-btn" data-field="comment" title="コメントをコピー">
-                        <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="field">
-                <div class="field-label">
-                    <div class="field-label-group">
-                        <i class="fas fa-hashtag" aria-hidden="true"></i>
-                        <span>ハッシュタグ</span>
-                        <span class="field-info">（カンマ区切り, 各20文字以内）</span>
-                    </div>
-                    <span class="char-count hashtag-count"></span>
-                </div>
-                <div class="textarea-container">
-                    <textarea class="hashtag" data-field="hashtag" aria-label="ハッシュタグ" rows="2" placeholder="ハッシュタグをカンマ区切りで入力してください"></textarea>
-                    <button type="button" class="field-copy-btn" data-field="hashtag" title="ハッシュタグをコピー">
-                        <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
+            {{ card_field('title', 'タイトル', 'fa-heading', 'タイトルを入力してください',
+                          maxlength=char_limits.title) }}
+            {{ card_field('menu', 'メニュー', 'fa-list', 'メニューを入力してください',
+                          maxlength=char_limits.menu) }}
+            {{ card_field('comment', 'コメント', 'fa-comment', 'コメントを入力してください',
+                          maxlength=char_limits.comment, rows=3) }}
+            {#- ハッシュタグの上限はタグ 1 個あたりなので maxlength は付けず、
+                data-max-length で JS に伝える -#}
+            {{ card_field('hashtag', 'ハッシュタグ', 'fa-hashtag',
+                          'ハッシュタグをカンマ区切りで入力してください',
+                          info='カンマ区切り, 各%d文字以内'|format(char_limits.hashtag),
+                          count_init='',
+                          data_max_length=char_limits.hashtag) }}
         </div>
         <div class="card-actions">
             <button type="button" class="copy-btn">

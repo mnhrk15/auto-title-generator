@@ -579,7 +579,8 @@ input[type="text"]:focus+.search-icon {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 24%;
+    /* インジケーターは 3 個。個数を変えたらここも変える（index.html と対応） */
+    width: 32%;
     position: relative;
     z-index: 2;
 }
@@ -1232,18 +1233,6 @@ textarea:focus {
     }
 }
 
-@keyframes slideIn {
-    0% {
-        transform: translateX(-20px);
-        opacity: 0;
-    }
-
-    100% {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
 @keyframes scaleIn {
     0% {
         transform: scale(0.9);
@@ -1834,7 +1823,6 @@ textarea:focus {
     border: 1px solid rgba(var(--border-color-rgb), 0.8);
     padding: var(--spacing-lg);
     transition: all var(--transition-normal) var(--transition-ease);
-    animation: slideUpFade 0.6s var(--transition-ease);
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -1997,11 +1985,6 @@ textarea:focus {
         margin-bottom: var(--spacing-sm);
     }
 
-    .template-card .description {
-        font-size: 0.95rem;
-        margin-bottom: var(--spacing-md);
-    }
-
     .page-btn {
         min-width: 36px;
         height: 36px;
@@ -2094,38 +2077,14 @@ textarea:focus {
     }
 
     .search-box>.input-wrapper,
-    .search-box>.input-wrapper.model-selection,
     .search-box>.primary-button {
         width: 100%;
         flex-basis: auto;
         margin-right: 0;
         /* Remove right margin if any for stacked layout */
     }
-
-    .model-select {
-        padding: 0.75rem 1rem 0.75rem 2.5rem;
-        /* Ensure padding is consistent */
-    }
 }
 
-/* Additional mobile optimization for model selection */
-@media (max-width: 576px) {
-
-    .search-box>.input-wrapper.model-selection {
-        flex-basis: auto;
-        min-width: auto;
-    }
-
-    .model-select {
-        font-size: 0.9rem;
-        padding: 0.7rem 1rem 0.7rem 2.3rem;
-    }
-
-    .model-icon {
-        left: 12px;
-        font-size: 0.85em;
-    }
-}
 
 /* 特集
 キーワード関連のスタイル */
@@ -2159,26 +2118,6 @@ textarea:focus {
     font-weight: 600;
     position: relative;
     z-index: 2;
-}
-
-.featured-keywords-title i {
-    font-size: 1.6rem;
-    color: var(--featured-accent-color);
-    text-shadow: 0 0 10px rgba(77, 166, 255, 0.5);
-    animation: sparkle 2s ease-in-out infinite;
-    margin-right: var(--spacing-sm);
-}
-
-@keyframes sparkle {
-
-    0%,
-    100% {
-        transform: scale(1) rotate(0deg);
-    }
-
-    50% {
-        transform: scale(1.1) rotate(5deg);
-    }
 }
 
 .featured-keywords-container {
@@ -2313,18 +2252,6 @@ textarea:focus {
     .featured-keyword-btn {
         font-size: 0.8rem;
         padding: var(--spacing-xs) var(--spacing-sm);
-    }
-
-    .featured-selection-toast,
-    .featured-deselection-toast,
-    .featured-error-toast,
-    .gender-change-toast,
-    .manual-gender-change-toast {
-        top: 10px;
-        right: 10px;
-        left: 10px;
-        max-width: none;
-        font-size: 0.8rem;
     }
 }
 
@@ -2585,18 +2512,6 @@ textarea:focus {
     .featured-fallback-notification,
     .featured-error-fallback-notification {
         top: 10px;
-        right: 10px;
-        left: 10px;
-        max-width: none;
-    }
-    
-    .featured-selection-toast,
-    .featured-deselection-toast,
-    .featured-error-toast,
-    .featured-retry-success-toast,
-    .gender-change-toast,
-    .manual-gender-change-toast {
-        bottom: 10px;
         right: 10px;
         left: 10px;
         max-width: none;

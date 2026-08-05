@@ -61,23 +61,35 @@ The application is configured for Render deployment:
 
 **Flask Application Factory Pattern**:
 - `/app/__init__.py`: Application factory with `create_app()` function
-- `/app/main.py`: Blueprint with routes and error handlers
+- `/app/main.py`: Blueprint with routes and request parsing
+- `/app/error_handlers.py`: App-wide error handlers. Every endpoint returns JSON, including
+  404 / 405 / unhandled exceptions. The `HTTPException` handler must stay registered alongside
+  the `Exception` one — with only the latter, Flask routes 404s there and they become 500s.
 - `/run.py`: Development server entry point
 - `/asgi.py`: Production ASGI adapter for async support
 
 **Async Processing Pipeline**:
 1. **Web Scraping** (`/app/scraping.py`): `HotPepperScraper` class uses aiohttp to asynchronously scrape hairstyle titles from HotPepper Beauty
-2. **AI Generation** (`/app/generator.py`): `TemplateGenerator` calls Gemini with structured output.
-   Prompt assembly lives in `/app/prompts.py`, the output schema in `/app/schemas.py`.
-3. **Request Handling** (`/app/main.py`): Async route `/api/generate` orchestrates the pipeline
+2. **AI Generation** (`/app/generator.py`): `TemplateGenerator` only initializes the Gemini client
+   and sends the request. The surrounding concerns are separate modules, each testable without an
+   API key: `/app/prompts.py` (prompt assembly), `/app/schemas.py` (output schema),
+   `/app/gemini_response.py` (response interpretation), `/app/template_validation.py` (validation),
+   `/app/seasons.py` (season/color normalization and appending).
+3. **Request Handling** (`/app/main.py`): Async route `/api/generate` orchestrates the pipeline.
+   `parse_generate_request()` is a pure function — it validates the body and normalizes `seasons`.
+   It is the **single** owner of season normalization (it used to run three times per request).
 
 **Service Layer** (`/app/services/`):
 - `keyword_analysis.py`: Classifies the input keyword as featured / normal / mixed. Pure logic with
   no I/O, so it is testable without a Flask application context.
-- `template_service.py`: Coordinates the scraper and the generator, and attaches the metadata that
-  the frontend reads off each template.
+- `featured_service.py`: Builds the featured-keyword list (gender filter, projection to public
+  fields, degraded-mode message). Flask-free.
+- `template_service.py`: Coordinates the scraper and the generator. Returns a `GenerationOutcome`
+  dataclass — request-level facts (`is_featured`, `featured_info`) live there, not duplicated into
+  every template. Only per-card metadata is attached to templates themselves.
 - Services never touch `current_app`. Dependencies (e.g. the featured-keyword repository) are passed
-  in as arguments; only routes resolve them.
+  in as arguments; only routes resolve them. The repository contract is documented as a `Protocol`
+  in `featured_keywords.py`, imported under `TYPE_CHECKING` so services stay Flask-free.
 
 **Frontend** (`/app/static/js/`):
 - Plain ES modules loaded via `<script type="module">`. No bundler, no `package.json`.
@@ -85,6 +97,14 @@ The application is configured for Render deployment:
 - `api.js` centralizes fetch calls. Errors surface as `ApiError` with a `kind`
   (`timeout` / `network` / `server` / `app`) so callers branch on a field, not on message text.
 - Non-2xx responses are parsed before throwing, so the server's error `code` reaches the UI.
+- `dom.js` holds selectors for elements that live as long as the page. Dynamically created
+  elements are queried by whoever creates them — that is not a violation. A selector string
+  appearing in two modules is. A startup assertion logs any `el` entry that came back null,
+  because these are bound to `index.html` by string matching only.
+- `toast.js` documents the five notification surfaces and when to use each. They are not five
+  copies of the same thing; do not merge them.
+- Templates repeated in `index.html` live in `templates/_macros.html`. Character limits come from
+  `config.CHAR_LIMITS` via `render_template` — never hardcode them in the template or in JS.
 - State lives in module scope (`progress.js`, `template-list.js`). There is no global store, and
   nothing is exposed on `window` — inline `onclick` attributes would not be able to see module
   scope, so all handlers are attached with `addEventListener`.
@@ -171,7 +191,8 @@ The application uses async extensively throughout the entire pipeline:
 - `HotPepperScraper.scrape_titles_async()`: Async web scraping with aiohttp
 - `TemplateGenerator.generate_templates_async()`: Async AI generation with Gemini
 - Main API endpoint `/api/generate`: Fully async request handling
-- `process_template_generation()`: Orchestrates async scraping + generation
+- `generate_templates_for_request()` (`/app/services/template_service.py`): Orchestrates async
+  scraping + generation and returns a `GenerationOutcome`
 
 **Session Management**:
 - Async context managers (`async with`) for HTTP sessions
@@ -216,6 +237,23 @@ The application uses async extensively throughout the entire pipeline:
 - Comprehensive request/response logging for debugging
 - Performance metrics logging for generation times
 
+## Lint and Formatting
+
+`pyproject.toml` configures ruff (lint + format). There is no type checker.
+
+```bash
+ruff check .          # lint
+ruff check . --fix
+ruff format .
+```
+
+Notes on the configuration:
+- `E501` (line length) is deliberately not selected — the formatter does not wrap strings, so
+  Japanese f-string log lines would show up as violations that cannot be fixed.
+- `quote-style = "preserve"` keeps the existing mix of `'` and `"`.
+- `*.md` is excluded: ruff 0.16 formats Python code blocks inside Markdown, and documentation
+  snippets are illustrative fragments that need not match the real code.
+
 ## Testing Structure
 
 Tests are organized by component:
@@ -236,6 +274,21 @@ All tests use pytest with async support (`@pytest.mark.asyncio` for async functi
 - Always verify existing functionality before implementing new features to prevent duplication
 - Maintain consistency in naming conventions and directory structure
 - UI/UX changes require explicit approval - do not modify layouts, colors, fonts, or spacing without permission
+
+### CSS
+
+`app/static/css/style.css` (3010 lines) is the one file that was never split. Sections are stacked
+in historical order, so **several selectors have more than one base definition and the final
+appearance is decided by "last one wins"** (`.featured-keyword-btn` has five). Before touching it,
+read the "既知の技術的負債" section of README.md — in particular:
+
+- Merge duplicate base definitions **at the first occurrence**, not the last. Moving them later
+  makes properties that only existed in the early definition win over `@media` blocks in between.
+- Do not reorder `@media` blocks before collapsing the duplicates. Some `@media` rules are
+  currently dead because a later base definition overrides them; reordering revives them.
+- New state classes should use the `is-` prefix (`.is-focused`, `.is-priority`). The existing mix
+  of `.active` / `.show` / `.copied` / `.hidden` / `.gender-option-active` is historical. Renaming
+  them means auditing 20+ string references in JS, which is not worth it — leave them alone.
 - Do not change specified technology stack versions without approval
 - Follow the existing async patterns when adding new functionality
 

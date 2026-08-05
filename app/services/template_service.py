@@ -5,63 +5,72 @@
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_MODEL
+from ..errors import NoResultsError
 from ..generator import TemplateGenerator
 from ..scraping import HotPepperScraper
 from .keyword_analysis import (
-    KEYWORD_TYPE_MIXED,
-    KeywordAnalysis,
     MODE_FEATURED,
+    KeywordAnalysis,
     analyze_keyword,
 )
+
+if TYPE_CHECKING:
+    from ..featured_keywords import FeaturedKeywordRepository
 
 logger = logging.getLogger(__name__)
 
 # ログに出力するスクレイピング結果の最大件数（全件出すとログが肥大するため）
 MAX_LOGGED_TITLES = 10
 
-MIXED_KEYWORD_NOTE = '特集キーワードと通常キーワードが混在しています'
+
+@dataclass(frozen=True)
+class GenerationOutcome:
+    """1 リクエスト分の生成結果。
+
+    is_featured / featured_info はリクエスト単位の情報なので、
+    テンプレートの中ではなくここに持たせる。以前はテンプレート 20 件全部に
+    同じ値を書き込み、ルートが templates[0] から読み戻していた。
+    """
+
+    templates: list[dict]
+    is_featured: bool
+    featured_info: dict | None
 
 
-def _log_scraped_titles(titles: List[str]) -> None:
+def _log_scraped_titles(titles: list[str]) -> None:
     logger.debug(f"スクレイピングで取得した全タイトルリスト: {titles}")
-    logger.info('スクレイピング結果のタイトル例 (最大%d件):' % MAX_LOGGED_TITLES)
+    logger.info(f'スクレイピング結果のタイトル例 (最大{MAX_LOGGED_TITLES}件):')
     for i, title in enumerate(titles[:MAX_LOGGED_TITLES]):
         logger.info(f'  {i + 1}: {title}')
     if len(titles) > MAX_LOGGED_TITLES:
         logger.info(f'  ... 他 {len(titles) - MAX_LOGGED_TITLES} 件')
 
 
-def _attach_metadata(templates: List[Dict], analysis: KeywordAnalysis) -> None:
-    """生成されたテンプレートに、フロントエンドが参照するメタデータを付ける。"""
-    is_mixed = analysis.keyword_type == KEYWORD_TYPE_MIXED
-    featured_info = analysis.featured_info
+def _attach_metadata(templates: list[dict], analysis: KeywordAnalysis) -> None:
+    """テンプレート 1 件ごとに必要なメタデータを付ける。
+
+    ここに置くのは「カードごとに表示が変わる」情報だけ。
+    リクエスト単位の情報は GenerationOutcome が持つ。
+    """
+    featured_name = (analysis.featured_info or {}).get('name', '') if analysis.is_featured else ''
 
     for template in templates:
         template['is_featured'] = analysis.is_featured
-        template['keyword_type'] = analysis.keyword_type
-        template['processing_mode'] = analysis.processing_mode
-        template['original_keyword'] = analysis.original_keyword
-        template['is_mixed_keyword'] = is_mixed
-
-        if analysis.is_featured and featured_info:
-            template['featured_keyword_name'] = featured_info.get('name', '')
-            template['featured_condition'] = featured_info.get('condition', '')
-            template['featured_gender'] = featured_info.get('gender', '')
-
-        if is_mixed:
-            template['mixed_processing_note'] = MIXED_KEYWORD_NOTE
+        if featured_name:
+            template['featured_keyword_name'] = featured_name
 
 
 async def generate_templates_for_request(
     keyword: str,
     gender: str,
-    repository,
-    seasons: Optional[List[str]] = None,
+    repository: 'FeaturedKeywordRepository',
+    seasons: list[str] | None = None,
     model: str = DEFAULT_MODEL,
-) -> Tuple[List[Dict], List[Dict]]:
+) -> GenerationOutcome:
     """スクレイピングとテンプレート生成を実行する。
 
     Args:
@@ -71,9 +80,8 @@ async def generate_templates_for_request(
         seasons: 正規化済みの季節・カラー選択
         model: 使用する Gemini モデル
 
-    Returns:
-        (templates, trending_keywords) のタプル。
-        該当するヘアスタイルが無い場合は ([], [])。
+    Raises:
+        NoResultsError: キーワードに一致するヘアスタイルが 1 件も無い場合
     """
     logger.info(
         f'非同期処理開始: キーワード: "{keyword}", 性別: "{gender}", '
@@ -94,8 +102,10 @@ async def generate_templates_for_request(
         logger.info(f'スクレイピング結果: {len(titles)} 件のタイトルを取得')
 
     if not titles:
+        # 「該当なし」はドメイン上の結果であってエラーではないが、
+        # 空リストで返すとスクレイピング失敗と区別できないため例外にする。
         logger.warning(f'キーワード "{keyword}" に一致するヘアスタイルが見つかりませんでした')
-        return [], []
+        raise NoResultsError()
 
     _log_scraped_titles(titles)
 
@@ -108,8 +118,8 @@ async def generate_templates_for_request(
     templates, trending_keywords = await generator.generate_templates_async(
         titles,
         keyword,
-        seasons,
-        gender,
+        seasons=seasons,
+        gender=gender,
         featured_info=analysis.featured_info,
         generation_context=analysis.to_generation_context(),
     )
@@ -123,4 +133,8 @@ async def generate_templates_for_request(
 
     _attach_metadata(templates, analysis)
 
-    return templates, trending_keywords
+    return GenerationOutcome(
+        templates=templates,
+        is_featured=analysis.is_featured,
+        featured_info=analysis.featured_info,
+    )

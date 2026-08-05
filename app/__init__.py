@@ -1,11 +1,11 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from typing import Optional
 
 from flask import Flask
 
 from . import config
 from .config import Settings
+from .error_handlers import register_error_handlers
 from .featured_keywords import EXTENSION_KEY, FeaturedKeywordsManager
 from .main import main_bp
 
@@ -15,7 +15,7 @@ _LOG_HANDLER_NAME = 'auto-title-generator-file'
 _LOG_STREAM_HANDLER_NAME = 'auto-title-generator-stream'
 
 
-def create_app(settings: Optional[Settings] = None) -> Flask:
+def create_app(settings: Settings | None = None) -> Flask:
     """Flask アプリケーションを生成する。
 
     Args:
@@ -26,7 +26,6 @@ def create_app(settings: Optional[Settings] = None) -> Flask:
 
     settings = settings or config.get_settings()
     app.config.from_mapping(settings.flask_config())
-    app.config['SETTINGS'] = settings
 
     setup_logging(app, settings)
 
@@ -35,6 +34,7 @@ def create_app(settings: Optional[Settings] = None) -> Flask:
     # かつ相対パス解決だったため実行時の CWD に依存していた。
     app.extensions[EXTENSION_KEY] = FeaturedKeywordsManager(settings.featured_keywords_path)
 
+    register_error_handlers(app)
     app.register_blueprint(main_bp)
 
     return app
@@ -65,7 +65,7 @@ def setup_logging(app: Flask, settings: Settings) -> None:
     file_handler = RotatingFileHandler(
         settings.log_dir / 'app.log',
         maxBytes=1024 * 1024,  # 1MB
-        backupCount=10
+        backupCount=10,
     )
     file_handler.name = _LOG_HANDLER_NAME
     file_handler.setFormatter(formatter)

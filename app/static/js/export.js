@@ -1,27 +1,11 @@
 // 生成結果のエクスポート（CSV / テキスト）と全件コピー。
 
+import { copyToClipboard } from './clipboard.js';
 import { el } from './dom.js';
 import { showError } from './status.js';
-import { showCopyToast, showToast } from './toast.js';
+import { showToast } from './toast.js';
+import { formatTemplateForExport, hashtagToText } from './template-format.js';
 import { getAllTemplates } from './template-list.js';
-
-const SEPARATOR = '='.repeat(40);
-
-/** ハッシュタグは配列で返ることも文字列のこともある */
-function hashtagToText(hashtag) {
-    return Array.isArray(hashtag) ? hashtag.join(', ') : (hashtag || '');
-}
-
-function formatTemplateAsText(template, index) {
-    return [
-        `■ テンプレート ${index + 1}`,
-        `【タイトル】\n${template.title}`,
-        `【メニュー】\n${template.menu}`,
-        `【コメント】\n${template.comment}`,
-        `【ハッシュタグ】\n${hashtagToText(template.hashtag)}`,
-        SEPARATOR,
-    ].join('\n\n');
-}
 
 function toCsv(templates) {
     const quote = (value) => `"${String(value).replace(/"/g, '""')}"`;
@@ -94,7 +78,7 @@ function openExportDialog(templates) {
     });
 
     dialog.querySelector('[data-format="txt"]').addEventListener('click', () => {
-        const text = templates.map(formatTemplateAsText).join('\n');
+        const text = templates.map(formatTemplateForExport).join('\n');
         downloadFile(text, 'hair_templates.txt', 'text/plain');
         showToast({ message: 'テキストファイルをダウンロードしました', icon: 'fa-check-circle', variant: 'success' });
         closeDialog();
@@ -123,12 +107,9 @@ export function initExport() {
             return;
         }
 
-        try {
-            await navigator.clipboard.writeText(templates.map(formatTemplateAsText).join('\n'));
-            showCopyToast('すべてのテンプレート');
-        } catch (error) {
-            showError('コピーに失敗しました');
-            console.error('コピーエラー:', error);
-        }
+        await copyToClipboard(
+            templates.map(formatTemplateForExport).join('\n'),
+            'すべてのテンプレート',
+        );
     });
 }

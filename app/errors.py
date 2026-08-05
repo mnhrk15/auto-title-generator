@@ -7,8 +7,6 @@
 ``AppError`` を送出すれば ``main.py`` の app_errorhandler が上記の形に変換する。
 """
 
-from typing import Optional, Tuple
-
 
 class ErrorCode:
     """API レスポンスの error.code に載せる値。"""
@@ -25,7 +23,7 @@ class ErrorCode:
     CONFIGURATION_ERROR = 'CONFIGURATION_ERROR'
 
 
-def error_payload(message: str, code: str, status: int) -> Tuple[dict, int]:
+def error_payload(message: str, code: str, status: int) -> tuple[dict, int]:
     """エラーレスポンスの本文と HTTP ステータスを組み立てる。"""
     return {
         'success': False,
@@ -47,11 +45,11 @@ class AppError(Exception):
     status_code = 500
     DEFAULT_MESSAGE = 'サーバー内部でエラーが発生しました。しばらく時間をおいて再度お試しください。'
 
-    def __init__(self, message: Optional[str] = None):
+    def __init__(self, message: str | None = None):
         self.message = message or self.DEFAULT_MESSAGE
         super().__init__(self.message)
 
-    def to_payload(self) -> Tuple[dict, int]:
+    def to_payload(self) -> tuple[dict, int]:
         return error_payload(self.message, self.code, self.status_code)
 
 
@@ -97,9 +95,7 @@ class GenerationError(AppError):
 
     code = ErrorCode.GENERATION_ERROR
     status_code = 502
-    DEFAULT_MESSAGE = (
-        'テンプレートの生成に失敗しました。しばらく時間をおいて再度お試しください。'
-    )
+    DEFAULT_MESSAGE = 'テンプレートの生成に失敗しました。しばらく時間をおいて再度お試しください。'
 
 
 class ConfigurationError(AppError):
@@ -111,17 +107,27 @@ class ConfigurationError(AppError):
 
 
 class FeaturedKeywordsError(AppError):
-    """特集キーワード機能に関連するエラーの基底クラス。"""
+    """特集キーワード機能に関連するエラーの基底クラス。
+
+    503 なのは、この機能が落ちてもテンプレート生成は使えるため。
+    フロントエンドはこのコードを見て、通常の生成へ案内する。
+    """
 
     code = ErrorCode.FEATURED_KEYWORDS_ERROR
-    status_code = 500
+    status_code = 503
+    # この文言は 2 つの用途で使う。
+    #   1. 例外として送出したときのレスポンス本文
+    #   2. 「機能は落ちているがリクエスト自体は成功」という降格時の案内
+    #      （featured_service._degraded_message がクラス属性として参照する）
     DEFAULT_MESSAGE = '特集キーワード機能で問題が発生しています。管理者にお問い合わせください。'
 
 
 class FeaturedKeywordsLoadError(FeaturedKeywordsError):
     """特集キーワードの読み込みに関するエラー。"""
 
-    DEFAULT_MESSAGE = '特集キーワードファイルの読み込みに問題があります。管理者にお問い合わせください。'
+    DEFAULT_MESSAGE = (
+        '特集キーワードファイルの読み込みに問題があります。管理者にお問い合わせください。'
+    )
 
 
 class FeaturedKeywordsValidationError(FeaturedKeywordsError):

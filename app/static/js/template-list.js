@@ -5,7 +5,6 @@
 
 import { el } from './dom.js';
 import { createTemplateCard, initializeTextareas } from './template-card.js';
-import { updateMensNotice } from './form-controls.js';
 
 const ITEMS_PER_PAGE = 6;
 const MAX_VISIBLE_PAGES = 5;
@@ -17,9 +16,17 @@ const state = {
     allTemplates: [],
 };
 
-/** 全テンプレート（カード上の編集を反映済み）を返す */
+// 進行中のカード描画予約。ページ番号を連打したときに前の予約を取り消す。
+let renderTimer = null;
+
+/**
+ * 全テンプレート（カード上の編集を反映済み）を返す。
+ *
+ * シャローコピーなので要素オブジェクト自体は共有される。目的は完全な不変性ではなく、
+ * 呼び出し側の sort / splice が元データを壊すのを防ぐこと。
+ */
 export function getAllTemplates() {
-    return state.allTemplates;
+    return [...state.allTemplates];
 }
 
 /** カード上の編集を元データへ書き戻す */
@@ -84,9 +91,18 @@ function updatePaginationUI() {
 }
 
 export function displayTemplatesForPage(page) {
+    // 状態とページャは同期で確定させる。カードの描画だけを遅延させることで、
+    // 連打しても「最後に押したページ」が必ず勝つ。
+    // 以前は両方を setTimeout の中でやっていたため、連打すると複数のタイマーが
+    // 並走し、表示中のカードと state.currentPage が食い違った。
+    state.currentPage = page;
+    updatePaginationUI();
+
     el.templatesLoading.classList.add('active');
 
-    setTimeout(() => {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(() => {
+        renderTimer = null;
         el.templateContainer.innerHTML = '';
 
         const startIndex = (page - 1) * ITEMS_PER_PAGE;
@@ -98,20 +114,16 @@ export function displayTemplatesForPage(page) {
             );
         });
 
-        state.currentPage = page;
-        updatePaginationUI();
         el.templatesLoading.classList.remove('active');
         initializeTextareas();
     }, RENDER_DELAY_MS);
 }
 
-export function displayTemplates(templates, gender = 'ladies') {
+export function displayTemplates(templates) {
     state.allTemplates = templates;
     state.totalPages = Math.ceil(templates.length / ITEMS_PER_PAGE);
-    state.currentPage = 1;
 
-    updateMensNotice(gender);
-    updatePaginationUI();
+    // ページャの更新は displayTemplatesForPage が同期で行う
     displayTemplatesForPage(1);
 }
 

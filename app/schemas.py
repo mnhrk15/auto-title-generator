@@ -12,8 +12,6 @@ trending_keywords を先に宣言しているのは、
 pydantic は google-genai の既存依存なので、requirements.txt への追加は不要。
 """
 
-from typing import List
-
 from pydantic import BaseModel
 
 
@@ -31,11 +29,11 @@ class GeneratedTemplate(BaseModel):
     title: str
     menu: str
     comment: str
-    hashtag: List[str]
+    hashtag: list[str]
 
 
 class GenerationResult(BaseModel):
     """テンプレート生成の出力全体。"""
 
-    trending_keywords: List[TrendingKeyword]
-    templates: List[GeneratedTemplate]
+    trending_keywords: list[TrendingKeyword]
+    templates: list[GeneratedTemplate]
