@@ -115,24 +115,11 @@ def test_generate_response_shape_is_stable(client, fake_pipeline):
     assert set(data.keys()) == {
         'success',
         'templates',
-        'trending_keywords',
         'is_featured',
-        'keyword_type',
-        'processing_mode',
-        'is_mixed_keyword',
-        'original_keyword',
         'featured_keyword_info',
-        'processing_summary',
-        'status',
     }
-    # script.js がテンプレート1件ごとに参照するメタデータ
-    assert {
-        'is_featured',
-        'keyword_type',
-        'processing_mode',
-        'original_keyword',
-        'is_mixed_keyword',
-    } <= set(data['templates'][0].keys())
+    # app/static/js がテンプレート1件ごとに参照するメタデータ
+    assert 'is_featured' in data['templates'][0]
 
 
 def test_featured_keywords_response_shape_is_stable(client):
@@ -140,16 +127,8 @@ def test_featured_keywords_response_shape_is_stable(client):
     response = client.get('/api/featured-keywords?gender=ladies')
 
     data = json.loads(response.data)
-    assert set(data.keys()) == {
-        'success',
-        'keywords',
-        'gender',
-        'total_keywords',
-        'filtered_keywords',
-        'health_status',
-        'status',
-    }
-    # script.js のボタン生成がこの4キーちょうどを前提にしている
+    assert set(data.keys()) == {'success', 'keywords', 'message'}
+    # featured-keywords.js のボタン生成がこの4キーちょうどを前提にしている
     assert data['keywords'], '検証のため特集キーワードが1件以上必要'
     assert set(data['keywords'][0].keys()) == {'name', 'keyword', 'gender', 'condition'}
 
@@ -270,3 +249,93 @@ def test_generate_templates_route_invalid_json(client):
     data = json.loads(response.data)
     assert data['success'] is False
     assert data['error']['code'] == 'INVALID_JSON'
+
+
+class TestParseGenerateRequest:
+    """リクエストのパースは Flask コンテキスト無しで検証できる"""
+
+    def test_normalizes_seasons(self):
+        from app.main import parse_generate_request
+
+        req = parse_generate_request(
+            {
+                'keyword': '髪質改善',
+                'gender': 'ladies',
+                # 定義順と異なる順序・未知の値・重複を含めても正規化される
+                'seasons': ['bleach_free', 'unknown', 'spring', 'spring'],
+            }
+        )
+
+        assert req.seasons == ['spring', 'bleach_free']
+
+    def test_drops_seasons_for_mens(self):
+        from app.main import parse_generate_request
+
+        req = parse_generate_request(
+            {'keyword': 'メンズパーマ', 'gender': 'mens', 'seasons': ['spring']}
+        )
+
+        assert req.seasons == []
+
+    def test_defaults(self):
+        from app.config import DEFAULT_MODEL
+        from app.main import parse_generate_request
+
+        req = parse_generate_request({'keyword': 'ボブ'})
+
+        assert req.gender == 'ladies'
+        assert req.seasons == []
+        assert req.model == DEFAULT_MODEL
+
+    @pytest.mark.parametrize('body', [[1, 2], 'ただの文字列', 42, None])
+    def test_non_object_body_is_invalid_json(self, body):
+        """配列や空ボディは以前 500 になっていた（data.get で AttributeError）"""
+        from app.errors import InvalidJsonError
+        from app.main import parse_generate_request
+
+        with pytest.raises(InvalidJsonError):
+            parse_generate_request(body)
+
+    @pytest.mark.parametrize(
+        'body',
+        [
+            {'gender': 'ladies'},  # keyword なし
+            {'keyword': ''},  # 空の keyword
+            {'keyword': 'ボブ', 'gender': 'invalid'},
+            {'keyword': 'ボブ', 'seasons': 'spring'},  # 配列でない
+        ],
+    )
+    def test_invalid_values(self, body):
+        from app.errors import ValidationError
+        from app.main import parse_generate_request
+
+        with pytest.raises(ValidationError):
+            parse_generate_request(body)
+
+
+def test_empty_body_returns_400_not_500(client):
+    """Content-Type なしの空ボディは 400。以前は get_json() が 415 を投げ 500 になっていた"""
+    response = client.post('/api/generate')
+
+    assert response.status_code == 400
+    assert json.loads(response.data)['error']['code'] == 'INVALID_JSON'
+
+
+def test_array_body_returns_400_not_500(client):
+    """JSON 配列は 400。以前は data.get の AttributeError で 500 になっていた"""
+    response = client.post('/api/generate', json=[1, 2])
+
+    assert response.status_code == 400
+    assert json.loads(response.data)['error']['code'] == 'INVALID_JSON'
+
+
+def test_featured_keywords_invalid_gender_is_rejected(client):
+    """不正な性別はサイレントに ladies へ倒さず 400 で返す
+
+    黙って倒すとフロントエンドのバグが表に出なくなる。
+    パラメータ自体が無い場合は従来どおり ladies を既定にする。
+    """
+    response = client.get('/api/featured-keywords?gender=xxx')
+
+    assert response.status_code == 400
+    assert json.loads(response.data)['error']['code'] == 'VALIDATION_ERROR'

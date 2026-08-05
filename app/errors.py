@@ -107,10 +107,18 @@ class ConfigurationError(AppError):
 
 
 class FeaturedKeywordsError(AppError):
-    """特集キーワード機能に関連するエラーの基底クラス。"""
+    """特集キーワード機能に関連するエラーの基底クラス。
+
+    503 なのは、この機能が落ちてもテンプレート生成は使えるため。
+    フロントエンドはこのコードを見て、通常の生成へ案内する。
+    """
 
     code = ErrorCode.FEATURED_KEYWORDS_ERROR
-    status_code = 500
+    status_code = 503
+    # この文言は 2 つの用途で使う。
+    #   1. 例外として送出したときのレスポンス本文
+    #   2. 「機能は落ちているがリクエスト自体は成功」という降格時の案内
+    #      （featured_service._degraded_message がクラス属性として参照する）
     DEFAULT_MESSAGE = '特集キーワード機能で問題が発生しています。管理者にお問い合わせください。'
 
 

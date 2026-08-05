@@ -6,8 +6,9 @@
 
 import pytest
 
+from app.errors import NoResultsError
 from app.services.keyword_analysis import KeywordAnalysis, analyze_keyword
-from app.services.template_service import MIXED_KEYWORD_NOTE, _attach_metadata
+from app.services.template_service import _attach_metadata, generate_templates_for_request
 
 FEATURED = {
     'name': 'テスト用くびれヘア',
@@ -30,7 +31,23 @@ def raw_templates(count=2):
     ]
 
 
+class _FeaturedRepo:
+    """くびれヘアだけを特集として扱う最小のリポジトリ"""
+
+    def is_available(self):
+        return True
+
+    def get_keyword_info(self, keyword):
+        return FEATURED if keyword.strip() == 'くびれヘア' else None
+
+
 class TestAttachMetadata:
+    """テンプレート 1 件ごとに付くメタデータ。
+
+    リクエスト単位の情報（keyword_type / processing_mode など）は
+    GenerationOutcome が持つので、ここには入らない。
+    """
+
     def test_normal_keyword(self):
         analysis = KeywordAnalysis(
             original_keyword='ボブ',
@@ -46,13 +63,8 @@ class TestAttachMetadata:
 
         for template in templates:
             assert template['is_featured'] is False
-            assert template['keyword_type'] == 'normal'
-            assert template['processing_mode'] == 'standard'
-            assert template['original_keyword'] == 'ボブ'
-            assert template['is_mixed_keyword'] is False
             # 特集でないときは特集用のキーを増やさない
             assert 'featured_keyword_name' not in template
-            assert 'mixed_processing_note' not in template
 
     def test_featured_keyword(self):
         analysis = analyze_keyword('くびれヘア', 'ladies', _FeaturedRepo())
@@ -63,11 +75,8 @@ class TestAttachMetadata:
         for template in templates:
             assert template['is_featured'] is True
             assert template['featured_keyword_name'] == 'テスト用くびれヘア'
-            assert template['featured_condition'] == FEATURED['condition']
-            assert template['featured_gender'] == 'ladies'
-            assert template['is_mixed_keyword'] is False
 
-    def test_mixed_keyword_gets_note(self):
+    def test_mixed_keyword_is_treated_as_featured(self):
         analysis = analyze_keyword('くびれヘア ボブ', 'ladies', _FeaturedRepo())
         templates = raw_templates()
 
@@ -75,17 +84,16 @@ class TestAttachMetadata:
 
         assert analysis.keyword_type == 'mixed'
         for template in templates:
-            assert template['is_mixed_keyword'] is True
-            assert template['mixed_processing_note'] == MIXED_KEYWORD_NOTE
+            assert template['is_featured'] is True
+            assert template['featured_keyword_name'] == 'テスト用くびれヘア'
 
     def test_all_templates_get_the_same_metadata(self):
-        """メタデータはリクエスト単位の情報なので全件に同じ値が入る"""
         analysis = analyze_keyword('くびれヘア', 'ladies', _FeaturedRepo())
         templates = raw_templates(count=5)
 
         _attach_metadata(templates, analysis)
 
-        keys = ('is_featured', 'keyword_type', 'processing_mode', 'original_keyword')
+        keys = ('is_featured', 'featured_keyword_name')
         first = {k: templates[0][k] for k in keys}
         assert all({k: t[k] for k in keys} == first for t in templates)
 
@@ -98,40 +106,37 @@ class TestAttachMetadata:
         assert templates == []
 
 
-class _FeaturedRepo:
-    """くびれヘアだけを特集として扱う最小のリポジトリ"""
-
-    def is_available(self):
-        return True
-
-    def get_keyword_info(self, keyword):
-        return FEATURED if keyword.strip() == 'くびれヘア' else None
-
-
 @pytest.mark.asyncio
 class TestGenerateTemplatesForRequest:
-    async def test_returns_empty_when_no_titles(self, fake_scraper):
-        """スクレイピング結果が0件なら生成へ進まない"""
-        from app.services.template_service import generate_templates_for_request
+    async def test_raises_when_no_titles(self, fake_scraper):
+        """スクレイピング結果が0件なら NoResultsError
 
-        with fake_scraper(titles=[]):
-            templates, trending = await generate_templates_for_request(
+        空リストで返すとスクレイピング失敗と区別できないため例外にしている。
+        """
+        with fake_scraper(titles=[]), pytest.raises(NoResultsError):
+            await generate_templates_for_request(
                 '存在しないキーワード', 'ladies', repository=_FeaturedRepo()
             )
 
-        assert templates == []
-        assert trending == []
-
-    async def test_attaches_metadata_to_generated_templates(self, fake_pipeline):
-        """生成結果にメタデータが付いて返る"""
-        from app.services.template_service import generate_templates_for_request
-
+    async def test_returns_outcome_with_request_level_metadata(self, fake_pipeline):
+        """リクエスト単位の情報は outcome に載る（templates[0] から読み戻さない）"""
         with fake_pipeline(templates=raw_templates()):
-            templates, _ = await generate_templates_for_request(
+            outcome = await generate_templates_for_request(
                 'くびれヘア', 'ladies', repository=_FeaturedRepo()
             )
 
-        assert len(templates) == 2
-        for template in templates:
+        assert outcome.is_featured is True
+        assert outcome.featured_info['name'] == 'テスト用くびれヘア'
+        assert len(outcome.templates) == 2
+        for template in outcome.templates:
             assert template['is_featured'] is True
             assert template['featured_keyword_name'] == 'テスト用くびれヘア'
+
+    async def test_normal_keyword_outcome(self, fake_pipeline):
+        with fake_pipeline(templates=raw_templates()):
+            outcome = await generate_templates_for_request(
+                'ボブ', 'ladies', repository=_FeaturedRepo()
+            )
+
+        assert outcome.is_featured is False
+        assert outcome.featured_info is None

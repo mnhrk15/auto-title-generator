@@ -54,8 +54,8 @@ class TestFeaturedKeywordsAPI:
         assert data['keywords'][0]['name'] == 'テスト用くびれヘア'
         assert data['keywords'][0]['keyword'] == 'くびれヘア'
         assert data['keywords'][0]['gender'] == 'ladies'
-        assert 'health_status' in data
-        assert data['status'] == 200
+        # 正常時も message キーは常に存在する（値は None）
+        assert data['message'] is None
 
     def test_get_featured_keywords_unavailable(self, use_repository, client):
         """特集キーワード取得API - 機能利用不可ケース"""
@@ -69,7 +69,6 @@ class TestFeaturedKeywordsAPI:
         assert data['success'] is True
         assert data['keywords'] == []
         assert '特集キーワードが設定されていません' in data['message']
-        assert 'health_status' in data
 
     def test_get_featured_keywords_with_error(self, use_repository, client):
         """特集キーワード取得API - 読み込みエラーは降格メッセージで返す"""
@@ -181,10 +180,6 @@ class TestTemplateGenerationAPI:
 
         assert data['success'] is True
         assert data['is_featured'] is True
-        assert data['keyword_type'] == 'featured'
-        assert data['processing_mode'] == 'featured'
-        assert data['is_mixed_keyword'] is False
-        assert data['original_keyword'] == 'くびれヘア'
 
         assert data['featured_keyword_info']['name'] == 'テスト用くびれヘア'
         assert (
@@ -194,8 +189,6 @@ class TestTemplateGenerationAPI:
         assert len(data['templates']) == 2
         for template in data['templates']:
             assert template['is_featured'] is True
-            assert template['keyword_type'] == 'featured'
-            assert template['processing_mode'] == 'featured'
             assert template['featured_keyword_name'] == 'テスト用くびれヘア'
 
     def test_generate_with_normal_keyword(self, use_repository, client, fake_pipeline):
@@ -213,17 +206,11 @@ class TestTemplateGenerationAPI:
 
         assert data['success'] is True
         assert data['is_featured'] is False
-        assert data['keyword_type'] == 'normal'
-        assert data['processing_mode'] == 'standard'
-        assert data['is_mixed_keyword'] is False
-        assert data['original_keyword'] == 'ボブ'
         assert data['featured_keyword_info'] is None
 
         assert len(data['templates']) == 2
         for template in data['templates']:
             assert template['is_featured'] is False
-            assert template['keyword_type'] == 'normal'
-            assert template['processing_mode'] == 'standard'
             assert 'featured_keyword_name' not in template
 
     def test_generate_with_mixed_keywords(self, use_repository, client, fake_pipeline):
@@ -241,19 +228,12 @@ class TestTemplateGenerationAPI:
 
         assert data['success'] is True
         assert data['is_featured'] is True
-        assert data['keyword_type'] == 'mixed'
-        assert data['processing_mode'] == 'featured'
-        assert data['is_mixed_keyword'] is True
-        assert data['original_keyword'] == 'くびれヘア ボブ'
-
         assert data['featured_keyword_info']['name'] == 'テスト用くびれヘア'
 
         assert len(data['templates']) == 2
         for template in data['templates']:
             assert template['is_featured'] is True
-            assert template['keyword_type'] == 'mixed'
-            assert template['is_mixed_keyword'] is True
-            assert template['mixed_processing_note']
+            assert template['featured_keyword_name'] == 'テスト用くびれヘア'
 
     def test_generate_invalid_request(self, client):
         """テンプレート生成API - 無効なリクエストのテスト"""
@@ -327,7 +307,6 @@ class TestEndToEndIntegration:
         generate_data = json.loads(generate_response.data)
         assert generate_data['success'] is True
         assert generate_data['is_featured'] is True
-        assert generate_data['keyword_type'] == 'featured'
         assert len(generate_data['templates']) >= 1
         assert any('くびれヘア' in t.get('title', '') for t in generate_data['templates'])
 
@@ -344,8 +323,7 @@ class TestEndToEndIntegration:
         data = json.loads(response.data)
         assert data['success'] is True
         assert data['is_featured'] is False
-        assert data['keyword_type'] == 'normal'
-        assert data['processing_mode'] == 'standard'
+        assert data['featured_keyword_info'] is None
         assert len(data['templates']) >= 1
 
     def test_error_recovery_and_logging(self, use_repository, client, fake_pipeline):

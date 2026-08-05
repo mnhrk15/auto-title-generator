@@ -5,6 +5,7 @@ from flask import Flask
 
 from . import config
 from .config import Settings
+from .error_handlers import register_error_handlers
 from .featured_keywords import EXTENSION_KEY, FeaturedKeywordsManager
 from .main import main_bp
 
@@ -25,7 +26,6 @@ def create_app(settings: Settings | None = None) -> Flask:
 
     settings = settings or config.get_settings()
     app.config.from_mapping(settings.flask_config())
-    app.config['SETTINGS'] = settings
 
     setup_logging(app, settings)
 
@@ -34,6 +34,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # かつ相対パス解決だったため実行時の CWD に依存していた。
     app.extensions[EXTENSION_KEY] = FeaturedKeywordsManager(settings.featured_keywords_path)
 
+    register_error_handlers(app)
     app.register_blueprint(main_bp)
 
     return app
