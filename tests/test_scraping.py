@@ -1,10 +1,11 @@
-import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-from app.scraping import HotPepperScraper
-from app.errors import ScrapingError
 import aiohttp
+import pytest
+
+from app.errors import ScrapingError
+from app.scraping import HotPepperScraper
+
 
 @pytest.mark.asyncio
 class TestHotPepperScraper:
@@ -90,7 +91,9 @@ class TestHotPepperScraper:
         mock_response = AsyncMock(spec=aiohttp.ClientResponse)
         mock_response.status = 404
         # raise_for_statusが呼び出されたときにエラーを発生させる
-        mock_response.raise_for_status.side_effect = aiohttp.ClientResponseError(MagicMock(), MagicMock(), status=404)
+        mock_response.raise_for_status.side_effect = aiohttp.ClientResponseError(
+            MagicMock(), MagicMock(), status=404
+        )
 
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
@@ -109,7 +112,7 @@ class TestHotPepperScraper:
         捕捉し漏れると「サイトが遅い」が 502 ではなく 500 になってしまう。
         """
         mock_cm = MagicMock()
-        mock_cm.__aenter__ = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_cm.__aenter__ = AsyncMock(side_effect=TimeoutError())
         mock_cm.__aexit__ = AsyncMock(return_value=False)
 
         with patch('aiohttp.ClientSession.get', MagicMock(return_value=mock_cm)):
@@ -120,8 +123,7 @@ class TestHotPepperScraper:
     async def test_async_context_manager(self):
         """非同期コンテキストマネージャの動作確認"""
         # __aenter__でセッションが作成され、__aexit__でclose()が呼ばれることを確認
-        with patch('aiohttp.ClientSession') as mock_session_class, \
-             patch('aiohttp.TCPConnector'):
+        with patch('aiohttp.ClientSession') as mock_session_class, patch('aiohttp.TCPConnector'):
             mock_session_instance = MagicMock()
             mock_session_instance.close = AsyncMock()
             mock_session_class.return_value = mock_session_instance

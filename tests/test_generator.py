@@ -1,13 +1,14 @@
-import pytest
 import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from google.genai import types
 
-from app.generator import TemplateGenerator
 from app.errors import GenerationError
+from app.generator import TemplateGenerator
 from app.schemas import GeneratedTemplate, GenerationResult, TrendingKeyword
+
 
 class TestTemplateGenerator:
     @pytest.fixture
@@ -32,7 +33,15 @@ class TestTemplateGenerator:
             "title": "★髪質改善×透明感カラー◎艶髪ストレート",  # 30文字以内
             "menu": "カット+カラー+髪質改善トリートメント",  # 50文字以内
             "comment": "髪質改善トリートメントで、まとまりのある艶やかな髪へ。",  # 120文字以内
-            "hashtag": ["髪質改善", "透明感カラー", "艶髪", "ストレートヘア", "トリートメント", "美髪", "サラサラ"]
+            "hashtag": [
+                "髪質改善",
+                "透明感カラー",
+                "艶髪",
+                "ストレートヘア",
+                "トリートメント",
+                "美髪",
+                "サラサラ",
+            ],
         }
 
         assert generator._validate_template(template, "髪質改善") is True
@@ -43,7 +52,7 @@ class TestTemplateGenerator:
             "title": "★" * 31,  # 31文字（制限超過）
             "menu": "カット+カラー",
             "comment": "コメント",
-            "hashtag": ["タグ1", "タグ2", "タグ3", "タグ4", "タグ5", "タグ6", "タグ7"]
+            "hashtag": ["タグ1", "タグ2", "タグ3", "タグ4", "タグ5", "タグ6", "タグ7"],
         }
 
         assert generator._validate_template(template, "test") is False
@@ -54,7 +63,15 @@ class TestTemplateGenerator:
             "title": "★髪質改善",
             "menu": "カット+カラー",
             "comment": "コメント",
-            "hashtag": ["タグ1", "タグ2", "タグ3", "タグ4", "タグ5", "タグ6", "これは20文字を超える非常に長いハッシュタグです"]
+            "hashtag": [
+                "タグ1",
+                "タグ2",
+                "タグ3",
+                "タグ4",
+                "タグ5",
+                "タグ6",
+                "これは20文字を超える非常に長いハッシュタグです",
+            ],
         }
 
         assert generator._validate_template(template, "髪質改善") is False
@@ -65,11 +82,10 @@ class TestTemplateGenerator:
             "title": "★髪質改善",
             "menu": "カット+カラー",
             "comment": "コメント",
-            "hashtag": ["タグ1", "タグ2"] # 7個未満
+            "hashtag": ["タグ1", "タグ2"],  # 7個未満
         }
 
         assert generator._validate_template(template, "髪質改善") is False
-
 
 
 class TestSeasonKeywordAppend:
@@ -163,7 +179,7 @@ class TestSeasonKeywordAppend:
 
         generator._apply_season_keywords(templates, ["spring", "bleach_free"])
 
-        applied = [self._suffix(t, n)[1:] for t, n in zip(templates, base_lengths)]
+        applied = [self._suffix(t, n)[1:] for t, n in zip(templates, base_lengths, strict=True)]
         assert applied.count("ブリーチなしカラー") == 3
         assert applied.count("春カラー") == 3
 
@@ -183,7 +199,7 @@ class TestSeasonKeywordAppend:
 
         generator._apply_season_keywords(templates, ["winter", "bleach_free"])
 
-        applied = {self._suffix(t, n)[1:] for t, n in zip(templates, (14, 10))}
+        applied = {self._suffix(t, n)[1:] for t, n in zip(templates, (14, 10), strict=True)}
         assert applied == {"冬カラー", "ブリーチなしカラー"}
 
     def test_prefers_keyword_that_fills_the_title(self, generator):
@@ -194,19 +210,22 @@ class TestSeasonKeywordAppend:
         generator._apply_season_keywords(templates, ["spring", "bleach_free"])
 
         # 18〜20文字帯にはブリーチなしカラー、23〜25文字帯には春カラーが入り、全て28〜30文字になる
-        applied = [self._suffix(t, n)[1:] for t, n in zip(templates, base_lengths)]
+        applied = [self._suffix(t, n)[1:] for t, n in zip(templates, base_lengths, strict=True)]
         assert applied[:3] == ["ブリーチなしカラー"] * 3
         assert applied[3:] == ["春カラー"] * 3
         assert [len(t["title"]) for t in templates] == [28, 29, 30, 28, 29, 30]
 
-    @pytest.mark.parametrize("title,expected", [
-        # タイトルが使っている区切り記号に合わせる
-        ("美髪パーマ/艶髪/レイヤーカット", "美髪パーマ/艶髪/レイヤーカット/春カラー"),
-        ("小顔レイヤーボブ×パーマ", "小顔レイヤーボブ×パーマ×春カラー"),
-        # 複数種類ある場合は末尾に近いものに合わせる
-        ("ふんわりパーマ×ミディアム/艶髪", "ふんわりパーマ×ミディアム/艶髪/春カラー"),
-        ("大人可愛いボブ/パーマ×艶髪", "大人可愛いボブ/パーマ×艶髪×春カラー"),
-    ])
+    @pytest.mark.parametrize(
+        "title,expected",
+        [
+            # タイトルが使っている区切り記号に合わせる
+            ("美髪パーマ/艶髪/レイヤーカット", "美髪パーマ/艶髪/レイヤーカット/春カラー"),
+            ("小顔レイヤーボブ×パーマ", "小顔レイヤーボブ×パーマ×春カラー"),
+            # 複数種類ある場合は末尾に近いものに合わせる
+            ("ふんわりパーマ×ミディアム/艶髪", "ふんわりパーマ×ミディアム/艶髪/春カラー"),
+            ("大人可愛いボブ/パーマ×艶髪", "大人可愛いボブ/パーマ×艶髪×春カラー"),
+        ],
+    )
     def test_separator_matches_title_delimiter(self, generator, title, expected):
         """タイトルがすでに使っている区切り記号に合わせて付加される"""
         templates = self._templates(title)
@@ -259,9 +278,7 @@ class TestSeasonKeywordAppend:
         """付加後も全タイトルが上限文字数以内に収まる"""
         from app import config
 
-        templates = self._templates(*[
-            "あ" * length for length in range(10, 30)
-        ])
+        templates = self._templates(*["あ" * length for length in range(10, 30)])
 
         generator._apply_season_keywords(
             templates, ["spring", "summer", "autumn", "winter", "bleach_free"]
@@ -270,7 +287,7 @@ class TestSeasonKeywordAppend:
         for template in templates:
             assert len(template["title"]) <= config.CHAR_LIMITS["title"]
         # 付加自体は行われている（上限チェックが空振りしていないこと）
-        assert sum(len(t["title"]) > n for t, n in zip(templates, range(10, 30))) > 0
+        assert sum(len(t["title"]) > n for t, n in zip(templates, range(10, 30), strict=True)) > 0
 
 
 class TestExtractResult:
@@ -289,9 +306,7 @@ class TestExtractResult:
 
     @staticmethod
     def _template(title="タイトル"):
-        return GeneratedTemplate(
-            title=title, menu="メニュー", comment="コメント", hashtag=["タグ"]
-        )
+        return GeneratedTemplate(title=title, menu="メニュー", comment="コメント", hashtag=["タグ"])
 
     @staticmethod
     def _response(parsed=None, text=None, finish_reason=types.FinishReason.STOP):
@@ -303,9 +318,7 @@ class TestExtractResult:
     def test_uses_parsed_result(self, generator):
         """parsed が返っていればそれをそのまま辞書化して使う"""
         parsed = GenerationResult(
-            trending_keywords=[
-                TrendingKeyword(keyword="ウルフカット", count=5, reason="テスト")
-            ],
+            trending_keywords=[TrendingKeyword(keyword="ウルフカット", count=5, reason="テスト")],
             templates=[self._template("タイトル1"), self._template("タイトル2")],
         )
 
@@ -316,13 +329,20 @@ class TestExtractResult:
 
     def test_falls_back_to_raw_text(self, generator):
         """parsed が None でも生テキストから復元できる"""
-        raw = json.dumps({
-            "trending_keywords": [],
-            "templates": [{
-                "title": "タイトル1", "menu": "メニュー",
-                "comment": "コメント", "hashtag": ["タグ"],
-            }],
-        }, ensure_ascii=False)
+        raw = json.dumps(
+            {
+                "trending_keywords": [],
+                "templates": [
+                    {
+                        "title": "タイトル1",
+                        "menu": "メニュー",
+                        "comment": "コメント",
+                        "hashtag": ["タグ"],
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
 
         templates, trending = generator._extract_result(self._response(parsed=None, text=raw))
 
@@ -340,13 +360,20 @@ class TestExtractResult:
 
     def test_schema_mismatch_raises(self, generator):
         """スキーマに合わないJSON（hashtag が配列でない）は生成エラー"""
-        raw = json.dumps({
-            "trending_keywords": [],
-            "templates": [{
-                "title": "タイトル", "menu": "メニュー",
-                "comment": "コメント", "hashtag": "タグ1 タグ2",
-            }],
-        }, ensure_ascii=False)
+        raw = json.dumps(
+            {
+                "trending_keywords": [],
+                "templates": [
+                    {
+                        "title": "タイトル",
+                        "menu": "メニュー",
+                        "comment": "コメント",
+                        "hashtag": "タグ1 タグ2",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        )
 
         with pytest.raises(GenerationError):
             generator._extract_result(self._response(parsed=None, text=raw))
@@ -357,8 +384,9 @@ class TestExtractResult:
         以前は finish_reason を見ておらず、途中で切れた JSON の
         パースエラーとしてしか観測できなかった。
         """
-        response = self._response(parsed=None, text=None,
-                                  finish_reason=types.FinishReason.MAX_TOKENS)
+        response = self._response(
+            parsed=None, text=None, finish_reason=types.FinishReason.MAX_TOKENS
+        )
 
         with pytest.raises(GenerationError) as excinfo:
             generator._extract_result(response)
@@ -392,17 +420,31 @@ class TestExtractResult:
         テンプレート20件の生成全体を失敗させてはいけない。
         """
         for payload in (
-            {"trending_keywords": None, "templates": [{
-                "title": "タイトル1", "menu": "メニュー",
-                "comment": "コメント", "hashtag": ["タグ"]}]},
-            {"templates": [{
-                "title": "タイトル1", "menu": "メニュー",
-                "comment": "コメント", "hashtag": ["タグ"]}]},
+            {
+                "trending_keywords": None,
+                "templates": [
+                    {
+                        "title": "タイトル1",
+                        "menu": "メニュー",
+                        "comment": "コメント",
+                        "hashtag": ["タグ"],
+                    }
+                ],
+            },
+            {
+                "templates": [
+                    {
+                        "title": "タイトル1",
+                        "menu": "メニュー",
+                        "comment": "コメント",
+                        "hashtag": ["タグ"],
+                    }
+                ]
+            },
         ):
             raw = json.dumps(payload, ensure_ascii=False)
 
-            templates, trending = generator._extract_result(
-                self._response(parsed=None, text=raw))
+            templates, trending = generator._extract_result(self._response(parsed=None, text=raw))
 
             assert templates[0]["title"] == "タイトル1"
             assert trending == []
@@ -425,10 +467,13 @@ class TestGenerateTemplatesAsync:
         parsed = GenerationResult(trending_keywords=[], templates=[])
         response = SimpleNamespace(
             candidates=[SimpleNamespace(finish_reason=types.FinishReason.STOP)],
-            parsed=parsed, text=None, usage_metadata=None,
+            parsed=parsed,
+            text=None,
+            usage_metadata=None,
         )
 
-        with patch.object(generator.client.aio.models, 'generate_content',
-                          new=AsyncMock(return_value=response)):
+        with patch.object(
+            generator.client.aio.models, 'generate_content', new=AsyncMock(return_value=response)
+        ):
             with pytest.raises(GenerationError):
                 await generator.generate_templates_async(["タイトル"], "髪質改善")

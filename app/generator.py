@@ -1,9 +1,10 @@
+import json
+import logging
+
 from google import genai
 from google.genai import types
 from pydantic import ValidationError
-from typing import List, Dict, Tuple, Optional
-import json
-import logging
+
 from . import config
 from .errors import AppError, ConfigurationError, GenerationError
 from .prompts import build_generation_prompt
@@ -12,8 +13,9 @@ from .schemas import GenerationResult
 # ロガーの設定
 logger = logging.getLogger(__name__)
 
+
 class TemplateGenerator:
-    def __init__(self, model_name: Optional[str] = None, settings: Optional[config.Settings] = None):
+    def __init__(self, model_name: str | None = None, settings: config.Settings | None = None):
         """テンプレート生成器を初期化する。
 
         Args:
@@ -31,7 +33,9 @@ class TemplateGenerator:
         # サポートされているモデルの検証
         model_name = model_name or config.DEFAULT_MODEL
         if model_name not in config.SUPPORTED_MODELS:
-            logger.warning(f"Unsupported model: {model_name}, falling back to {config.DEFAULT_MODEL}")
+            logger.warning(
+                f"Unsupported model: {model_name}, falling back to {config.DEFAULT_MODEL}"
+            )
             model_name = config.DEFAULT_MODEL
 
         self.model_name = model_name
@@ -39,19 +43,29 @@ class TemplateGenerator:
         # Google GenAI SDKクライアント初期化
         self.client = genai.Client(api_key=self.settings.gemini_api_key)
         logger.info(f"TemplateGeneratorが初期化されました（モデル: {model_name}）")
-        
-    def _normalize_seasons(self, seasons: Optional[List[str]], gender: str) -> List[str]:
+
+    def _normalize_seasons(self, seasons: list[str] | None, gender: str) -> list[str]:
         """季節・カラー選択値を config の定義順に正規化する（未知値と重複を除去）
 
         メンズでは季節カラー／ブリーチなしカラーを一切扱わないため常に空リストを返す。
         """
         return config.normalize_seasons(seasons, gender)
 
-    def _create_prompt(self, titles: List[str], keyword: str, seasons: List[str] = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> str:
+    def _create_prompt(
+        self,
+        titles: list[str],
+        keyword: str,
+        seasons: list[str] = None,
+        gender: str = 'ladies',
+        featured_info: dict = None,
+        generation_context: dict = None,
+    ) -> str:
         """プロンプトテンプレートの作成（組み立ては app/prompts.py に委譲）"""
-        return build_generation_prompt(titles, keyword, seasons, gender, featured_info, generation_context)
+        return build_generation_prompt(
+            titles, keyword, seasons, gender, featured_info, generation_context
+        )
 
-    def _extract_result(self, response) -> Tuple[List[Dict], List[Dict]]:
+    def _extract_result(self, response) -> tuple[list[dict], list[dict]]:
         """Gemini のレスポンスからテンプレートとトレンドキーワードを取り出す。
 
         response_schema による構造化出力を使っているため、
@@ -73,7 +87,9 @@ class TemplateGenerator:
             # 稀に parsed が None になることがあるので、生テキストから復元を試みる
             response_text = getattr(response, 'text', None)
             if not response_text:
-                raise GenerationError('Gemini から空のレスポンスが返されました。再度お試しください。')
+                raise GenerationError(
+                    'Gemini から空のレスポンスが返されました。再度お試しください。'
+                )
             try:
                 data = json.loads(response_text)
                 # トレンドキーワードは付随情報でしかない。欠落や null のために
@@ -118,17 +134,14 @@ class TemplateGenerator:
             return
 
         messages = {
-            types.FinishReason.MAX_TOKENS:
-                '生成結果が長すぎて途中で打ち切られました。時間をおいて再度お試しください。',
-            types.FinishReason.SAFETY:
-                '安全性フィルタにより生成が中断されました。別のキーワードをお試しください。',
-            types.FinishReason.RECITATION:
-                '引用チェックにより生成が中断されました。別のキーワードをお試しください。',
+            types.FinishReason.MAX_TOKENS: '生成結果が長すぎて途中で打ち切られました。時間をおいて再度お試しください。',
+            types.FinishReason.SAFETY: '安全性フィルタにより生成が中断されました。別のキーワードをお試しください。',
+            types.FinishReason.RECITATION: '引用チェックにより生成が中断されました。別のキーワードをお試しください。',
         }
         logger.error(f"Gemini の生成が正常終了しませんでした: finish_reason={finish_reason}")
         raise GenerationError(messages.get(finish_reason))
 
-    def _validate_template(self, template: Dict[str, str], keyword: str) -> bool:
+    def _validate_template(self, template: dict[str, str], keyword: str) -> bool:
         """テンプレートの文字数制限チェックとキーワード含有チェック"""
         try:
             # 必須キーの存在チェック
@@ -137,39 +150,47 @@ class TemplateGenerator:
                 if key not in template:
                     logger.warning(f"テンプレートに必須キー '{key}' がありません")
                     return False
-            
+
             # タイトルにキーワードが含まれているかチェック（警告のみ出力し、テンプレートは有効とする）
             if keyword.lower() not in template['title'].lower():
-                logger.warning(f"タイトルにキーワード '{keyword}' が含まれていません: {template['title']}")
+                logger.warning(
+                    f"タイトルにキーワード '{keyword}' が含まれていません: {template['title']}"
+                )
                 # キーワードが含まれていなくても、テンプレートを有効とする（return Falseを削除）
-                
+
             # 文字数制限チェック
             for key, limit in config.CHAR_LIMITS.items():
                 if key == 'hashtag':
                     # ハッシュタグは配列なのでスキップ
                     continue
-                    
+
                 if len(template[key]) > limit:
-                    logger.warning(f"{key}の文字数が制限を超えています: {len(template[key])} > {limit}")
+                    logger.warning(
+                        f"{key}の文字数が制限を超えています: {len(template[key])} > {limit}"
+                    )
                     return False
-            
+
             # ハッシュタグのチェック
             if not isinstance(template['hashtag'], list):
-                logger.warning(f"ハッシュタグがリスト形式ではありません: {type(template['hashtag'])}")
+                logger.warning(
+                    f"ハッシュタグがリスト形式ではありません: {type(template['hashtag'])}"
+                )
                 return False
-                
+
             if len(template['hashtag']) < config.HASHTAG_MIN_COUNT:
                 logger.warning(
                     f"ハッシュタグの数が少なすぎます: "
                     f"{len(template['hashtag'])} < {config.HASHTAG_MIN_COUNT}"
                 )
                 return False
-                
+
             for tag in template['hashtag']:
                 if len(tag) > config.CHAR_LIMITS['hashtag']:
-                    logger.warning(f"ハッシュタグが長すぎます: {tag} ({len(tag)} > {config.CHAR_LIMITS['hashtag']})")
+                    logger.warning(
+                        f"ハッシュタグが長すぎます: {tag} ({len(tag)} > {config.CHAR_LIMITS['hashtag']})"
+                    )
                     return False
-            
+
             logger.debug(f"テンプレート検証成功: '{template['title']}'")
             return True
         except (KeyError, AttributeError, TypeError) as e:
@@ -178,13 +199,13 @@ class TemplateGenerator:
             return False
 
     @staticmethod
-    def _pick_separator(title: str, rotation_index: int) -> Tuple[str, int]:
+    def _pick_separator(title: str, rotation_index: int) -> tuple[str, int]:
         """タイトルに付ける区切り記号と、次のローテーション位置を返す"""
         # タイトルがすでに使っている区切り記号に合わせる（複数あれば末尾に近いもの）
         matched = max(
             (d for d in config.SEASON_APPEND_DELIMITERS if d in title),
             key=title.rfind,
-            default=None
+            default=None,
         )
         if matched is not None:
             return matched, rotation_index
@@ -199,7 +220,7 @@ class TemplateGenerator:
                 break
         return separator, rotation_index
 
-    def _apply_season_keywords(self, templates: List[Dict[str, str]], seasons: List[str]) -> None:
+    def _apply_season_keywords(self, templates: list[dict[str, str]], seasons: list[str]) -> None:
         """選択された季節・カラーキーワードをタイトルへ付加する（テンプレートを直接書き換える）
 
         - SEASON_APPEND_THRESHOLD 文字未満のタイトルのみが対象
@@ -228,7 +249,7 @@ class TemplateGenerator:
         remaining = sorted(
             (t for t in templates if len(t.get('title', '')) < config.SEASON_APPEND_THRESHOLD),
             key=lambda t: len(t.get('title', '')),
-            reverse=True
+            reverse=True,
         )
 
         # タイトル側ではなくキーワード側から割り当てる。
@@ -237,15 +258,17 @@ class TemplateGenerator:
         exhausted = set()
         while remaining and len(exhausted) < len(seasons):
             key = min(
-                (k for k in seasons if k not in exhausted),
-                key=lambda k: (counts[k], priority[k])
+                (k for k in seasons if k not in exhausted), key=lambda k: (counts[k], priority[k])
             )
             keyword = keywords[key]
             target = next(
-                (t for t in remaining
-                 if keyword not in t['title']
-                 and len(t['title']) + separator_length + len(keyword) <= title_limit),
-                None
+                (
+                    t
+                    for t in remaining
+                    if keyword not in t['title']
+                    and len(t['title']) + separator_length + len(keyword) <= title_limit
+                ),
+                None,
             )
             if target is None:
                 # このキーワードを付加できるタイトルはもう残っていない
@@ -260,7 +283,15 @@ class TemplateGenerator:
         applied = sum(counts.values())
         logger.info(f"季節・カラーキーワードを {applied} 件のタイトルに付加しました: {counts}")
 
-    async def generate_templates_async(self, titles: List[str], keyword: str, seasons: List[str] = None, gender: str = 'ladies', featured_info: Dict = None, generation_context: Dict = None) -> Tuple[List[Dict[str, str]], List[Dict]]:
+    async def generate_templates_async(
+        self,
+        titles: list[str],
+        keyword: str,
+        seasons: list[str] = None,
+        gender: str = 'ladies',
+        featured_info: dict = None,
+        generation_context: dict = None,
+    ) -> tuple[list[dict[str, str]], list[dict]]:
         """テンプレートの非同期生成
 
         Returns:
@@ -273,17 +304,21 @@ class TemplateGenerator:
         if not keyword:
             logger.error("キーワードが指定されていません")
             raise ValueError("キーワードが指定されていません")
-            
+
         # 生成コンテキストの処理
         context = generation_context or {}
         keyword_type = context.get('keyword_type', 'normal')
         processing_mode = context.get('processing_mode', 'standard')
-        
+
         selected_seasons = self._normalize_seasons(seasons, gender)
 
-        logger.info(f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', 季節・カラー選択: {selected_seasons}, 性別: '{gender}', 特集対応: {featured_info is not None}, キーワードタイプ: {keyword_type}, 処理モード: {processing_mode}")
-        prompt = self._create_prompt(titles, keyword, selected_seasons, gender, featured_info, generation_context)
-        
+        logger.info(
+            f"非同期テンプレート生成開始: タイトル数: {len(titles)}, キーワード: '{keyword}', 季節・カラー選択: {selected_seasons}, 性別: '{gender}', 特集対応: {featured_info is not None}, キーワードタイプ: {keyword_type}, 処理モード: {processing_mode}"
+        )
+        prompt = self._create_prompt(
+            titles, keyword, selected_seasons, gender, featured_info, generation_context
+        )
+
         try:
             # プロンプト全文は数KBあり毎リクエスト出すとログが肥大するため、規模だけ記録する
             logger.debug(f"プロンプト長: {len(prompt)} 文字")
@@ -307,9 +342,7 @@ class TemplateGenerator:
                 ),
             )
             response = await self.client.aio.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=request_config
+                model=self.model_name, contents=prompt, config=request_config
             )
             logger.info("Gemini API応答受信")
 
@@ -319,11 +352,11 @@ class TemplateGenerator:
             # バリデーション
             valid_templates = []
             for i, template in enumerate(templates):
-                logger.debug(f"テンプレート {i+1} の検証: {template.get('title', '不明')}")
+                logger.debug(f"テンプレート {i + 1} の検証: {template.get('title', '不明')}")
                 if self._validate_template(template, keyword):
                     valid_templates.append(template)
                 else:
-                    logger.warning(f"テンプレート {i+1} は検証に失敗しました")
+                    logger.warning(f"テンプレート {i + 1} は検証に失敗しました")
 
             if not valid_templates:
                 logger.error("有効なテンプレートがありません")
@@ -339,7 +372,7 @@ class TemplateGenerator:
                     f"要求={config.MAX_TEMPLATES}件 / 受信={len(templates)}件 / 有効={len(valid_templates)}件"
                 )
 
-            result_templates = valid_templates[:config.MAX_TEMPLATES]
+            result_templates = valid_templates[: config.MAX_TEMPLATES]
 
             # 選択された季節・カラーキーワードを後処理で付加する
             self._apply_season_keywords(result_templates, selected_seasons)

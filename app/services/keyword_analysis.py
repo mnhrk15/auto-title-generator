@@ -6,7 +6,6 @@ I/O を持たない純粋なロジックなので、Flask コンテキストな�
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from .. import config
 
@@ -39,10 +38,10 @@ class KeywordAnalysis:
     keyword_type: str
     processing_mode: str
     is_featured: bool
-    featured_info: Optional[Dict] = None
-    normal_keywords: List[str] = field(default_factory=list)
+    featured_info: dict | None = None
+    normal_keywords: list[str] = field(default_factory=list)
 
-    def to_generation_context(self) -> Dict:
+    def to_generation_context(self) -> dict:
         """TemplateGenerator に渡すコンテキスト情報。"""
         return {
             'keyword_type': self.keyword_type,
@@ -52,7 +51,7 @@ class KeywordAnalysis:
         }
 
 
-def split_keywords(keyword: str) -> List[str]:
+def split_keywords(keyword: str) -> list[str]:
     """複合キーワードを個々のキーワードに分割する。
 
     最初に見つかった区切り文字1種類だけで分割する（既存挙動を維持）。
@@ -65,7 +64,7 @@ def split_keywords(keyword: str) -> List[str]:
     return [keyword]
 
 
-def _standard(original: str, normalized: str, normal_keywords: List[str]) -> KeywordAnalysis:
+def _standard(original: str, normalized: str, normal_keywords: list[str]) -> KeywordAnalysis:
     return KeywordAnalysis(
         original_keyword=original,
         normalized_keyword=normalized,
@@ -96,7 +95,9 @@ def analyze_keyword(keyword: str, gender: str, repository) -> KeywordAnalysis:
 
     try:
         if not repository.is_available():
-            logger.info(f'特集キーワード機能が利用できません - 通常キーワードとして処理: "{normalized}"')
+            logger.info(
+                f'特集キーワード機能が利用できません - 通常キーワードとして処理: "{normalized}"'
+            )
             return _standard(original, normalized, [normalized])
 
         featured_found = []

@@ -11,7 +11,6 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -34,7 +33,7 @@ KEYWORD_SEPARATORS = (' ', '　', ',', '、', '/', '＋', '+')
 # --- Gemini モデル ---
 DEFAULT_MODEL = 'gemini-3.1-flash-lite'
 SUPPORTED_MODELS = ('gemini-3.1-flash-lite', 'gemini-3-flash-preview')
-GEMINI_TEMPERATURE = 1.0          # Gemini 3 系は 1.0 未満にすると出力品質が落ちる
+GEMINI_TEMPERATURE = 1.0  # Gemini 3 系は 1.0 未満にすると出力品質が落ちる
 GEMINI_MAX_OUTPUT_TOKENS = 32768
 # タイムアウトとリトライの予算:
 #   gunicorn.conf.py の timeout=120 と、フロントエンドの AbortController(120秒) が上限。
@@ -46,7 +45,7 @@ GEMINI_MAX_OUTPUT_TOKENS = 32768
 #   gunicorn の timeout とフロントエンドの AbortController も併せて見直すこと。
 #   attempts=3 かつ 45秒 にすると生成だけで 138秒となりワーカーが先に殺されるため不可。
 GEMINI_REQUEST_TIMEOUT_MS = 40_000
-GEMINI_RETRY_ATTEMPTS = 2         # 初回 + リトライ1回
+GEMINI_RETRY_ATTEMPTS = 2  # 初回 + リトライ1回
 GEMINI_RETRY_INITIAL_DELAY = 1.0
 GEMINI_RETRY_MAX_DELAY = 4.0
 
@@ -56,7 +55,7 @@ CHAR_LIMITS = {
     'title': 30,
     'menu': 50,
     'comment': 120,
-    'hashtag': 20  # per word
+    'hashtag': 20,  # per word
 }
 # プロンプトの目標帯と生成後の検証で共有する値（片方だけ変えて不整合にならないようにする）
 HASHTAG_MIN_COUNT = 7
@@ -84,16 +83,16 @@ SEASON_COLOR_CHOICES = {
 # 使っていなければ SEASON_APPEND_SEPARATORS をこの順にローテーションする
 SEASON_APPEND_SEPARATORS = ("◎", "/", "×")
 SEASON_APPEND_DELIMITERS = ("/", "×")
-SEASON_APPEND_THRESHOLD = 26       # この文字数未満のタイトルのみ付加対象
+SEASON_APPEND_THRESHOLD = 26  # この文字数未満のタイトルのみ付加対象
 # 短尺タイトル枠: 付加後にちょうど上限文字数へ届くよう、付加する語の長さごとに目標帯を作る。
 # 目標帯の上限は「上限文字数 - 区切り記号1文字 - キーワード長」で、そこから
 # SHORT_TITLE_BAND_WIDTH 文字下までを許容幅とする（例: 春カラー → 23〜25文字）
 SHORT_TITLE_BAND_WIDTH = 2
-SHORT_TITLE_SLOTS_PER_CHOICE = 4   # チェック1つあたりの短尺枠数
-SHORT_TITLE_SLOTS_MAX = 12         # 短尺枠の合計上限（MAX_TEMPLATES のうち）
+SHORT_TITLE_SLOTS_PER_CHOICE = 4  # チェック1つあたりの短尺枠数
+SHORT_TITLE_SLOTS_MAX = 12  # 短尺枠の合計上限（MAX_TEMPLATES のうち）
 
 
-def normalize_seasons(seasons: Optional[List[str]], gender: str) -> List[str]:
+def normalize_seasons(seasons: list[str] | None, gender: str) -> list[str]:
     """季節・カラー選択値を SEASON_COLOR_CHOICES の定義順に正規化する（未知値と重複を除去）。
 
     メンズでは季節カラー／ブリーチなしカラーを一切扱わないため常に空リストを返す。
@@ -133,7 +132,7 @@ def _env_bool(name: str, default: bool) -> bool:
 class Settings:
     """環境変数に由来する設定値。"""
 
-    gemini_api_key: Optional[str]
+    gemini_api_key: str | None
     scraping_delay_min: float
     scraping_delay_max: float
     max_pages: int
@@ -174,7 +173,7 @@ class Settings:
         }
 
 
-_settings: Optional[Settings] = None
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:

@@ -6,8 +6,10 @@ import pytest
 # テスト対象のモジュールをインポートできるようにする（app パッケージの import より前に実行する必要がある）
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app import create_app  # noqa: E402
-from app import config  # noqa: E402
+from app import (
+    config,  # noqa: E402
+    create_app,  # noqa: E402
+)
 
 
 @pytest.fixture(autouse=True)
@@ -37,9 +39,11 @@ def setup_test_env(request, monkeypatch):
 def client():
     """テスト用クライアントを作成"""
     app = create_app()
-    app.config.update({
-        'TESTING': True,
-    })
+    app.config.update(
+        {
+            'TESTING': True,
+        }
+    )
 
     with app.test_client() as client:
         yield client

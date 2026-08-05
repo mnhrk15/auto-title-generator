@@ -46,16 +46,19 @@ class BrokenRepository:
 
 
 class TestSplitKeywords:
-    @pytest.mark.parametrize('raw,expected', [
-        ('くびれヘア', ['くびれヘア']),
-        ('くびれヘア 髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア　髪質改善', ['くびれヘア', '髪質改善']),  # 全角スペース
-        ('くびれヘア,髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア、髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア/髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア+髪質改善', ['くびれヘア', '髪質改善']),
-        ('くびれヘア＋髪質改善', ['くびれヘア', '髪質改善']),
-    ])
+    @pytest.mark.parametrize(
+        'raw,expected',
+        [
+            ('くびれヘア', ['くびれヘア']),
+            ('くびれヘア 髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア　髪質改善', ['くびれヘア', '髪質改善']),  # 全角スペース
+            ('くびれヘア,髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア、髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア/髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア+髪質改善', ['くびれヘア', '髪質改善']),
+            ('くびれヘア＋髪質改善', ['くびれヘア', '髪質改善']),
+        ],
+    )
     def test_splits_on_each_separator(self, raw, expected):
         assert split_keywords(raw) == expected
 
@@ -137,7 +140,10 @@ class TestAnalyzeKeyword:
         """
         repo = FakeRepository([LADIES_FEATURED])
         expected_keys = {
-            'keyword_type', 'processing_mode', 'original_keyword', 'normalized_keyword',
+            'keyword_type',
+            'processing_mode',
+            'original_keyword',
+            'normalized_keyword',
         }
 
         for keyword, repository in [

@@ -9,7 +9,7 @@ import copy
 import logging
 import os
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from flask import current_app
 
@@ -40,9 +40,11 @@ class FeaturedKeywordsManager:
             json_path: 特集キーワードJSONファイルのパス。
                        省略時は config の既定値（パッケージ内の絶対パス）。
         """
-        self.json_path = json_path if json_path is not None else config.get_settings().featured_keywords_path
-        self.keywords: List[Dict] = []
-        self._last_error: Optional[Exception] = None
+        self.json_path = (
+            json_path if json_path is not None else config.get_settings().featured_keywords_path
+        )
+        self.keywords: list[dict] = []
+        self._last_error: Exception | None = None
         self._load_keywords()
 
     def _load_keywords(self) -> None:
@@ -63,7 +65,7 @@ class FeaturedKeywordsManager:
         """
         return self.get_keyword_info(keyword) is not None
 
-    def get_keyword_info(self, keyword: str) -> Optional[Dict]:
+    def get_keyword_info(self, keyword: str) -> dict | None:
         """特集キーワードの詳細情報を取得する
 
         Args:
@@ -98,7 +100,7 @@ class FeaturedKeywordsManager:
             logger.debug(f"特集キーワード情報取得エラー詳細: {traceback.format_exc()}")
             return None
 
-    def get_all_keywords(self) -> List[Dict]:
+    def get_all_keywords(self) -> list[dict]:
         """すべての特集キーワード情報を取得する
 
         Returns:
@@ -126,13 +128,15 @@ class FeaturedKeywordsManager:
         self._load_keywords()
 
         if self._last_error is None:
-            logger.info(f"特集キーワードを正常に再読み込みしました: {old_count}件 -> {len(self.keywords)}件")
+            logger.info(
+                f"特集キーワードを正常に再読み込みしました: {old_count}件 -> {len(self.keywords)}件"
+            )
             return True
 
         logger.warning(f"特集キーワード再読み込み中にエラーが発生しました: {self._last_error}")
         return False
 
-    def get_last_error(self) -> Optional[Exception]:
+    def get_last_error(self) -> Exception | None:
         """最後に発生したエラーを取得する
 
         Returns:
@@ -140,7 +144,7 @@ class FeaturedKeywordsManager:
         """
         return self._last_error
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """特集キーワード機能の健全性状態を取得する
 
         Returns:
@@ -152,7 +156,7 @@ class FeaturedKeywordsManager:
             'file_path': str(self.json_path),
             'file_exists': os.path.exists(self.json_path),
             'last_error': str(self._last_error) if self._last_error else None,
-            'error_type': type(self._last_error).__name__ if self._last_error else None
+            'error_type': type(self._last_error).__name__ if self._last_error else None,
         }
 
 

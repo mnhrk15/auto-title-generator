@@ -60,18 +60,24 @@ class TestBuildGenerationPrompt:
 
         assert "春カラー" not in prompt
 
-    @pytest.mark.parametrize("seasons,expected_rule,expected_rest", [
-        # 「春カラー」(4文字)+区切り1文字 → 25文字までが目標帯、幅2で23〜25文字
-        (["spring"], "20個中**4個は23〜25文字**", 16),
-        (["spring", "summer"], "20個中**8個は23〜25文字**", 12),
-        # 「ブリーチなしカラー」(9文字)+区切り1文字 → 20文字までが目標帯
-        (["bleach_free"], "20個中**4個は18〜20文字**", 16),
-        # 語の長さが異なる場合は帯を分ける（長いタイトル帯から順に提示）
-        (["winter", "bleach_free"], "20個中**4個は23〜25文字**、**4個は18〜20文字**", 12),
-        # 5つ選択時は1つあたりの枠が2に減り、合計10個に収まる
-        (["spring", "summer", "autumn", "winter", "bleach_free"],
-         "20個中**8個は23〜25文字**、**2個は18〜20文字**", 10),
-    ])
+    @pytest.mark.parametrize(
+        "seasons,expected_rule,expected_rest",
+        [
+            # 「春カラー」(4文字)+区切り1文字 → 25文字までが目標帯、幅2で23〜25文字
+            (["spring"], "20個中**4個は23〜25文字**", 16),
+            (["spring", "summer"], "20個中**8個は23〜25文字**", 12),
+            # 「ブリーチなしカラー」(9文字)+区切り1文字 → 20文字までが目標帯
+            (["bleach_free"], "20個中**4個は18〜20文字**", 16),
+            # 語の長さが異なる場合は帯を分ける（長いタイトル帯から順に提示）
+            (["winter", "bleach_free"], "20個中**4個は23〜25文字**、**4個は18〜20文字**", 12),
+            # 5つ選択時は1つあたりの枠が2に減り、合計10個に収まる
+            (
+                ["spring", "summer", "autumn", "winter", "bleach_free"],
+                "20個中**8個は23〜25文字**、**2個は18〜20文字**",
+                10,
+            ),
+        ],
+    )
     def test_create_prompt_short_title_slots(self, seasons, expected_rule, expected_rest):
         """季節・カラー選択時に、付加後に上限文字数へ届く目標帯が指示されるかテスト"""
         titles = ["★髪質改善トリートメントで艶髪ストレート"]
@@ -97,9 +103,7 @@ class TestBuildGenerationPrompt:
         """メンズは seasons を渡しても短尺タイトル枠の指示は入らない"""
         titles = ["★メンズマッシュ×ニュアンスパーマ"]
 
-        prompt = build_generation_prompt(
-            titles, "メンズパーマ", seasons=["spring"], gender="mens"
-        )
+        prompt = build_generation_prompt(titles, "メンズパーマ", seasons=["spring"], gender="mens")
 
         assert "後から語句を追記するための余白" not in prompt
         assert "- title: **25〜28文字**を目標" in prompt
@@ -130,7 +134,6 @@ class TestBuildGenerationPrompt:
         assert "trending_keywordsを先に出力し" in prompt
 
 
-
 class TestFeaturedInstruction:
     """特集キーワード分岐のテスト
 
@@ -149,15 +152,17 @@ class TestFeaturedInstruction:
 
     def _prompt(self, featured_info=FEATURED, context=None):
         return build_generation_prompt(
-            self.TITLES, self.KEYWORD,
+            self.TITLES,
+            self.KEYWORD,
             featured_info=featured_info,
             generation_context=context,
         )
 
     def test_featured_condition_is_embedded(self):
         """純粋な特集キーワードでは条件文がそのまま埋め込まれる"""
-        prompt = self._prompt(context={'keyword_type': 'featured',
-                                       'original_keyword': self.KEYWORD})
+        prompt = self._prompt(
+            context={'keyword_type': 'featured', 'original_keyword': self.KEYWORD}
+        )
 
         assert "【重要】特集掲載条件の厳守" in prompt
         assert self.FEATURED["condition"] in prompt
@@ -167,8 +172,9 @@ class TestFeaturedInstruction:
 
     def test_mixed_keyword_uses_original_keyword_and_name(self):
         """混在キーワードでは入力全体と特集名の双方が出る"""
-        prompt = self._prompt(context={'keyword_type': 'mixed',
-                                       'original_keyword': 'ダークパープル ボブ'})
+        prompt = self._prompt(
+            context={'keyword_type': 'mixed', 'original_keyword': 'ダークパープル ボブ'}
+        )
 
         assert "【重要】特集掲載条件の厳守（混在キーワード処理）" in prompt
         assert "入力されたキーワード「ダークパープル ボブ」" in prompt
@@ -183,12 +189,15 @@ class TestFeaturedInstruction:
         # 通常のプロンプトとしては成立している
         assert self.KEYWORD in prompt
 
-    @pytest.mark.parametrize("bad_info", [
-        "文字列",
-        ["リスト"],
-        {"name": "条件なし"},                    # condition 欠落
-        {"name": "条件が空", "condition": ""},   # condition が空
-    ])
+    @pytest.mark.parametrize(
+        "bad_info",
+        [
+            "文字列",
+            ["リスト"],
+            {"name": "条件なし"},  # condition 欠落
+            {"name": "条件が空", "condition": ""},  # condition が空
+        ],
+    )
     def test_malformed_featured_info_is_skipped_without_raising(self, bad_info):
         """特集情報が壊れていても例外にせず、特集ブロックを省いて継続する"""
         prompt = self._prompt(featured_info=bad_info)

@@ -1,6 +1,5 @@
 import logging
 from logging.handlers import RotatingFileHandler
-from typing import Optional
 
 from flask import Flask
 
@@ -15,7 +14,7 @@ _LOG_HANDLER_NAME = 'auto-title-generator-file'
 _LOG_STREAM_HANDLER_NAME = 'auto-title-generator-stream'
 
 
-def create_app(settings: Optional[Settings] = None) -> Flask:
+def create_app(settings: Settings | None = None) -> Flask:
     """Flask アプリケーションを生成する。
 
     Args:
@@ -65,7 +64,7 @@ def setup_logging(app: Flask, settings: Settings) -> None:
     file_handler = RotatingFileHandler(
         settings.log_dir / 'app.log',
         maxBytes=1024 * 1024,  # 1MB
-        backupCount=10
+        backupCount=10,
     )
     file_handler.name = _LOG_HANDLER_NAME
     file_handler.setFormatter(formatter)

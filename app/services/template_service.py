@@ -5,15 +5,14 @@
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
 
 from ..config import DEFAULT_MODEL
 from ..generator import TemplateGenerator
 from ..scraping import HotPepperScraper
 from .keyword_analysis import (
     KEYWORD_TYPE_MIXED,
-    KeywordAnalysis,
     MODE_FEATURED,
+    KeywordAnalysis,
     analyze_keyword,
 )
 
@@ -25,16 +24,16 @@ MAX_LOGGED_TITLES = 10
 MIXED_KEYWORD_NOTE = '特集キーワードと通常キーワードが混在しています'
 
 
-def _log_scraped_titles(titles: List[str]) -> None:
+def _log_scraped_titles(titles: list[str]) -> None:
     logger.debug(f"スクレイピングで取得した全タイトルリスト: {titles}")
-    logger.info('スクレイピング結果のタイトル例 (最大%d件):' % MAX_LOGGED_TITLES)
+    logger.info(f'スクレイピング結果のタイトル例 (最大{MAX_LOGGED_TITLES}件):')
     for i, title in enumerate(titles[:MAX_LOGGED_TITLES]):
         logger.info(f'  {i + 1}: {title}')
     if len(titles) > MAX_LOGGED_TITLES:
         logger.info(f'  ... 他 {len(titles) - MAX_LOGGED_TITLES} 件')
 
 
-def _attach_metadata(templates: List[Dict], analysis: KeywordAnalysis) -> None:
+def _attach_metadata(templates: list[dict], analysis: KeywordAnalysis) -> None:
     """生成されたテンプレートに、フロントエンドが参照するメタデータを付ける。"""
     is_mixed = analysis.keyword_type == KEYWORD_TYPE_MIXED
     featured_info = analysis.featured_info
@@ -59,9 +58,9 @@ async def generate_templates_for_request(
     keyword: str,
     gender: str,
     repository,
-    seasons: Optional[List[str]] = None,
+    seasons: list[str] | None = None,
     model: str = DEFAULT_MODEL,
-) -> Tuple[List[Dict], List[Dict]]:
+) -> tuple[list[dict], list[dict]]:
     """スクレイピングとテンプレート生成を実行する。
 
     Args:
