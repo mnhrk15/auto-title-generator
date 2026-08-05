@@ -11,7 +11,13 @@ const FIELD_LABELS = {
     hashtag: 'ハッシュタグ',
 };
 
-const HASHTAG_MAX_LENGTH = 20;
+// ハッシュタグの上限はタグ 1 個あたり。textarea 全体を制限する maxlength は使えないので、
+// サーバーが data-max-length で渡す（出典は app/config.py の CHAR_LIMITS）。
+const HASHTAG_MAX_LENGTH_FALLBACK = 20;
+
+function hashtagMaxLength(textarea) {
+    return Number(textarea.dataset.maxLength) || HASHTAG_MAX_LENGTH_FALLBACK;
+}
 
 /** 文字数カウンターを更新する。上限は textarea 自身の maxlength を唯一の出典にする */
 export function updateCharCount(textarea, countElement) {
@@ -29,11 +35,12 @@ export function updateCharCount(textarea, countElement) {
 
 /** ハッシュタグは「タグ個数と各タグ長」で管理するので、全体文字数ではなく個数を出す */
 export function updateHashtagCount(textarea, countElement) {
+    const maxLength = hashtagMaxLength(textarea);
     const hashtags = textarea.value.split(',').map((tag) => tag.trim()).filter(Boolean);
-    const longTags = hashtags.filter((tag) => tag.length > HASHTAG_MAX_LENGTH);
+    const longTags = hashtags.filter((tag) => tag.length > maxLength);
 
     if (longTags.length > 0) {
-        countElement.textContent = `${longTags.length}個のタグが${HASHTAG_MAX_LENGTH}文字を超えています`;
+        countElement.textContent = `${longTags.length}個のタグが${maxLength}文字を超えています`;
         countElement.classList.add('error');
     } else {
         countElement.textContent = `${hashtags.length}個のタグ`;

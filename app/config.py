@@ -79,6 +79,16 @@ SEASON_COLOR_CHOICES = {
     "winter": "冬カラー",
     "bleach_free": "ブリーチなしカラー",
 }
+# UI のチェックボックスに出すラベル。キーは SEASON_COLOR_CHOICES と一対一で対応する。
+# 生成側は「春カラー」という付加語を、UI 側は「春」という短いラベルを使うため別辞書にしている。
+# 反復順がそのままチェックボックスの表示順になる。
+SEASON_UI_LABELS = {
+    "spring": "春",
+    "summer": "夏",
+    "autumn": "秋",
+    "winter": "冬",
+    "bleach_free": "ブリーチなしカラー",
+}
 # 付加時の区切り記号。タイトルが SEASON_APPEND_DELIMITERS の記号を使っていればそれに合わせ、
 # 使っていなければ SEASON_APPEND_SEPARATORS をこの順にローテーションする
 SEASON_APPEND_SEPARATORS = ("◎", "/", "×")

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from flask import Blueprint, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
 
-from .config import DEFAULT_MODEL, GENDERS
+from .config import CHAR_LIMITS, DEFAULT_MODEL, GENDERS, SEASON_UI_LABELS
 from .errors import InvalidJsonError, ValidationError
 from .featured_keywords import get_featured_repository
 from .seasons import normalize_seasons
@@ -82,7 +82,14 @@ def _featured_keyword_info(outcome: GenerationOutcome) -> dict | None:
 def index() -> str:
     """トップページのルート"""
     logger.info('トップページにアクセスがありました')
-    return render_template('index.html')
+    # 文字数上限と季節ラベルは config.py を唯一の出典にする。以前はテンプレート側に
+    # 30 / 50 / 120 / 20 が直書きされており、config を変えても UI の表示と
+    # maxlength が追随しなかった。
+    return render_template(
+        'index.html',
+        char_limits=CHAR_LIMITS,
+        season_labels=SEASON_UI_LABELS,
+    )
 
 
 @main_bp.route('/api/featured-keywords', methods=['GET'])

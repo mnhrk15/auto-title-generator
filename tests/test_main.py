@@ -339,3 +339,33 @@ def test_featured_keywords_invalid_gender_is_rejected(client):
 
     assert response.status_code == 400
     assert json.loads(response.data)['error']['code'] == 'VALIDATION_ERROR'
+
+
+class TestTemplateContext:
+    """テンプレートに渡す値の一元化"""
+
+    def test_season_ui_labels_matches_choices(self):
+        """UI ラベルと生成用の付加語でキーが一致していること
+
+        片方だけ増やすと、チェックできるのに生成側が無視する（またはその逆）になる。
+        """
+        assert list(config.SEASON_UI_LABELS) == list(config.SEASON_COLOR_CHOICES)
+
+    def test_index_renders_char_limits_from_config(self, client):
+        """文字数上限がテンプレートに直書きされていないこと"""
+        html = client.get('/').data.decode('utf-8')
+
+        assert f'maxlength="{config.CHAR_LIMITS["title"]}"' in html
+        assert f'0/{config.CHAR_LIMITS["title"]}' in html
+        assert f'（{config.CHAR_LIMITS["menu"]}文字以内）' in html
+        # ハッシュタグはタグ1個あたりの上限なので data 属性で渡す
+        assert f'data-max-length="{config.CHAR_LIMITS["hashtag"]}"' in html
+
+    def test_index_renders_season_checkboxes(self, client):
+        """季節・カラーのチェックボックスが config の定義順に並ぶこと"""
+        html = client.get('/').data.decode('utf-8')
+
+        positions = [html.index(f'value="{key}"') for key in config.SEASON_UI_LABELS]
+        assert positions == sorted(positions)
+        for label in config.SEASON_UI_LABELS.values():
+            assert f'>{label}</span>' in html
