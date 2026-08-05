@@ -1,6 +1,6 @@
 // 性別・季節カラーの選択状態に応じた表示制御と、初期アニメーション。
 
-import { el } from './dom.js';
+import { el, getSelectedGender } from './dom.js';
 
 /** 選択中の性別オプションを強調する */
 export function updateGenderSelectionStyles() {
@@ -24,8 +24,7 @@ export function updateSeasonSelectionStyles() {
 export function updateSeasonVisibility() {
     if (!el.seasonSelection) return;
 
-    const checked = document.querySelector('input[name="gender"]:checked');
-    const isMens = checked && checked.value === 'mens';
+    const isMens = getSelectedGender() === 'mens';
 
     el.seasonSelection.classList.toggle('hidden', isMens);
     if (isMens) {

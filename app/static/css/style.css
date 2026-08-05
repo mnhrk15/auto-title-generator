@@ -579,7 +579,8 @@ input[type="text"]:focus+.search-icon {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 24%;
+    /* インジケーターは 3 個。個数を変えたらここも変える（index.html と対応） */
+    width: 32%;
     position: relative;
     z-index: 2;
 }

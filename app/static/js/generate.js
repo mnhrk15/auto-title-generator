@@ -7,8 +7,11 @@ import {
 } from './progress.js';
 import { hideError, hideLoading, hideResults, showError, showLoading, showResults } from './status.js';
 import { showToast } from './toast.js';
+import { updateMensNotice } from './form-controls.js';
 import { displayTemplates } from './template-list.js';
-import { featuredKeywords, showFeaturedErrorFallbackNotification } from './featured-keywords.js';
+import {
+    clearSelection, getSelectedKeyword, showFeaturedErrorFallbackNotification,
+} from './featured-keywords.js';
 
 const NETWORK_ERROR_MESSAGES = {
     timeout: 'テンプレート生成がタイムアウトしました。もう一度お試しください。',
@@ -42,8 +45,8 @@ function handleApiError(error) {
     if (error.kind === 'server' || error.kind === 'app') {
         if (error.code === 'FEATURED_KEYWORDS_ERROR') {
             showError('特集キーワード機能でエラーが発生しましたが、通常のテンプレート生成を試行できます。');
-            if (featuredKeywords.selectedKeyword) {
-                featuredKeywords.clearSelection();
+            if (getSelectedKeyword()) {
+                clearSelection();
                 showFeaturedErrorFallbackNotification();
             }
             return;
@@ -87,7 +90,8 @@ async function generate() {
 
         completeProgress();
         notifySuccess(data);
-        displayTemplates(data.templates, gender);
+        updateMensNotice(gender);
+        displayTemplates(data.templates);
         showResults();
         el.results.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
@@ -102,7 +106,7 @@ async function generate() {
             showError(NETWORK_ERROR_MESSAGES.app);
         }
 
-        if (featuredKeywords.selectedKeyword) {
+        if (getSelectedKeyword()) {
             setTimeout(showFeaturedErrorFallbackNotification, 2000);
         }
     } finally {
