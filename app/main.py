@@ -53,7 +53,11 @@ def parse_generate_request(data: object) -> GenerateRequest:
     if gender not in GENDERS:
         raise ValidationError('無効な性別が指定されました。ladies または mens を指定してください。')
 
-    seasons = data.get('seasons') or []
+    # 未指定（キーなし・null）は空扱い。それ以外で配列でないものは弾く。
+    # `or []` にすると 0 や {} のような falsy な非リストが素通りしてしまう。
+    seasons = data.get('seasons')
+    if seasons is None:
+        seasons = []
     if not isinstance(seasons, list):
         raise ValidationError('季節・カラーの指定形式が正しくありません。配列で指定してください。')
 

@@ -73,18 +73,27 @@ async function loadFeaturedKeywords(gender = null) {
     state.fallbackMessage = data.message || null;
 }
 
+// 進行中の読み込みの世代。読み込み中に性別を切り替えると 2 本のリクエストが並走し、
+// 応答順によっては古い方が後着して一覧を上書きしてしまう（ラジオと一覧が食い違い、
+// 以後どちらも自動では直らない）。自分が最新でなければ描画しない。
+let loadSeq = 0;
+
 /**
  * 読み込み → 描画。失敗したらエラー状態を描く。
  *
- * @returns {Promise<boolean>} 成功したか
+ * @returns {Promise<boolean>} 呼び出し側がフォールバック通知を出す必要がないか。
+ *   追い越された場合は描画も通知もせず true を返す（最新の読み込みが結果を決める）。
  */
 async function loadAndRender(gender, errorMessages) {
+    const seq = ++loadSeq;
     try {
         renderLoadingState();
         await loadFeaturedKeywords(gender);
+        if (seq !== loadSeq) return true;
         renderFeaturedKeywords();
         return true;
     } catch (error) {
+        if (seq !== loadSeq) return true;
         console.error('特集キーワードの読み込みに失敗:', error);
         // サーバー起因（503）も一過性のことがあり、再読み込み以外に復帰手段が
         // なくなってしまうため、種別によらず再試行ボタンを出す
@@ -232,11 +241,12 @@ function selectFeaturedKeyword(keyword) {
         return;
     }
 
-    clearSelection();
-
-    // 性別の書き換えは入力欄の反映より先に行う。書き換えが一覧の再読み込みを
-    // 起こすため、後続の updateButtonState が対象ボタンを見失わないようにする。
+    // 性別の書き換えを先に試す。ユーザーが確認ダイアログで拒否したらこの選択は
+    // 成立しないので、既存の選択には手を触れずに抜ける
+    // （先に clearSelection すると、拒否したのに直前の選択だけが消える）。
     if (!applyGender(keyword.gender)) return;
+
+    clearSelection();
 
     el.keywordInput.value = keyword.keyword;
     el.keywordInput.focus();
@@ -353,8 +363,7 @@ function setupGenderChangeListeners() {
 
             state.genderTouchedByUser = true;
 
-            // reloadKeywordsForGender は内部で同期的に clearSelection() するため、
-            // 選択の有無は呼ぶ前に確定させる
+            // この直後に clearSelection() するので、選択の有無は先に確定させる
             const hadSelection = Boolean(state.selectedKeyword);
 
             clearSelection();

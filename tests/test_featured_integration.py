@@ -105,6 +105,34 @@ class TestFeaturedKeywordsAPI:
         assert data['success'] is False
         assert data['error']['code'] == 'FEATURED_KEYWORDS_ERROR'
 
+    def test_degraded_path_repository_failure_is_503(self, app, client):
+        """降格パスのリポジトリ呼び出しが失敗しても 503 になること
+
+        get_last_error / get_health_status を例外保護の外に置くと、ここが 500 になり、
+        フロントの「通常の生成は使えます」という案内に分岐できなくなる。
+        """
+        from app.featured_keywords import EXTENSION_KEY
+
+        class BrokenOnDegradedPath:
+            def is_available(self):
+                return False
+
+            def get_all_keywords(self):
+                return []
+
+            def get_last_error(self):
+                raise RuntimeError('降格パスで失敗')
+
+            def get_health_status(self):
+                return {}
+
+        app.extensions[EXTENSION_KEY] = BrokenOnDegradedPath()
+
+        response = client.get('/api/featured-keywords')
+
+        assert response.status_code == 503
+        assert json.loads(response.data)['error']['code'] == 'FEATURED_KEYWORDS_ERROR'
+
     def test_get_featured_keywords_data_sanitization(self, use_repository, client):
         """特集キーワード取得API - 欠損フィールドを持つ項目は除外される"""
         use_repository(

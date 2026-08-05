@@ -277,6 +277,12 @@ class TestParseGenerateRequest:
 
         assert req.seasons == []
 
+    @pytest.mark.parametrize('body', [{'keyword': 'ボブ'}, {'keyword': 'ボブ', 'seasons': None}])
+    def test_seasons_omitted_or_null_is_empty(self, body):
+        from app.main import parse_generate_request
+
+        assert parse_generate_request(body).seasons == []
+
     def test_defaults(self):
         from app.config import DEFAULT_MODEL
         from app.main import parse_generate_request
@@ -303,6 +309,11 @@ class TestParseGenerateRequest:
             {'keyword': ''},  # 空の keyword
             {'keyword': 'ボブ', 'gender': 'invalid'},
             {'keyword': 'ボブ', 'seasons': 'spring'},  # 配列でない
+            # falsy な非リスト。`data.get('seasons') or []` と書くと素通りする
+            {'keyword': 'ボブ', 'seasons': 0},
+            {'keyword': 'ボブ', 'seasons': False},
+            {'keyword': 'ボブ', 'seasons': ''},
+            {'keyword': 'ボブ', 'seasons': {}},
         ],
     )
     def test_invalid_values(self, body):

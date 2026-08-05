@@ -60,19 +60,24 @@ def list_featured_keywords(
     """
     # 保護するのはリポジトリ境界だけにする。ここを広く囲うと、
     # 下の投影処理のバグまで「機能の降格」として握りつぶされる。
+    # 降格パスの get_last_error / get_health_status もリポジトリ呼び出しなので、
+    # 同じ try に入れる（外に出すと、そこでの失敗が 503 ではなく 500 になる）。
     try:
         available = repository.is_available()
-        all_keywords = repository.get_all_keywords() if available else []
+        if not available:
+            last_error = repository.get_last_error()
+            health_status = repository.get_health_status()
+        else:
+            all_keywords = repository.get_all_keywords()
     except Exception as e:
         raise FeaturedKeywordsError() from e
 
     if not available:
-        last_error = repository.get_last_error()
         if last_error is not None:
             logger.warning(f'特集キーワード機能が利用できません: {last_error}')
         else:
             logger.warning('特集キーワードが設定されていません')
-        logger.debug(f'特集キーワード機能の状態: {repository.get_health_status()}')
+        logger.debug(f'特集キーワード機能の状態: {health_status}')
         return FeaturedKeywordsView(keywords=[], message=_degraded_message(last_error))
 
     filtered = [k for k in all_keywords if k.get('gender') == gender]
