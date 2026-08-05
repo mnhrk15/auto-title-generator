@@ -10,11 +10,12 @@ FeaturedKeywordsManagerのユニットテスト
 
 import pytest
 import json
+import logging
 import os
 import tempfile
 import shutil
-import copy
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch
+from app import config, create_app
 from app.featured_keywords import (
     FeaturedKeywordsManager,
     FeaturedKeywordsError,
@@ -136,7 +137,7 @@ class TestFeaturedKeywordsManager:
         assert len(manager.keywords) == 2
         assert manager.get_last_error() is None
         
-        keywords = manager.load_keywords()
+        keywords = manager.get_all_keywords()
         assert len(keywords) == 2
         assert keywords[0]['name'] == "テスト用くびれヘア"
         assert keywords[1]['name'] == "テスト用韓国風マッシュ"
@@ -238,20 +239,6 @@ class TestFeaturedKeywordsManager:
         assert len(manager.keywords) == 0
         assert isinstance(manager.get_last_error(), FeaturedKeywordsLoadError)
         assert "文字エンコーディングエラー" in str(manager.get_last_error())
-    
-    def test_load_keywords(self, valid_keywords_file):
-        """load_keywordsメソッドのテスト"""
-        manager = FeaturedKeywordsManager(valid_keywords_file)
-        keywords = manager.load_keywords()
-        
-        assert isinstance(keywords, list)
-        assert len(keywords) == 2
-        assert keywords[0]['name'] == "テスト用くびれヘア"
-        
-        # 返されるリストが独立したコピーであることを確認
-        keywords[0]['name'] = "変更されたテスト"
-        original_keywords = manager.load_keywords()
-        assert original_keywords[0]['name'] == "テスト用くびれヘア"
     
     def test_is_featured_keyword_valid_cases(self, valid_keywords_file):
         """is_featured_keywordメソッドの有効なケースのテスト"""
@@ -369,7 +356,9 @@ class TestFeaturedKeywordsManager:
         all_keywords = manager.get_all_keywords()
         assert isinstance(all_keywords, list)
         assert len(all_keywords) == 2
-        
+        assert all_keywords[0]['name'] == "テスト用くびれヘア"
+        assert all_keywords[1]['name'] == "テスト用韓国風マッシュ"
+
         # 返されるリストが独立したコピーであることを確認
         all_keywords[0]['name'] = "変更されたテスト"
         original_keywords = manager.get_all_keywords()
@@ -505,6 +494,57 @@ class TestFeaturedKeywordsManager:
         assert manager.is_available() is False
         assert len(manager.keywords) == 0
     
+    def test_non_string_field_is_skipped_not_raised(self, temp_dir, valid_keywords_data):
+        """文字列でないフィールドがあっても、その1件をスキップして継続する
+
+        検証中に TypeError が漏れると FeaturedKeywordsManager の生成、ひいては
+        create_app() ごと失敗する。このファイルは運用者が手で編集するため、
+        1件のタイポでアプリが起動不能になってはいけない。
+        """
+        data = [
+            {
+                "name": 2026,  # 文字列でない
+                "keyword": "テスト",
+                "gender": "ladies",
+                "condition": "テスト条件"
+            },
+            {
+                "name": "テスト",
+                "keyword": ["リスト"],  # 文字列でない
+                "gender": "ladies",
+                "condition": "テスト条件"
+            },
+        ] + valid_keywords_data
+
+        file_path = os.path.join(temp_dir, 'non_string_fields.json')
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        manager = FeaturedKeywordsManager(file_path)
+
+        # 不正な2件だけが落ちて、正常な2件は生き残る
+        assert manager.is_available() is True
+        assert len(manager.keywords) == len(valid_keywords_data)
+        assert manager.get_keyword_info("くびれヘア") is not None
+
+    def test_non_string_field_does_not_break_create_app(self, temp_dir, monkeypatch):
+        """不正なデータファイルでもアプリは起動できる"""
+        data = [{
+            "name": 2026,
+            "keyword": "テスト",
+            "gender": "ladies",
+            "condition": "テスト条件"
+        }]
+        file_path = os.path.join(temp_dir, 'broken.json')
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False)
+
+        monkeypatch.setenv('FEATURED_KEYWORDS_PATH', file_path)
+        config.reset_settings()
+
+        app = create_app()
+        assert app is not None
+
     def test_exact_matching(self, valid_keywords_file):
         """正確なマッチングのテスト"""
         manager = FeaturedKeywordsManager(valid_keywords_file)
@@ -544,21 +584,29 @@ class TestFeaturedKeywordsManager:
             assert info is not None
             assert info['name'] == "テスト用くびれヘア"
     
-    @patch('app.featured_keywords.logger')
-    def test_logging_behavior(self, mock_logger, valid_keywords_file):
-        """ログ出力の動作テスト"""
-        manager = FeaturedKeywordsManager(valid_keywords_file)
-        
-        # 正常読み込み時のログ確認
-        mock_logger.info.assert_called()
-        
-        # キーワード判定時のログ確認
-        manager.is_featured_keyword("くびれヘア")
-        mock_logger.debug.assert_called()
-        
-        # 存在しないキーワードの判定時のログ確認
-        manager.is_featured_keyword("存在しないキーワード")
-        mock_logger.debug.assert_called()
+    def test_load_logs_the_loaded_count(self, valid_keywords_file, caplog):
+        """読み込み結果の件数がログに出る（運用時にこの行で状態を判断するため）"""
+        with caplog.at_level(logging.INFO, logger='app.featured_loader'):
+            FeaturedKeywordsManager(valid_keywords_file)
+
+        assert '特集キーワードを正常に読み込みました: 2件' in caplog.text
+
+    def test_load_logs_skipped_items(self, temp_dir, caplog):
+        """検証で弾いた件数がログに出る（黙ってデータが減らないこと）"""
+        file_path = os.path.join(temp_dir, 'partial.json')
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump([
+                {"name": "有効", "keyword": "有効キーワード",
+                 "gender": "ladies", "condition": "条件"},
+                {"name": "性別が不正", "keyword": "不正キーワード",
+                 "gender": "unknown", "condition": "条件"},
+            ], f, ensure_ascii=False)
+
+        with caplog.at_level(logging.WARNING, logger='app.featured_loader'):
+            manager = FeaturedKeywordsManager(file_path)
+
+        assert len(manager.keywords) == 1
+        assert '有効 1件, エラー 1件' in caplog.text
 
 
 class TestFeaturedKeywordsExceptions:

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 3 Flash Preview AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, streamlined UI with blue color theme, and real-time keyword updates.
+This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 3.1 Flash Lite AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, streamlined UI with blue color theme, and real-time keyword updates.
 
 ## Common Development Commands
 
@@ -32,27 +32,21 @@ gunicorn asgi:app -c gunicorn.conf.py
 ```
 
 ### Testing
-```bash
-# Run all tests
-pytest tests/
+Settings live in `pytest.ini` (testpaths, asyncio_mode=strict, and an `integration` marker
+that is excluded by default via `addopts`).
 
-# Run all tests with async support (recommended)
-pytest tests/ --asyncio-mode=auto
+```bash
+# Run all tests (tests hitting the real Gemini API are excluded automatically)
+pytest
+
+# Run the tests that call the real Gemini API (requires GEMINI_API_KEY)
+pytest -m integration
 
 # Run specific test file
 pytest tests/test_generator.py -v
 
-# Run with coverage report
-pytest tests/ --cov=app --cov-report=html
-
-# Run integration tests (requires GEMINI_API_KEY)
-pytest tests/test_integration.py -v
-
-# Run tests excluding UI tests (if Selenium not available)
-pytest tests/ -k "not test_ui"
-
 # Run tests with detailed output and show local variables on failure
-pytest tests/ -vvs --tb=long
+pytest -vvs --tb=long
 ```
 
 ### Deployment
@@ -73,8 +67,27 @@ The application is configured for Render deployment:
 
 **Async Processing Pipeline**:
 1. **Web Scraping** (`/app/scraping.py`): `HotPepperScraper` class uses aiohttp to asynchronously scrape hairstyle titles from HotPepper Beauty
-2. **AI Generation** (`/app/generator.py`): `TemplateGenerator` class uses Google Gemini 3 Flash Preview (default model) with thinkingLevel=MINIMAL for optimized template generation
+2. **AI Generation** (`/app/generator.py`): `TemplateGenerator` calls Gemini with structured output.
+   Prompt assembly lives in `/app/prompts.py`, the output schema in `/app/schemas.py`.
 3. **Request Handling** (`/app/main.py`): Async route `/api/generate` orchestrates the pipeline
+
+**Service Layer** (`/app/services/`):
+- `keyword_analysis.py`: Classifies the input keyword as featured / normal / mixed. Pure logic with
+  no I/O, so it is testable without a Flask application context.
+- `template_service.py`: Coordinates the scraper and the generator, and attaches the metadata that
+  the frontend reads off each template.
+- Services never touch `current_app`. Dependencies (e.g. the featured-keyword repository) are passed
+  in as arguments; only routes resolve them.
+
+**Frontend** (`/app/static/js/`):
+- Plain ES modules loaded via `<script type="module">`. No bundler, no `package.json`.
+- `main.js` is the entry point and only wires up each module's `init()`.
+- `api.js` centralizes fetch calls. Errors surface as `ApiError` with a `kind`
+  (`timeout` / `network` / `server` / `app`) so callers branch on a field, not on message text.
+- Non-2xx responses are parsed before throwing, so the server's error `code` reaches the UI.
+- State lives in module scope (`progress.js`, `template-list.js`). There is no global store, and
+  nothing is exposed on `window` — inline `onclick` attributes would not be able to see module
+  scope, so all handlers are attached with `addEventListener`.
 
 **Configuration Management** (`/app/config.py`):
 - Environment-based configuration with dotenv support
@@ -106,15 +119,19 @@ The application is configured for Render deployment:
 - `PORT`: Server port (Render automatically provides this, defaults to 5000 locally)
 - `SCRAPING_DELAY_MIN/MAX`: Rate limiting for web scraping (default: 1-3 seconds, increase if getting blocked)
 - `MAX_PAGES`: Limit for scraping pages per request (default: 3, production: 1 for faster performance)
-- `FLASK_ENV`: Set to 'production' for SSL verification in scraping
-- `LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL - default: INFO)
+- `SCRAPER_VERIFY_SSL`: Scraper certificate verification (default: true, using the certifi CA bundle).
+  Set to 'false' only as a last resort in a local environment that cannot verify the chain.
+- `LOG_DIR`: Log output directory (defaults to `<project root>/logs`)
+- `FEATURED_KEYWORDS_PATH`: Featured keywords JSON path (defaults to `app/data/featured_keywords.json`)
 
 ### Google Gemini SDK Configuration
 
 **SDK**: `google-genai 1.70.0`
 - Google GenAI SDK for Gemini 3 models
-- Used in `TemplateGenerator` constructor: `self.client = genai.Client(api_key=config.GEMINI_API_KEY)`
+- Used in `TemplateGenerator` constructor: `self.client = genai.Client(api_key=self.settings.gemini_api_key)`
 - Optimized generation with `thinkingLevel=MINIMAL` setting (minimizes internal reasoning for speed)
+- Structured output via `response_schema` (see `app/schemas.py`) — the model is constrained to the
+  JSON schema, so no manual JSON extraction from the response text is needed
 - Default model: `gemini-3.1-flash-lite` (no user selection required)
 - Supported models: `gemini-3.1-flash-lite`, `gemini-3-flash-preview`
 - Located at `app/generator.py`
@@ -122,18 +139,30 @@ The application is configured for Render deployment:
 **Performance Optimization**:
 ```python
 # SDK configuration in generator.py
-config_with_thinking = types.GenerateContentConfig(
-    temperature=1.0,
-    max_output_tokens=32768,
+request_config = types.GenerateContentConfig(
+    temperature=config.GEMINI_TEMPERATURE,
+    max_output_tokens=config.GEMINI_MAX_OUTPUT_TOKENS,
     thinking_config=types.ThinkingConfig(
         thinking_level=types.ThinkingLevel.MINIMAL  # Minimizes thinking for speed
-    )
+    ),
+    response_mime_type='application/json',
+    response_schema=GenerationResult,
+    http_options=types.HttpOptions(
+        timeout=config.GEMINI_REQUEST_TIMEOUT_MS,
+        retry_options=types.HttpRetryOptions(attempts=config.GEMINI_RETRY_ATTEMPTS, ...),
+    ),
 )
 ```
 
-**Performance Metrics**:
-- Previous model (gemini-2.5-flash + thinking_budget=0): ~8-10 seconds
-- Current model (gemini-3.1-flash-lite + thinkingLevel=MINIMAL): TBD (to be benchmarked)
+**Timeout budget**: `gunicorn.conf.py` has `timeout = 120` and the frontend aborts at 120s.
+That ceiling covers the **whole request — scraping plus generation**, not generation alone:
+- generation: `40s x 2 attempts + 4s max backoff` ≈ 84s
+- scraping: `MAX_PAGES x (10s per page + up to 3s delay)`
+
+With the production `MAX_PAGES=1` this is ≈ 97s and fits. With the default `MAX_PAGES=3` it is
+≈ 123s and can exceed the worker timeout, so raising `MAX_PAGES` means revisiting the gunicorn
+timeout and the frontend `AbortController` too. Raising attempts to 3 at 45s blows the budget on
+generation alone. These values are coupled — change them together.
 
 ### Async/Await Usage
 The application uses async extensively throughout the entire pipeline:
@@ -168,26 +197,38 @@ The application uses async extensively throughout the entire pipeline:
 - Memory leak prevention with max_requests=1000
 
 **SSL and Security**:
-- Development: SSL verification disabled for local testing
-- Production: Full SSL verification enabled when FLASK_ENV='production'
-- Environment-based SSL context switching in scraper
+- SSL verification is **on by default in every environment**, using the certifi CA bundle.
+  `FLASK_ENV` is not read anywhere — an earlier version gated verification on it, which silently
+  disabled verification in production because `FLASK_ENV` was never set on Render.
+- Disable it only by setting `SCRAPER_VERIFY_SSL=false` explicitly (local development only).
+  Values that cannot be parsed as a boolean fall back to the default rather than to `false`,
+  so a typo cannot silently turn verification off.
 
 **Logging and Monitoring**:
-- Rotating file logs (1MB limit, 10 backups) in `/logs/app.log`
+- Handlers are attached to the **root logger** in `setup_logging()`, so `app.logger` and every
+  module's `logging.getLogger(__name__)` share them. Registration is idempotent across repeated
+  `create_app()` calls.
+- Two sinks: rotating file logs (1MB limit, 10 backups) in `LOG_DIR/app.log`, **and stderr**.
+  The stderr handler is required — Render collects the container's stdout/stderr, and the log
+  file does not survive a restart. Do not remove it when touching `setup_logging()`.
+- Each gunicorn worker is its own process, so `ロギングシステムが初期化されました` appears once
+  per worker (2 lines with the default `workers = 2`), not once per deploy.
 - Comprehensive request/response logging for debugging
 - Performance metrics logging for generation times
 
 ## Testing Structure
 
 Tests are organized by component:
-- `test_generator.py`: AI template generation testing with async support
+- `test_prompts.py`: Prompt assembly (pure functions, no API key needed)
+- `test_generator.py`: Result extraction, template validation, season keyword appending
+- `test_keyword_analysis.py`: Keyword classification (no Flask context needed)
 - `test_scraping.py`: Web scraping functionality with aiohttp mocking
-- `test_main.py`: Flask route and error handling with async endpoints
-- `test_integration.py`: End-to-end workflow testing requiring real API key
-- `test_ui.py`: Frontend functionality using Selenium (skipped if not available)
-- `conftest.py`: Shared test fixtures with automatic environment setup
+- `test_main.py`: Flask routes, error handling, and response-shape snapshots
+- `test_featured_keywords.py` / `test_featured_integration.py`: Featured keyword feature
+- `test_integration.py`: Calls the real Gemini API — marked `integration`, excluded by default
+- `conftest.py`: Shared fixtures. Resets the settings cache per test so `monkeypatch.setenv` works.
 
-All tests use pytest with async support (`@pytest.mark.asyncio` for async functions). UI tests are automatically skipped if Selenium dependencies are not available.
+All tests use pytest with async support (`@pytest.mark.asyncio` for async functions).
 
 ## Important Development Guidelines
 
@@ -207,10 +248,10 @@ All tests use pytest with async support (`@pytest.mark.asyncio` for async functi
 ### Performance Considerations
 
 **AI Generation Optimization**:
-- **Gemini 3 Flash Preview**: Default model for template generation (no user selection needed)
+- **gemini-3.1-flash-lite**: Default model for template generation (no user selection needed)
 - **thinkingLevel=MINIMAL**: Minimizes internal reasoning for optimized speed
 - **temperature=1.0**: Required for Gemini 3 models (values below 1.0 cause degraded output)
-- **Performance metrics**: TBD (to be benchmarked after migration)
+- **Structured output**: `response_schema` constrains the model to the expected JSON shape
 
 **Resource Management**:
 - **Memory optimization**: gunicorn max_requests=1000 prevents memory leaks
@@ -231,8 +272,8 @@ When updating AI models or SDKs:
 4. Test async functionality with the SDK
 5. Validate JSON response parsing works with new model outputs
 6. Check character limits still work with updated generation patterns
-7. Update default model in JavaScript (`app/static/js/script.js`) and `app/main.py` if changing models
-8. Update `supported_models` list in `app/generator.py` constructor
+7. Update `DEFAULT_MODEL` and `SUPPORTED_MODELS` in `app/config.py` (these are the single source of
+   truth — the frontend no longer sends a model name)
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

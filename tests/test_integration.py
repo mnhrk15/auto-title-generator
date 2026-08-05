@@ -3,6 +3,11 @@ import os
 from app.generator import TemplateGenerator
 from app import config
 
+# 実 Gemini API を呼び出すため、デフォルトの pytest 実行からは除外される。
+# 実行するには `pytest -m integration`（GEMINI_API_KEY が必要）。
+pytestmark = pytest.mark.integration
+
+
 class TestTemplateGeneratorIntegration:
     @pytest.fixture
     def generator(self):
@@ -11,12 +16,13 @@ class TestTemplateGeneratorIntegration:
             pytest.skip("GEMINI_API_KEY not set in environment")
         return TemplateGenerator()
     
-    def test_generate_templates_with_real_api(self, generator):
+    @pytest.mark.asyncio
+    async def test_generate_templates_with_real_api(self, generator):
         """実際のGemini APIを使用してテンプレートを生成"""
         titles = ["★髪質改善トリートメントで艶髪ストレート"]
         keyword = "髪質改善"
 
-        templates, _trending = generator.generate_templates(titles, keyword)
+        templates, _trending = await generator.generate_templates_async(titles, keyword)
         
         # 基本的な検証
         assert isinstance(templates, list)

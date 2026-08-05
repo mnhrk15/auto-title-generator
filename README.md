@@ -16,8 +16,8 @@
   - 特集掲載条件を満たした高品質テンプレート生成
 
 ## 技術スタック
-- **バックエンド**: Python 3.11.8, Flask 3.0.2 (ASGI対応)
-- **AI**: Google Gemini 3 Flash Preview (thinkingLevel=MINIMALで高速化、デフォルトモデル)
+- **バックエンド**: Python 3.12, Flask 3.0.2 (ASGI対応)
+- **AI**: Google Gemini 3.1 Flash Lite (`gemini-3.1-flash-lite`、thinkingLevel=MINIMALで高速化、構造化出力)
 - **SDK**: google-genai 1.70.0
 - **フロントエンド**: HTML, CSS, JavaScript
 - **スクレイピング**: BeautifulSoup4 4.12.3, aiohttp 3.9.3 (完全非同期処理)
@@ -27,15 +27,15 @@
 ## セットアップ方法
 
 ### 前提条件
-- **Python 3.11.8以上** (推奨バージョン)
+- **Python 3.12以上** (推奨バージョン)
 - pip (Pythonパッケージマネージャー)
 - **Google Gemini API キー** ([Google AI Studio](https://makersuite.google.com/app/apikey)で取得)
 
 ### インストール手順
 1. リポジトリのクローン
 ```bash
-git clone https://github.com/mnhrk/template-generator.git
-cd template-generator
+git clone https://github.com/mnhrk/auto-title-generator.git
+cd auto-title-generator
 ```
 
 2. 仮想環境の作成と有効化
@@ -289,24 +289,44 @@ POST /api/generate
 
 ## プロジェクト構造
 ```
-template-generator/
+auto-title-generator/
 ├── app/
-│   ├── main.py              # メインアプリケーションロジック
-│   ├── scraping.py          # スクレイピング機能
-│   ├── generator.py         # テンプレート生成ロジック
-│   ├── featured_keywords.py # 特集キーワード管理クラス
-│   ├── config.py            # 設定ファイル
+│   ├── __init__.py           # create_app()（アプリ生成・ロギング設定）
+│   ├── main.py               # ルートとエラーハンドラのみ
+│   ├── config.py             # 静的定数 + Settings（環境変数由来の設定）
+│   ├── errors.py             # AppError 階層・エラーコード・レスポンス組み立て
+│   ├── prompts.py            # Gemini プロンプトの組み立て（純関数）
+│   ├── schemas.py            # 構造化出力（response_schema）の pydantic モデル
+│   ├── generator.py          # Gemini 呼び出し・結果検証・季節カラー付加
+│   ├── scraping.py           # HotPepper Beauty の非同期スクレイピング
+│   ├── featured_loader.py    # 特集キーワード JSON の読み込みと検証
+│   ├── featured_keywords.py  # 特集キーワードの参照リポジトリ
+│   ├── services/
+│   │   ├── keyword_analysis.py   # キーワード解析（特集/通常/混在の判定）
+│   │   └── template_service.py   # スクレイピングと生成の協調
 │   ├── data/
-│   │   └── featured_keywords.json  # 特集キーワードデータファイル
-│   ├── static/              # 静的ファイル（CSS, JS等）
-│   └── templates/           # HTMLテンプレート
-├── tests/                   # テストファイル
-│   ├── test_featured_keywords.py     # 特集キーワード機能テスト
-│   ├── test_featured_integration.py  # 特集機能統合テスト
-│   └── test_featured_ui.py          # 特集機能UIテスト
-├── requirements.txt         # 依存パッケージリスト
-└── run.py                  # アプリケーション起動スクリプト
-```
+│   │   └── featured_keywords.json
+│   ├── static/
+│   │   ├── css/style.css
+│   │   └── js/                # ES modules（バンドラ不使用）
+│   │       ├── main.js           # エントリポイント
+│   │       ├── dom.js            # DOM 参照の一元管理
+│   │       ├── api.js            # fetch ラッパーと ApiError
+│   │       ├── toast.js          # トースト・通知
+│   │       ├── status.js         # ローディング/エラー/結果の表示制御
+│   │       ├── progress.js       # 疑似進捗バー
+│   │       ├── featured-keywords.js
+│   │       ├── template-card.js  # カード1枚の生成
+│   │       ├── template-list.js  # 一覧とページネーション
+│   │       ├── export.js         # CSV/テキスト出力・全件コピー
+│   │       ├── form-controls.js  # 性別・季節カラーの選択制御
+│   │       └── generate.js       # 生成ボタンのフロー
+│   └── templates/
+├── tests/
+├── pytest.ini                # テスト設定（integration マーカー等）
+├── requirements.txt
+├── asgi.py                   # 本番の ASGI エントリポイント
+└── run.py                    # 開発サーバー起動
 
 ## 主要コンポーネントの説明
 
@@ -319,12 +339,12 @@ template-generator/
 - **非同期スクレイピング**: aiohttp 3.9.3使用で高速並行処理
 - **対象サイト**: HotPepper Beauty (レディース/メンズ両対応)
 - **レート制限**: 設定可能な待機時間でサイト負荷を軽減
-- **SSL対応**: 開発/本番環境で自動切り替え
+- **SSL対応**: certifi の CA バンドルで常時検証（`SCRAPER_VERIFY_SSL=false` で明示的に無効化可能）
 - **エラーハンドリング**: 包括的な例外処理とログ出力
 - **セッション管理**: async context managerで適切なリソース管理
 
 ### generator.py
-- **AI エンジン**: Google Gemini 3 Flash Preview使用（デフォルトモデル、ユーザー選択不要）
+- **AI エンジン**: Google Gemini 3.1 Flash Lite（`gemini-3.1-flash-lite`、ユーザー選択不要）
 - **高速化**: thinkingLevel=MINIMAL設定で思考プロセスを最小化
 - **SDK**: google-genai 1.70.0
 - **非同期処理**: 完全async/await対応で高いスループット
@@ -332,10 +352,21 @@ template-generator/
 - **季節・カラー後処理**: `_apply_season_keywords()` が生成後のタイトルへ選択キーワードを均等配分で付加
 
 ### config.py
-- アプリケーション設定の管理
-- 環境変数の読み込みと設定
-- ホスト設定やその他のパラメータ管理
+- 環境に依存しない値はモジュール定数（URL、文字数上限、モデル名など）
+- 環境変数由来の値は `Settings`（frozen dataclass）に隔離し、`get_settings()` で遅延生成
 - 季節・カラー選択肢（`SEASON_COLOR_CHOICES`）と付加ルールの定数
+
+### prompts.py
+- Gemini に渡すプロンプトの組み立て（純関数のため API キー不要でテストできる）
+- 性別ごとの語彙・例示は `GENDER_VOCABULARY` のデータとして保持
+
+### errors.py
+- `AppError` を基底とする例外階層と、API レスポンス形状の組み立て
+- ルート層は `AppError` を送出するだけでよく、変換は app_errorhandler が担う
+
+### services/
+- `keyword_analysis.py`: 入力キーワードが特集/通常/混在のどれかを判定（I/O なし）
+- `template_service.py`: スクレイパーと生成器の協調、結果へのメタデータ付与
 
 ### featured_keywords.py
 - **特集キーワード管理**: JSONファイルからの特集キーワード読み込み
@@ -348,46 +379,36 @@ template-generator/
 ## テスト
 
 ### テスト構成
-- **test_generator.py**: AI生成機能（非同期対応）
+- **test_prompts.py**: プロンプト組み立て（APIキー不要の純関数テスト）
+- **test_generator.py**: 生成結果の抽出・検証・季節カラー付加
+- **test_keyword_analysis.py**: キーワード解析（Flaskコンテキスト不要）
 - **test_scraping.py**: スクレイピング機能（aiohttp mock使用）
-- **test_main.py**: Flask API エンドポイント（非同期ルート対応）
-- **test_integration.py**: エンドツーエンドテスト（実APIキー必要）
-- **test_ui.py**: フロントエンド機能（Selenium、自動スキップ対応）
+- **test_main.py**: Flask API エンドポイントとレスポンス形状
 - **test_featured_keywords.py**: 特集キーワード管理機能のユニットテスト
 - **test_featured_integration.py**: 特集キーワード機能のAPI統合テスト
-- **test_featured_ui.py**: 特集キーワード機能のUIテスト（Selenium対応）
+- **test_integration.py**: 実 Gemini API を呼ぶテスト（`-m integration` でのみ実行）
 
 ### テスト実行方法
+設定は `pytest.ini` にあります。実 API を呼ぶテストは既定で除外されます。
+
 ```bash
-# すべてのテストを実行
-pytest tests/
+# すべてのテストを実行（実APIを呼ぶテストは自動的に除外される）
+pytest
 
-# 非同期テスト対応モードで実行
-pytest tests/ --asyncio-mode=auto
-
-# UIテストを除外して実行（Seleniumが無い場合）
-pytest tests/ -k "not test_ui"
-
-# 特集キーワード機能のテストのみ実行
-pytest tests/test_featured_keywords.py tests/test_featured_integration.py -v
-
-# 特集キーワードUIテストを実行（RUN_UI_TESTS=1が必要）
-RUN_UI_TESTS=1 pytest tests/test_featured_ui.py -v
+# 実 Gemini API を呼ぶテストを実行（GEMINI_API_KEY が必要）
+pytest -m integration
 
 # 特定のテストファイルのみ実行
 pytest tests/test_generator.py -v
 
-# カバレッジ付きで実行
-pytest tests/ --cov=app
-
-# 特集キーワード機能のカバレッジレポート
-pytest tests/test_featured_*.py --cov=app.featured_keywords --cov-report=html
+# 特集キーワード機能のテストのみ実行
+pytest tests/test_featured_keywords.py tests/test_featured_integration.py -v
 ```
 
 ## パフォーマンス特性
 
 ### AI生成速度
-- **Gemini 3 Flash Preview**: デフォルトモデル使用（ユーザー選択不要）
+- **gemini-3.1-flash-lite**: デフォルトモデル使用（ユーザー選択不要）
 - **thinkingLevel=MINIMAL**: 思考プロセス最小化で高速化
 - **SDK**: google-genai 1.70.0
 
@@ -408,7 +429,7 @@ pytest tests/test_featured_*.py --cov=app.featured_keywords --cov-report=html
 - **重要**: Gemini APIキーは機密情報です。環境変数で管理し、リポジトリにコミットしないでください
 
 ## ライセンス
-このプロジェクトはMITライセンスの下で公開されています。
+未設定です（LICENSE ファイルは配置されていません）。
 
 ## 貢献
 バグ報告や機能改善の提案は、GitHubのIssueを通じてお願いします。
@@ -447,7 +468,7 @@ pytest tests/test_featured_*.py --cov=app.featured_keywords --cov-report=html
      - その他必要な環境変数（render.yamlで設定済み）
 
    **パフォーマンス最適化**: 
-   - **Gemini 3 Flash Preview**: デフォルトAIモデル使用（ユーザー選択不要）
+   - **gemini-3.1-flash-lite**: デフォルトAIモデル使用（ユーザー選択不要）
    - **thinkingLevel=MINIMAL**: 思考プロセス最小化で高速化
    - **非同期処理**: 完全async/awaitパイプライン
    - **リソース最適化**: MAX_PAGES=1でスクレイピング高速化

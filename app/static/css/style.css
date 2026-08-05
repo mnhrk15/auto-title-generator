@@ -20,6 +20,9 @@
     --border-color: #e9ecef;
     --card-bg: #ffffff;
     --card-bg-hover: #fbfcff;
+    /* フッター。body の --secondary-color 上で帯として見えるようカード色に合わせる
+       （未定義のまま var() で参照され、背景が透明になっていた） */
+    --footer-bg: #ffffff;
 
     /* シャドウ - 奥行き感のあるデザイン */
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
@@ -35,10 +38,27 @@
     --border-radius-lg: 18px;
     --border-radius-xl: 24px;
 
+    /* レイアウト */
+    --container-max-width: 1200px;
+
     /* トランジション - スムーズで洗練された動き */
     --transition-fast: 0.2s;
     --transition-normal: 0.3s;
     --transition-slow: 0.5s;
+    /* --primary-color の alpha 版を作るための RGB 成分 */
+    --primary-color-rgb: 67, 97, 238;
+    --border-color-rgb: 233, 236, 239;
+    /* 特集セクションのアクセント。--warning-color と同値だが用途が別なので分けている */
+    --featured-accent-color: #4da6ff;
+    --featured-gradient-start: #667eea;
+    --featured-gradient-end: #764ba2;
+    /* 特集対応トーストの金色（旧 addToastStyles() の直書きから集約） */
+    --featured-gold: #ffd700;
+    --featured-gold-light: #ffed4e;
+    --featured-gold-dark: #ffb700;
+    /* 重なり順のレイヤー */
+    --z-overlay: 1000;
+    --z-toast: 10000;
     --transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
 
     /* スペーシング - 統一された間隔 */
@@ -69,7 +89,7 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: var(--container-max-width);
     width: 100%;
     margin: 0 auto;
     padding: var(--spacing-lg);
@@ -133,107 +153,13 @@ h1 {
     text-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 
-/* ヘッダー内の検索ボックス */
-.main-search {
-    max-width: 700px;
-    margin-top: var(--spacing-md);
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: var(--border-radius-lg);
-    padding: var(--spacing-md);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-    backdrop-filter: blur(5px);
-    box-shadow: var(--shadow-sm);
-    transition: all var(--transition-normal) var(--transition-ease);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.main-search:hover {
-    background: rgba(255, 255, 255, 0.2);
-    box-shadow: var(--shadow-md);
-}
-
-.main-search .input-wrapper {
-    flex: 1;
-}
-
-.main-search input[type="text"] {
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(255, 255, 255, 0.5);
-}
-
-.main-search input[type="text"]:focus {
-    background: white;
-    border-color: white;
-}
-
-.main-search .primary-button {
-    background: rgba(255, 255, 255, 0.25);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    font-weight: 700;
-}
-
-.main-search .primary-button:hover {
-    background: rgba(255, 255, 255, 0.35);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-    transform: translateY(-3px);
-}
-
-.gender-selector {
-    display: flex;
-    gap: var(--spacing-sm);
-    background: rgba(255, 255, 255, 0.1);
-    padding: var(--spacing-xs);
-    border-radius: var(--border-radius-md);
-}
-
-.gender-selector .gender-option {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-xs);
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-}
-
-.gender-selector input[type="radio"] {
-    position: absolute;
-    opacity: 0;
-}
-
-.radio-label-mini {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: var(--border-radius-sm);
-    color: white;
-    font-size: 1.2rem;
-    transition: all var(--transition-fast) var(--transition-ease);
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.gender-selector input[type="radio"]:checked+.radio-label-mini {
-    background: rgba(255, 255, 255, 0.25);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.gender-selector .gender-option:hover .radio-label-mini {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
-}
-
 /* 折りたたみ式ガイド */
 .guide-collapsible {
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
     margin-bottom: var(--spacing-lg);
     box-shadow: var(--shadow-sm);
-    border: 1px solid rgba(233, 236, 239, 0.8);
+    border: 1px solid rgba(var(--border-color-rgb), 0.8);
     transition: all var(--transition-normal) var(--transition-ease);
     overflow: hidden;
 }
@@ -279,7 +205,7 @@ details[open] .guide-summary::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(67, 97, 238, 0.1);
+    background: rgba(var(--primary-color-rgb), 0.1);
     border-radius: 50%;
 }
 
@@ -291,64 +217,6 @@ details[open] .guide-summary::after {
     padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg) calc(var(--spacing-lg) + 32px + var(--spacing-md));
     border-top: 1px solid var(--border-color);
     background-color: rgba(248, 249, 255, 0.5);
-}
-
-/* ここから元のガイドスタイル */
-.guide {
-    background: var(--card-bg);
-    padding: var(--spacing-lg);
-    border-radius: var(--border-radius-lg);
-    margin-bottom: var(--spacing-lg);
-    box-shadow: var(--shadow-card);
-    transition: transform var(--transition-normal) var(--transition-ease),
-        box-shadow var(--transition-normal) var(--transition-ease);
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(233, 236, 239, 0.8);
-}
-
-.guide::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 150px;
-    height: 150px;
-    background: linear-gradient(135deg, rgba(67, 97, 238, 0.03), rgba(72, 149, 239, 0.08));
-    border-radius: 0 0 0 100%;
-    z-index: 0;
-}
-
-.guide:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-card-hover);
-}
-
-.guide-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: var(--spacing-lg);
-    color: var(--primary-color);
-    position: relative;
-    z-index: 1;
-}
-
-.guide-header i {
-    font-size: 1.8rem;
-    margin-right: var(--spacing-md);
-    background-color: rgba(67, 97, 238, 0.1);
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-}
-
-.guide h2 {
-    font-size: 1.6rem;
-    font-weight: 700;
-    letter-spacing: 0.5px;
 }
 
 .guide-step {
@@ -407,7 +275,7 @@ details[open] .guide-summary::after {
     border-radius: var(--border-radius-lg);
     padding: var(--spacing-lg);
     box-shadow: var(--shadow-card);
-    border: 1px solid rgba(233, 236, 239, 0.8);
+    border: 1px solid rgba(var(--border-color-rgb), 0.8);
     position: relative;
     margin-top: calc(-1 * var(--spacing-lg));
 }
@@ -443,7 +311,7 @@ details[open] .guide-summary::after {
 }
 
 .gender-option:hover {
-    background-color: rgba(67, 97, 238, 0.08);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
     transform: translateY(-2px);
 }
 
@@ -482,14 +350,14 @@ details[open] .guide-summary::after {
 
 .gender-option input[type="radio"]:checked+.radio-label i {
     color: var(--primary-color);
-    text-shadow: 0 0 5px rgba(67, 97, 238, 0.4);
+    text-shadow: 0 0 5px rgba(var(--primary-color-rgb), 0.4);
 }
 
 /* 選択中の性別オプションの親要素のスタイル */
 .gender-option-active {
     border: 2px solid var(--primary-color);
-    background-color: rgba(67, 97, 238, 0.08);
-    box-shadow: 0 3px 8px rgba(67, 97, 238, 0.15);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
+    box-shadow: 0 3px 8px rgba(var(--primary-color-rgb), 0.15);
     transform: translateY(-2px);
 }
 
@@ -544,7 +412,7 @@ input[type="text"]:hover {
 input[type="text"]:focus {
     border-color: var(--primary-color);
     outline: none;
-    box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.15);
+    box-shadow: 0 0 0 4px rgba(var(--primary-color-rgb), 0.15);
 }
 
 input[type="text"]:focus+.search-icon {
@@ -553,8 +421,7 @@ input[type="text"]:focus+.search-icon {
 
 .primary-button,
 .secondary-button,
-.copy-btn,
-.edit-btn {
+.copy-btn{
     padding: var(--spacing-md) var(--spacing-lg);
     border: none;
     border-radius: var(--border-radius-md);
@@ -575,7 +442,7 @@ input[type="text"]:focus+.search-icon {
 .primary-button {
     background: var(--primary-gradient);
     color: white;
-    box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+    box-shadow: 0 4px 15px rgba(var(--primary-color-rgb), 0.3);
 }
 
 .primary-button::before {
@@ -620,7 +487,7 @@ input[type="text"]:focus+.search-icon {
 }
 
 .secondary-button:hover {
-    background-color: rgba(67, 97, 238, 0.05);
+    background-color: rgba(var(--primary-color-rgb), 0.05);
     transform: translateY(-3px);
     box-shadow: var(--shadow-md);
 }
@@ -628,36 +495,6 @@ input[type="text"]:focus+.search-icon {
 .secondary-button:active {
     transform: translateY(-1px);
     box-shadow: var(--shadow-sm);
-}
-
-.copy-btn {
-    background-color: var(--success-color);
-    color: white;
-    box-shadow: 0 4px 15px rgba(6, 214, 160, 0.3);
-    transition: all var(--transition-fast) var(--transition-ease);
-}
-
-.copy-btn:hover {
-    background-color: #05b889;
-    box-shadow: 0 6px 20px rgba(6, 214, 160, 0.4);
-}
-
-.copy-btn.copied {
-    background-color: #05b889;
-}
-
-.edit-btn {
-    background-color: transparent;
-    color: white;
-    padding: var(--spacing-xs);
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    font-size: 0.9rem;
-}
-
-.edit-btn:hover {
-    background-color: rgba(255, 255, 255, 0.2);
 }
 
 /* ローディング */
@@ -676,7 +513,7 @@ input[type="text"]:focus+.search-icon {
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-card);
     padding: var(--spacing-xl);
-    border: 1px solid rgba(233, 236, 239, 0.8);
+    border: 1px solid rgba(var(--border-color-rgb), 0.8);
     position: relative;
     overflow: hidden;
 }
@@ -690,17 +527,6 @@ input[type="text"]:focus+.search-icon {
     height: 8px;
     background: var(--primary-gradient);
     z-index: 1;
-}
-
-.spinner {
-    width: 60px;
-    height: 60px;
-    border: 5px solid rgba(67, 97, 238, 0.15);
-    border-top: 5px solid var(--primary-color);
-    border-radius: 50%;
-    animation: spin 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
-    margin: 0 auto var(--spacing-lg);
-    box-shadow: 0 0 15px rgba(67, 97, 238, 0.1);
 }
 
 .loading-message {
@@ -745,7 +571,7 @@ input[type="text"]:focus+.search-icon {
     left: 0;
     right: 0;
     height: 2px;
-    background-color: rgba(67, 97, 238, 0.08);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
     z-index: 1;
 }
 
@@ -763,7 +589,7 @@ input[type="text"]:focus+.search-icon {
     height: 24px;
     border-radius: 50%;
     background-color: var(--card-bg);
-    border: 2px solid rgba(67, 97, 238, 0.3);
+    border: 2px solid rgba(var(--primary-color-rgb), 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -777,14 +603,14 @@ input[type="text"]:focus+.search-icon {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background-color: rgba(67, 97, 238, 0.2);
+    background-color: rgba(var(--primary-color-rgb), 0.2);
     transform: scale(0);
     transition: transform 0.3s var(--transition-ease);
 }
 
 .step-indicator.active .step-dot {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+    box-shadow: 0 0 0 4px rgba(var(--primary-color-rgb), 0.1);
 }
 
 .step-indicator.active .step-dot::before {
@@ -829,7 +655,7 @@ input[type="text"]:focus+.search-icon {
 .progress-bar {
     width: 100%;
     height: 12px;
-    background-color: rgba(67, 97, 238, 0.08);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
     border-radius: var(--border-radius-md);
     overflow: hidden;
     position: relative;
@@ -844,7 +670,7 @@ input[type="text"]:focus+.search-icon {
     transition: width 0.4s var(--transition-ease);
     position: relative;
     overflow: hidden;
-    box-shadow: 0 2px 4px rgba(67, 97, 238, 0.2);
+    box-shadow: 0 2px 4px rgba(var(--primary-color-rgb), 0.2);
 }
 
 .progress-fill::after {
@@ -893,83 +719,12 @@ input[type="text"]:focus+.search-icon {
     animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-    0% {
-        transform: scale(0.8);
-        opacity: 0.8;
-    }
-
-    50% {
-        transform: scale(1.2);
-        opacity: 1;
-    }
-
-    100% {
-        transform: scale(0.8);
-        opacity: 0.8;
-    }
-}
-
 .progress-percent {
     font-weight: 600;
     color: var(--primary-color);
-    background-color: rgba(67, 97, 238, 0.08);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
     padding: 2px 8px;
     border-radius: var(--border-radius-sm);
-}
-
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
-/* メンテナンス告知バナー */
-.maintenance-notice {
-    background-color: rgba(77, 166, 255, 0.08);
-    color: var(--text-color);
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--border-radius-lg);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    max-width: 700px;
-    margin: var(--spacing-lg) auto 0;
-    border-left: 4px solid var(--warning-color);
-    box-shadow: var(--shadow-sm);
-    font-weight: 500;
-    line-height: 1.6;
-}
-
-.maintenance-notice i {
-    font-size: 1.4rem;
-    color: var(--warning-color);
-    background-color: rgba(77, 166, 255, 0.12);
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-}
-
-@media (max-width: 576px) {
-    .maintenance-notice {
-        margin: var(--spacing-md) auto 0;
-        padding: var(--spacing-sm) var(--spacing-md);
-        font-size: 0.85rem;
-    }
-
-    .maintenance-notice i {
-        font-size: 1.1rem;
-        width: 28px;
-        height: 28px;
-    }
 }
 
 /* エラーメッセージ */
@@ -1033,7 +788,7 @@ input[type="text"]:focus+.search-icon {
     margin-top: var(--spacing-xl);
     animation: fadeInUp 0.6s var(--transition-ease);
     padding-top: var(--spacing-lg);
-    border-top: 1px solid rgba(233, 236, 239, 0.6);
+    border-top: 1px solid rgba(var(--border-color-rgb), 0.6);
 }
 
 .results-header {
@@ -1062,7 +817,7 @@ input[type="text"]:focus+.search-icon {
 .results-header i {
     font-size: 1.5rem;
     color: var(--primary-color);
-    background-color: rgba(67, 97, 238, 0.1);
+    background-color: rgba(var(--primary-color-rgb), 0.1);
     width: 40px;
     height: 40px;
     display: flex;
@@ -1089,13 +844,6 @@ input[type="text"]:focus+.search-icon {
     flex-direction: column;
     height: 100%;
     position: relative;
-}
-
-.template-card:hover {
-    transform: translateY(-6px);
-    box-shadow: var(--shadow-card-hover);
-    border-color: rgba(67, 97, 238, 0.2);
-    background-color: var(--card-bg-hover);
 }
 
 .card-header {
@@ -1132,8 +880,8 @@ input[type="text"]:focus+.search-icon {
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
-    background: linear-gradient(135deg, #4da6ff, #66b3ff);
-    color: #2b2d42;
+    background: linear-gradient(135deg, var(--featured-accent-color), #66b3ff);
+    color: var(--text-color);
     padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--border-radius-sm);
     font-size: 0.8rem;
@@ -1158,7 +906,7 @@ input[type="text"]:focus+.search-icon {
 
 .featured-indicator i {
     font-size: 0.9rem;
-    color: #2b2d42;
+    color: var(--text-color);
 }
 
 @keyframes featuredGlow {
@@ -1181,7 +929,7 @@ input[type="text"]:focus+.search-icon {
 
 /* 特集対応テンプレートカードの追加スタイル */
 .template-card.featured {
-    border: 2px solid #4da6ff;
+    border: 2px solid var(--featured-accent-color);
     position: relative;
     box-shadow: 0 8px 25px rgba(77, 166, 255, 0.15), var(--shadow-card);
 }
@@ -1206,8 +954,8 @@ input[type="text"]:focus+.search-icon {
 
 /* 特集対応テンプレートのヘッダー強調 */
 .template-card.featured .card-header {
-    background: linear-gradient(135deg, #4da6ff, #66b3ff);
-    color: #2b2d42;
+    background: linear-gradient(135deg, var(--featured-accent-color), #66b3ff);
+    color: var(--text-color);
     position: relative;
     overflow: hidden;
 }
@@ -1253,7 +1001,10 @@ input[type="text"]:focus+.search-icon {
     margin-bottom: 0;
 }
 
-.field label {
+/* テンプレートカードのフィールド見出し行。
+   textarea と関連付いていない偽の <label> を <div class="field-label"> に置き換えたため、
+   セレクタも要素依存から class 依存に変えている。 */
+.field-label {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1285,7 +1036,7 @@ input[type="text"]:focus+.search-icon {
 .char-count {
     color: var(--text-color-light);
     font-size: 0.85rem;
-    background-color: rgba(67, 97, 238, 0.08);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
     padding: 2px 8px;
     border-radius: var(--border-radius-sm);
     transition: all var(--transition-fast) var(--transition-ease);
@@ -1365,7 +1116,7 @@ textarea {
 }
 
 textarea:hover {
-    border-color: rgba(67, 97, 238, 0.3);
+    border-color: rgba(var(--primary-color-rgb), 0.3);
 }
 
 textarea::placeholder {
@@ -1396,7 +1147,7 @@ textarea::placeholder {
 textarea:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+    box-shadow: 0 0 0 4px rgba(var(--primary-color-rgb), 0.1);
     background-color: white;
 }
 
@@ -1407,15 +1158,6 @@ textarea:focus {
     background-color: rgba(248, 249, 255, 0.5);
 }
 
-.copy-btn {
-    background-color: var(--success-color);
-    color: white;
-}
-
-.copy-btn:hover {
-    background-color: #1ba883;
-}
-
 /* エクスポートボタン */
 .export-buttons {
     display: flex;
@@ -1423,7 +1165,7 @@ textarea:focus {
     justify-content: center;
     margin-top: var(--spacing-xl);
     padding-top: var(--spacing-lg);
-    border-top: 1px dashed rgba(233, 236, 239, 0.8);
+    border-top: 1px dashed rgba(var(--border-color-rgb), 0.8);
 }
 
 /* フッター */
@@ -1521,7 +1263,7 @@ textarea:focus {
 
 /* 特集キーワードセクション */
 .featured-keywords-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--featured-gradient-start) 0%, var(--featured-gradient-end) 100%);
     border-radius: var(--border-radius-lg);
     padding: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
@@ -1530,18 +1272,6 @@ textarea:focus {
     position: relative;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.featured-keywords-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.1), transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.08), transparent 50%);
-    z-index: 1;
 }
 
 .featured-keywords-section::after {
@@ -1579,25 +1309,6 @@ textarea:focus {
     letter-spacing: 0.5px;
 }
 
-.featured-keywords-title i {
-    font-size: 1.6rem;
-    color: #4da6ff;
-    text-shadow: 0 0 10px rgba(77, 166, 255, 0.5);
-    animation: sparkle 2s ease-in-out infinite alternate;
-}
-
-@keyframes sparkle {
-    0% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
-
-    100% {
-        transform: scale(1.1);
-        filter: brightness(1.3);
-    }
-}
-
 .featured-keywords-container {
     position: relative;
     z-index: 2;
@@ -1606,20 +1317,6 @@ textarea:focus {
     gap: var(--spacing-md);
     justify-content: flex-start;
     align-items: flex-start;
-}
-
-.featured-keywords-loading {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 1rem;
-    font-weight: 500;
-}
-
-.featured-keywords-loading i {
-    font-size: 1.2rem;
-    animation: spin 1s linear infinite;
 }
 
 .featured-keyword-btn {
@@ -1642,39 +1339,6 @@ textarea:focus {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-.featured-keyword-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s var(--transition-ease);
-}
-
-.featured-keyword-btn:hover {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.4);
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.featured-keyword-btn:hover::before {
-    left: 100%;
-}
-
-.featured-keyword-btn.active {
-    background: rgba(255, 255, 255, 0.9);
-    color: var(--primary-color);
-    border-color: white;
-    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px) scale(1.05);
-    text-shadow: none;
-    font-weight: 700;
-}
-
 .featured-keyword-btn.active::after {
     content: '\f00c';
     font-family: 'Font Awesome 6 Free';
@@ -1692,11 +1356,6 @@ textarea:focus {
     justify-content: center;
     font-size: 0.7rem;
     box-shadow: 0 2px 8px rgba(6, 214, 160, 0.4);
-}
-
-.featured-keyword-btn:active {
-    transform: translateY(-1px) scale(1.01);
-    transition: transform 0.1s var(--transition-ease);
 }
 
 /* 特集キーワードボタンの追加アニメーション効果 */
@@ -1746,12 +1405,8 @@ textarea:focus {
         opacity: 1;
         transform: scale(1) translateY(0);
     }
-}
+}/* ボタンのパルス効果（選択時） */
 
-/* ボタンのパルス効果（選択時） */
-.featured-keyword-btn.active {
-    animation: activeButtonPulse 2s ease-in-out infinite;
-}
 
 @keyframes activeButtonPulse {
 
@@ -1815,23 +1470,8 @@ textarea:focus {
 .featured-keyword-btn[data-gender="mens"]:hover {
     border-color: rgba(135, 206, 235, 0.6);
     background: rgba(135, 206, 235, 0.15);
-}
+}/* 特集キーワードボタンの無効状態 */
 
-/* 特集キーワードボタンの無効状態 */
-.featured-keyword-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-.featured-keyword-btn:disabled:hover {
-    transform: none;
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: none;
-}
 
 /* 特集キーワードエラー状態 */
 .featured-keywords-error {
@@ -1841,10 +1481,6 @@ textarea:focus {
     color: rgba(255, 255, 255, 0.7);
     font-size: 0.95rem;
     font-style: italic;
-}
-
-.featured-keywords-error i {
-    color: rgba(255, 255, 255, 0.5);
 }
 
 /* レスポンシブデザイン */
@@ -1994,100 +1630,105 @@ textarea:focus {
     }
 }
 
-.gender-option-wrapper {
-    min-width: 120px;
-    flex: none;
-    width: calc(50% - var(--spacing-sm) / 2);
-}
+/* スマートフォン用 (縦) */
+/* NOTE: 以下は @media の開き括弧と閉じ括弧が編集事故で失われ、
+   モバイル向けの指定が全画面幅に適用されていた箇所（囲み直して復旧） */
+@media (max-width: 576px) {
+    .gender-option-wrapper {
+        min-width: 120px;
+        flex: none;
+        width: calc(50% - var(--spacing-sm) / 2);
+    }
 
-.gender-option {
-    padding: var(--spacing-sm);
-    border-radius: var(--border-radius-sm);
-}
+    .gender-option {
+        padding: var(--spacing-sm);
+        border-radius: var(--border-radius-sm);
+    }
 
-/* この設定を削除して横並びを維持 */
+    /* この設定を削除して横並びを維持 */
 
-input[type="text"] {
-    height: 46px;
-    font-size: 0.95rem;
-    padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) calc(var(--spacing-sm) * 4);
-}
+    input[type="text"] {
+        height: 46px;
+        font-size: 0.95rem;
+        padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) calc(var(--spacing-sm) * 4);
+    }
 
-.search-icon {
-    left: var(--spacing-sm);
-}
+    .search-icon {
+        left: var(--spacing-sm);
+    }
 
-.primary-button {
-    height: 46px;
-    font-size: 0.95rem;
-}
+    .primary-button {
+        height: 46px;
+        font-size: 0.95rem;
+    }
 
-.guide-collapsible {
-    margin-bottom: var(--spacing-md);
-}
+    .guide-collapsible {
+        margin-bottom: var(--spacing-md);
+    }
 
-.guide-summary {
-    padding: var(--spacing-sm) var(--spacing-md);
-}
+    .guide-summary {
+        padding: var(--spacing-sm) var(--spacing-md);
+    }
 
-.guide-content {
-    padding: var(--spacing-sm);
-}
+    .guide-content {
+        padding: var(--spacing-sm);
+    }
 
-.guide-step {
-    margin-bottom: var(--spacing-sm);
-}
+    .guide-step {
+        margin-bottom: var(--spacing-sm);
+    }
 
-.guide-step-number {
-    width: 24px;
-    height: 24px;
-    font-size: 0.8rem;
-}
+    .guide-step-number {
+        width: 24px;
+        height: 24px;
+        font-size: 0.8rem;
+    }
 
-.guide-step-text span {
-    font-size: 0.9rem;
-}
+    .guide-step-text span {
+        font-size: 0.9rem;
+    }
 
-.template-container {
-    gap: var(--spacing-md);
-}
+    .template-container {
+        gap: var(--spacing-md);
+    }
 
-.export-buttons {
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
+    .export-buttons {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
 
-.loading-content {
-    padding: var(--spacing-md);
-}
+    .loading-content {
+        padding: var(--spacing-md);
+    }
 
-.progress-steps {
-    overflow-x: auto;
-    padding-bottom: var(--spacing-xs);
-    justify-content: flex-start;
-}
+    .progress-steps {
+        overflow-x: auto;
+        padding-bottom: var(--spacing-xs);
+        justify-content: flex-start;
+    }
 
-.step-label {
-    font-size: 0.7rem;
-    white-space: nowrap;
-}
+    .step-label {
+        font-size: 0.7rem;
+        white-space: nowrap;
+    }
 
-.step-indicator {
-    min-width: 75px;
-    margin-right: var(--spacing-sm);
-}
+    .step-indicator {
+        min-width: 75px;
+        margin-right: var(--spacing-sm);
+    }
 
-.results-header {
-    font-size: 1.2rem;
-    margin-bottom: var(--spacing-md);
-}
+    .results-header {
+        font-size: 1.2rem;
+        margin-bottom: var(--spacing-md);
+    }
 
-.field-info {
-    display: none;
-}
+    .field-info {
+        display: none;
+    }
 
-.field-copy-btn {
-    opacity: 0.8;
+    .field-copy-btn {
+        opacity: 0.8;
+    }
 }
 
 /* スマートフォン用 (横) / タブレット (縦) */
@@ -2190,7 +1831,7 @@ input[type="text"] {
     background-color: var(--card-bg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-card);
-    border: 1px solid rgba(233, 236, 239, 0.8);
+    border: 1px solid rgba(var(--border-color-rgb), 0.8);
     padding: var(--spacing-lg);
     transition: all var(--transition-normal) var(--transition-ease);
     animation: slideUpFade 0.6s var(--transition-ease);
@@ -2203,47 +1844,29 @@ input[type="text"] {
 .template-card:hover {
     transform: translateY(-5px);
     box-shadow: var(--shadow-card-hover);
-    border-color: rgba(67, 97, 238, 0.2);
+    border-color: rgba(var(--primary-color-rgb), 0.2);
+    background-color: var(--card-bg-hover);
 }
 
+/* .title は編集可能な textarea。旧実装は JS で color と font-weight を
+   インラインで上書きしており、この規則の青・太字は実際には見えていなかった。
+   インライン指定を廃止した分をここに反映し、見た目を従来どおりに保つ。 */
 .template-card .title {
-    color: var(--primary-color);
-    font-weight: 700;
+    color: var(--text-color);
+    font-weight: normal;
     margin-bottom: var(--spacing-md);
     font-size: 1.25rem;
     line-height: 1.4;
 }
 
-.template-card .description {
-    color: var(--text-color);
-    margin-bottom: var(--spacing-lg);
-    line-height: 1.6;
-    flex-grow: 1;
-}
-
-.template-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: auto;
-}
-
-.template-tag {
-    background-color: rgba(67, 97, 238, 0.1);
-    color: var(--primary-color);
-    font-size: 0.8rem;
-    padding: 4px 10px;
-    border-radius: var(--border-radius-sm);
-    font-weight: 600;
-    display: inline-block;
-}
-
 .copy-btn {
+    background-color: var(--success-color);
+    color: var(--text-color-light);
+    box-shadow: 0 4px 15px rgba(6, 214, 160, 0.3);
+    transition: all var(--transition-fast) var(--transition-ease);
     background: none;
     border: none;
-    color: var(--text-color-light);
     cursor: pointer;
-    transition: all var(--transition-fast) var(--transition-ease);
     display: flex;
     align-items: center;
     padding: var(--spacing-sm);
@@ -2251,8 +1874,9 @@ input[type="text"] {
 }
 
 .copy-btn:hover {
+    background-color: rgba(var(--primary-color-rgb), 0.08);
+    box-shadow: 0 6px 20px rgba(6, 214, 160, 0.4);
     color: var(--primary-color);
-    background-color: rgba(67, 97, 238, 0.08);
 }
 
 .copy-btn i {
@@ -2271,7 +1895,7 @@ input[type="text"] {
     opacity: 0;
     transition: opacity 0.3s var(--transition-ease);
     pointer-events: none;
-    z-index: 1000;
+    z-index: var(--z-overlay);
     box-shadow: var(--shadow-md);
 }
 
@@ -2313,7 +1937,7 @@ input[type="text"] {
 }
 
 .page-btn:hover:not(.current-page) {
-    background-color: rgba(67, 97, 238, 0.08);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
     border-color: var(--primary-color-light);
     color: var(--primary-color);
 }
@@ -2420,81 +2044,13 @@ input[type="text"] {
 .spinner {
     width: 50px;
     height: 50px;
-    border: 5px solid rgba(67, 97, 238, 0.2);
+    border: 5px solid rgba(var(--primary-color-rgb), 0.2);
+    border-top: 5px solid var(--primary-color);
     border-radius: 50%;
-    border-top-color: var(--primary-color);
     animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% {
-        transform: rotate(0deg);
-    }
-
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
-/* Style for the model selection dropdown to match other input fields */
-.search-box .input-wrapper.model-selection {
-    display: flex;
-    align-items: center;
-    position: relative;
-}
-
-.model-icon {
-    position: absolute;
-    /* Changed from relative for better alignment within wrapper */
-    left: 15px;
-    /* Match search-icon if it's similar */
-    color: var(--text-color-light);
-    /* Use consistent icon color */
-    font-size: 0.9em;
-    /* Match other icons */
-    pointer-events: none;
-    /* Allow clicks to pass through to the select */
-    z-index: 2;
-}
-
-.model-select {
-    flex-grow: 1;
-    width: 100%;
-    /* Make select take full width of its wrapper */
-    height: var(--input-height, 48px);
-    /* Match existing input height */
-    padding: 0.75rem 1rem 0.75rem 2.5rem;
-    /* Adjust left padding for icon */
-    font-size: var(--input-font-size, 1rem);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-md);
-    background-color: var(--card-bg);
-    color: var(--text-color);
-    appearance: none;
-    /* Remove default browser arrow */
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236c757d' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
-    /* Custom arrow */
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 1em;
-    cursor: pointer;
-    transition: all var(--transition-fast) var(--transition-ease);
-    box-shadow: var(--shadow-sm);
-}
-
-.model-select:hover {
-    border-color: var(--primary-color-light);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
-}
-
-.model-select:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
-    transform: translateY(-1px);
+    margin: 0 auto var(--spacing-lg);
+    box-shadow: 0 0 15px rgba(var(--primary-color-rgb), 0.1);
+    border-top-color: var(--primary-color);
 }
 
 /* Adjustments for the search-box layout if needed */
@@ -2512,14 +2068,6 @@ input[type="text"] {
     /* Allow keyword input to take more space */
     min-width: 200px;
     /* Minimum width for keyword input */
-}
-
-.search-box>.input-wrapper.model-selection {
-    flex-grow: 0;
-    /* Model select takes less space */
-    flex-basis: 180px;
-    /* Base width for selects, adjust as needed */
-    min-width: 160px;
 }
 
 .search-box>.primary-button {
@@ -2582,7 +2130,7 @@ input[type="text"] {
 /* 特集
 キーワード関連のスタイル */
 .featured-keywords-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--featured-gradient-start) 0%, var(--featured-gradient-end) 100%);
     border-radius: var(--border-radius-lg);
     padding: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
@@ -2614,9 +2162,11 @@ input[type="text"] {
 }
 
 .featured-keywords-title i {
-    margin-right: var(--spacing-sm);
-    color: #4da6ff;
+    font-size: 1.6rem;
+    color: var(--featured-accent-color);
+    text-shadow: 0 0 10px rgba(77, 166, 255, 0.5);
     animation: sparkle 2s ease-in-out infinite;
+    margin-right: var(--spacing-sm);
 }
 
 @keyframes sparkle {
@@ -2672,6 +2222,7 @@ input[type="text"] {
     border-color: rgba(255, 255, 255, 0.5);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .featured-keyword-btn:hover::before {
@@ -2689,10 +2240,13 @@ input[type="text"] {
     border-color: white;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     transform: translateY(-2px);
+    text-shadow: none;
+    font-weight: 700;
+    animation: activeButtonPulse 2s ease-in-out infinite;
 }
 
 .featured-keyword-btn.active i {
-    color: #4da6ff;
+    color: var(--featured-accent-color);
     animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -2712,29 +2266,17 @@ input[type="text"] {
     opacity: 0.7;
     cursor: not-allowed;
     transform: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .featured-keyword-btn:disabled:hover {
+    transform: none;
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.3);
-    transform: none;
     box-shadow: none;
-}
+}/* 特集キーワード状態表示 */
 
-/* 特集キーワード状態表示 */
-.featured-keywords-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-lg);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.9rem;
-}
-
-.featured-keywords-loading i {
-    margin-right: var(--spacing-sm);
-    animation: spin 1s linear infinite;
-}
 
 @keyframes spin {
     from {
@@ -2744,20 +2286,6 @@ input[type="text"] {
     to {
         transform: rotate(360deg);
     }
-}
-
-.featured-keywords-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-lg);
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.9rem;
-}
-
-.featured-keywords-empty i {
-    margin-right: var(--spacing-sm);
-    font-size: 1.1rem;
 }
 
 .featured-keywords-error {
@@ -2772,83 +2300,8 @@ input[type="text"] {
 }
 
 .featured-keywords-error i {
+    color: var(--featured-accent-color);
     margin-right: var(--spacing-sm);
-    color: #4da6ff;
-}
-
-/* トースト通知スタイル */
-.featured-selection-toast,
-.featured-deselection-toast,
-.featured-error-toast,
-.gender-change-toast,
-.manual-gender-change-toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: white;
-    color: var(--text-color);
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    z-index: 1000;
-    transform: translateX(100%);
-    opacity: 0;
-    transition: all var(--transition-normal) var(--transition-ease);
-    max-width: 300px;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-.featured-selection-toast.show,
-.featured-deselection-toast.show,
-.featured-error-toast.show,
-.gender-change-toast.show,
-.manual-gender-change-toast.show {
-    transform: translateX(0);
-    opacity: 1;
-}
-
-.featured-selection-toast {
-    border-left: 4px solid var(--success-color);
-}
-
-.featured-selection-toast i {
-    color: #4da6ff;
-}
-
-.featured-deselection-toast {
-    border-left: 4px solid var(--text-color-light);
-}
-
-.featured-deselection-toast i {
-    color: var(--text-color-light);
-}
-
-.featured-error-toast {
-    border-left: 4px solid var(--error-color);
-}
-
-.featured-error-toast i {
-    color: var(--error-color);
-}
-
-.gender-change-toast {
-    border-left: 4px solid var(--primary-color);
-}
-
-.gender-change-toast i {
-    color: var(--primary-color);
-}
-
-.manual-gender-change-toast {
-    border-left: 4px solid var(--warning-color);
-}
-
-.manual-gender-change-toast i {
-    color: var(--warning-color);
 }
 
 /* レスポンシブ対応 */
@@ -2897,15 +2350,18 @@ input[type="text"] {
 .featured-keywords-loading {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: var(--spacing-sm);
-    padding: var(--spacing-lg);
     color: rgba(255, 255, 255, 0.8);
     font-size: 0.9rem;
+    font-weight: 500;
+    justify-content: center;
+    padding: var(--spacing-lg);
 }
 
 .featured-keywords-loading i {
     font-size: 1.1rem;
+    animation: spin 1s linear infinite;
+    margin-right: var(--spacing-sm);
 }
 
 /* エラー状態 */
@@ -2933,7 +2389,9 @@ input[type="text"] {
     font-size: 1.2rem;
 }
 
-.featured-keywords-error .error-message {
+/* グローバルな .error-message とのクラス名衝突を避けるため、
+   JS 側で .featured-keywords-error-text に改名している */
+.featured-keywords-error-text {
     font-size: 0.9rem;
     line-height: 1.4;
 }
@@ -2986,14 +2444,15 @@ input[type="text"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-sm);
     padding: var(--spacing-lg);
     color: rgba(255, 255, 255, 0.6);
     font-size: 0.9rem;
+    gap: var(--spacing-sm);
     font-style: italic;
 }
 
 .featured-keywords-empty i {
+    margin-right: var(--spacing-sm);
     font-size: 1.1rem;
 }
 
@@ -3007,7 +2466,7 @@ input[type="text"] {
     background: white;
     border-radius: var(--border-radius-md);
     box-shadow: var(--shadow-lg);
-    z-index: 10000;
+    z-index: var(--z-toast);
     transform: translateX(100%);
     transition: transform var(--transition-normal) var(--transition-ease);
     border-left: 4px solid var(--primary-color);
@@ -3109,91 +2568,6 @@ input[type="text"] {
     transform: translateY(-1px);
 }
 
-/* トースト通知スタイル */
-.featured-selection-toast,
-.featured-deselection-toast,
-.featured-error-toast,
-.featured-retry-success-toast,
-.gender-change-toast,
-.manual-gender-change-toast {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: white;
-    color: var(--text-color);
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    z-index: 10000;
-    transform: translateY(100%);
-    opacity: 0;
-    transition: all var(--transition-normal) var(--transition-ease);
-    max-width: 350px;
-    font-size: 0.9rem;
-}
-
-.featured-selection-toast.show,
-.featured-deselection-toast.show,
-.featured-error-toast.show,
-.featured-retry-success-toast.show,
-.gender-change-toast.show,
-.manual-gender-change-toast.show {
-    transform: translateY(0);
-    opacity: 1;
-}
-
-/* 各トーストの色分け */
-.featured-selection-toast {
-    border-left: 4px solid var(--success-color);
-}
-
-.featured-selection-toast i {
-    color: var(--success-color);
-}
-
-.featured-deselection-toast {
-    border-left: 4px solid var(--text-color-light);
-}
-
-.featured-deselection-toast i {
-    color: var(--text-color-light);
-}
-
-.featured-error-toast {
-    border-left: 4px solid var(--error-color);
-}
-
-.featured-error-toast i {
-    color: var(--error-color);
-}
-
-.featured-retry-success-toast {
-    border-left: 4px solid var(--success-color);
-}
-
-.featured-retry-success-toast i {
-    color: var(--success-color);
-}
-
-.gender-change-toast {
-    border-left: 4px solid var(--primary-color);
-}
-
-.gender-change-toast i {
-    color: var(--primary-color);
-}
-
-.manual-gender-change-toast {
-    border-left: 4px solid var(--accent-color);
-}
-
-.manual-gender-change-toast i {
-    color: var(--accent-color);
-}
-
 /* アニメーション */
 @keyframes slideInDown {
     from {
@@ -3232,7 +2606,7 @@ input[type="text"] {
         padding: var(--spacing-md);
     }
     
-    .featured-keywords-error .error-message {
+    .featured-keywords-error-text {
         font-size: 0.85rem;
     }
 }
@@ -3245,7 +2619,8 @@ input[type="text"] {
 /* 以下の display 指定はユーティリティの .hidden（前方で定義）より後に来るため、
    .hidden が効くよう明示的に打ち消す */
 .season-selection.hidden,
-.mens-notice.hidden {
+.mens-notice.hidden,
+.pagination.hidden {
     display: none;
 }
 
@@ -3296,7 +2671,7 @@ input[type="text"] {
 }
 
 .season-option:hover {
-    background-color: rgba(67, 97, 238, 0.08);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
     transform: translateY(-2px);
 }
 
@@ -3324,8 +2699,8 @@ input[type="text"] {
 /* 選択中の季節オプションのスタイル（JSで付与） */
 .season-option-active {
     border-color: var(--primary-color);
-    background-color: rgba(67, 97, 238, 0.08);
-    box-shadow: 0 3px 8px rgba(67, 97, 238, 0.15);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
+    box-shadow: 0 3px 8px rgba(var(--primary-color-rgb), 0.15);
 }
 
 @media (max-width: 576px) {
@@ -3462,8 +2837,8 @@ input[type="text"] {
 .mens-word-group.is-priority .mens-word-list li {
     color: var(--primary-color);
     font-weight: 600;
-    background-color: rgba(67, 97, 238, 0.08);
-    border-color: rgba(67, 97, 238, 0.3);
+    background-color: rgba(var(--primary-color-rgb), 0.08);
+    border-color: rgba(var(--primary-color-rgb), 0.3);
 }
 
 @media (max-width: 576px) {
@@ -3485,4 +2860,235 @@ input[type="text"] {
     .mens-word-list li {
         font-size: 0.78rem;
     }
+}
+
+/* =========================================================================
+   エクスポートダイアログ（旧 script.js のインライン <style> から移設）
+
+   動的 <style> は <link> より後に head へ挿入されるため、同じ詳細度なら
+   注入側が勝っていた。その順序を保つため、このファイルの末尾に置く。
+   ========================================================================= */
+.export-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-overlay);
+    animation: fadeIn 0.3s;
+}
+
+.export-dialog-content {
+    background-color: white;
+    border-radius: var(--border-radius-lg);
+    max-width: 400px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: scaleIn 0.3s;
+}
+
+.export-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: var(--primary-gradient);
+    color: white;
+}
+
+.export-dialog-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.export-dialog-body {
+    padding: var(--spacing-lg);
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.export-option {
+    flex: 1;
+    background-color: white;
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    transition: all 0.3s var(--transition-ease);
+}
+
+.export-option:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(var(--primary-color-rgb), 0.05);
+    transform: translateY(-5px);
+}
+
+.export-option i {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-xs);
+}
+
+@media (max-width: 768px) {
+    .export-dialog-body {
+        flex-direction: column;
+    }
+}
+
+
+/* =========================================================================
+   コピー完了状態（旧 script.js の addToastStyles() から移設）
+
+   同ブロックにあった .toast 系は下の「トースト（統一版）」に一本化したため削除した。
+   ここに残っていた旧 .toast 定義と @media(max-width:768px) は、統一版が上書きしない
+   left / text-align / justify-content だけを漏らし、577〜768px でトーストを
+   左寄せ・中央揃えにしてしまっていた。
+   ========================================================================= */
+.copy-btn.copied {
+    background-color: var(--success-color);
+    color: white;
+}
+
+
+/* =========================================================================
+   アクセシビリティ用ユーティリティ
+   ========================================================================= */
+
+/* 視覚的には隠すがスクリーンリーダーには読ませる。
+   表示/非表示を切り替える .hidden とは目的が異なるので別名にしている。 */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+
+/* =========================================================================
+   トースト（統一版）
+
+   以前は .toast 系（JS 注入）と .featured-*-toast 系（style.css）の2系統が
+   同じ位置・同じ役割で並存していた。ここで .toast + modifier に一本化する。
+   ジオメトリは 8種のうち 6種が使っていた .featured-*-toast 系に揃えてある。
+
+   中央下のピル型 #copied-toast は見た目も役割も別コンポーネントなので統合しない。
+   ========================================================================= */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    color: var(--text-color);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    z-index: var(--z-toast);
+    transform: translateY(100%);
+    opacity: 0;
+    transition: all var(--transition-normal) var(--transition-ease);
+    max-width: 350px;
+    font-size: 0.9rem;
+    border-left: 4px solid var(--text-color-light);
+}
+
+.toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.toast .toast-title {
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.toast .toast-message {
+    font-size: 0.85rem;
+    color: var(--text-color-light);
+}
+
+.toast--success            { border-left-color: var(--success-color); }
+.toast--success i          { color: var(--success-color); }
+.toast--info               { border-left-color: var(--text-color-light); }
+.toast--info i             { color: var(--text-color-light); }
+.toast--error              { border-left-color: var(--error-color); }
+.toast--error i            { color: var(--error-color); }
+.toast--primary            { border-left-color: var(--primary-color); }
+.toast--primary i          { color: var(--primary-color); }
+.toast--accent             { border-left-color: var(--accent-color); }
+.toast--accent i           { color: var(--accent-color); }
+
+.toast--featured {
+    background: linear-gradient(135deg, var(--featured-gold-light), var(--featured-gold));
+    border-left-color: var(--featured-gold-dark);
+    color: var(--text-color);
+}
+
+.toast--featured i {
+    color: var(--featured-gold-dark);
+}
+
+.toast--featured .toast-message {
+    color: var(--text-color);
+}
+
+@media (max-width: 576px) {
+    .toast {
+        left: 20px;
+        right: 20px;
+        max-width: none;
+    }
+}
+
+
+/* =========================================================================
+   JS のインラインスタイルから移設した状態表現
+   ========================================================================= */
+
+/* 旧: textarea の focus/blur で boxShadow を直接書き換えていた */
+.textarea-container.is-focused {
+    box-shadow: 0 0 0 4px rgba(var(--primary-color-rgb), 0.1);
+}
+
+/* 旧: 特集キーワードボタンの mouseenter/mouseleave/mousedown/focus で
+   transform と outline を直接書き換えていた */
+.featured-keyword-btn:hover:not(.active) {
+    transform: translateY(-2px) scale(1.02);
+}
+
+.featured-keyword-btn:active:not(.active) {
+    transform: translateY(0) scale(0.98);
+}
+
+.featured-keyword-btn:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
 }
