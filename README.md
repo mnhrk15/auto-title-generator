@@ -16,18 +16,18 @@
   - 特集掲載条件を満たした高品質テンプレート生成
 
 ## 技術スタック
-- **バックエンド**: Python 3.12, Flask 3.0.2 (ASGI対応)
+- **バックエンド**: Python 3.11, Flask 3.0.2 (ASGI対応)
 - **AI**: Google Gemini 3.1 Flash Lite (`gemini-3.1-flash-lite`、thinkingLevel=MINIMALで高速化、構造化出力)
 - **SDK**: google-genai 1.70.0
 - **フロントエンド**: HTML, CSS, JavaScript
 - **スクレイピング**: BeautifulSoup4 4.12.3, aiohttp 3.9.3 (完全非同期処理)
 - **本番環境**: Gunicorn 21.2.0 + Uvicorn 0.29.0 (ASGI対応)
-- **テスト**: pytest 8.1.1 (非同期テスト対応)
+- **テスト**: pytest（非同期テスト対応）/ **Lint・整形**: ruff
 
 ## セットアップ方法
 
 ### 前提条件
-- **Python 3.12以上** (推奨バージョン)
+- **Python 3.11** (本番は `runtime.txt` の `python-3.11.8`)
 - pip (Pythonパッケージマネージャー)
 - **Google Gemini API キー** ([Google AI Studio](https://makersuite.google.com/app/apikey)で取得)
 
@@ -63,9 +63,15 @@ GEMINI_API_KEY=your_gemini_api_key_here
 FLASK_SECRET_KEY=your_secret_key_here
 FLASK_DEBUG=True
 SCRAPING_DELAY_MIN=1
-SCRAPING_DELAY_MAX=3
-MAX_PAGES=3
+SCRAPING_DELAY_MAX=2
+MAX_PAGES=1
 ```
+
+`MAX_PAGES` を増やすときは注意してください。gunicorn のワーカータイムアウトと
+フロントエンドの中断はどちらも 120 秒で、これはスクレイピングと生成の合計に効きます。
+`MAX_PAGES=3` にすると合計が 120 秒を超えうるため、`gunicorn.conf.py` の `timeout` と
+`app/static/js/api.js` の `TIMEOUT_GENERATE_MS` も一緒に見直す必要があります
+（詳細は `app/config.py` のタイムアウト予算のコメント）。
 
 **重要**: Google Gemini APIキーが必須です。[Google AI Studio](https://makersuite.google.com/app/apikey)で取得してください。
 
@@ -223,20 +229,17 @@ GET /api/featured-keywords?gender={ladies|mens}
     {
       "name": "くびれヘア",
       "keyword": "くびれヘア",
-      "gender": "ladies"
+      "gender": "ladies",
+      "condition": "スタイル名に『くびれヘア』を含めること。"
     }
   ],
-  "gender": "ladies",
-  "total_keywords": 10,
-  "filtered_keywords": 5,
-  "health_status": {
-    "is_available": true,
-    "keywords_count": 10,
-    "file_exists": true
-  },
-  "status": 200
+  "message": null
 }
 ```
+
+`message` は、特集キーワードが未設定・読み込み失敗などで機能が降格しているときだけ
+文言が入ります（`success` は `true` のまま）。フロントエンドはこれを表示したうえで
+通常のテンプレート生成を継続します。
 
 #### テンプレート生成API
 ```
@@ -269,40 +272,49 @@ POST /api/generate
 {
   "success": true,
   "is_featured": true,
-  "keyword_type": "featured",
-  "processing_mode": "featured",
   "featured_keyword_info": {
     "name": "くびれヘア",
-    "condition": "スタイル名に『くびれヘア』を含めること。"
+    "condition": "スタイル名に『くびれヘア』を含めること。",
+    "gender": "ladies"
   },
   "templates": [
     {
       "title": "大人可愛いくびれヘアスタイル",
       "menu": "カット + カラー",
       "comment": "トレンドのくびれヘアで素敵にイメチェン",
-      "hashtag": "#くびれヘア #大人可愛い #ヘアスタイル",
-      "is_featured": true
+      "hashtag": ["#くびれヘア", "#大人可愛い", "#ヘアスタイル"],
+      "is_featured": true,
+      "featured_keyword_name": "くびれヘア"
     }
   ]
 }
 ```
+
+`hashtag` は文字列ではなく配列です（`app/schemas.py` の `list[str]`）。
+特集キーワードでない場合は `is_featured` が `false`、`featured_keyword_info` は
+`null` になり、テンプレート側の `featured_keyword_name` も付きません。
 
 ## プロジェクト構造
 ```
 auto-title-generator/
 ├── app/
 │   ├── __init__.py           # create_app()（アプリ生成・ロギング設定）
-│   ├── main.py               # ルートとエラーハンドラのみ
+│   ├── main.py               # ルート定義とリクエストのパース
+│   ├── error_handlers.py     # アプリ全体のエラーハンドラ（全て JSON で返す）
 │   ├── config.py             # 静的定数 + Settings（環境変数由来の設定）
 │   ├── errors.py             # AppError 階層・エラーコード・レスポンス組み立て
 │   ├── prompts.py            # Gemini プロンプトの組み立て（純関数）
 │   ├── schemas.py            # 構造化出力（response_schema）の pydantic モデル
-│   ├── generator.py          # Gemini 呼び出し・結果検証・季節カラー付加
+│   ├── generator.py          # Gemini クライアントの初期化とリクエスト送信
+│   ├── gemini_response.py    # Gemini レスポンスの解釈
+│   ├── template_validation.py# 生成結果の検証（文字数・ハッシュタグ）
+│   ├── seasons.py            # 季節カラーの正規化とタイトルへの付加
 │   ├── scraping.py           # HotPepper Beauty の非同期スクレイピング
 │   ├── featured_loader.py    # 特集キーワード JSON の読み込みと検証
 │   ├── featured_keywords.py  # 特集キーワードの参照リポジトリ
-│   ├── services/
+│   ├── services/             # Flask に依存しない協調層
 │   │   ├── keyword_analysis.py   # キーワード解析（特集/通常/混在の判定）
+│   │   ├── featured_service.py   # 特集キーワード一覧の組み立て
 │   │   └── template_service.py   # スクレイピングと生成の協調
 │   ├── data/
 │   │   └── featured_keywords.json
@@ -315,6 +327,8 @@ auto-title-generator/
 │   │       ├── toast.js          # トースト・通知
 │   │       ├── status.js         # ローディング/エラー/結果の表示制御
 │   │       ├── progress.js       # 疑似進捗バー
+│   │       ├── clipboard.js      # クリップボード操作と完了表示
+│   │       ├── template-format.js# テンプレートのテキスト整形
 │   │       ├── featured-keywords.js
 │   │       ├── template-card.js  # カード1枚の生成
 │   │       ├── template-list.js  # 一覧とページネーション
@@ -322,11 +336,16 @@ auto-title-generator/
 │   │       ├── form-controls.js  # 性別・季節カラーの選択制御
 │   │       └── generate.js       # 生成ボタンのフロー
 │   └── templates/
+│       ├── base.html
+│       ├── index.html
+│       └── _macros.html      # 繰り返しマークアップの Jinja マクロ
 ├── tests/
+├── pyproject.toml            # ruff（lint + format）の設定
 ├── pytest.ini                # テスト設定（integration マーカー等）
 ├── requirements.txt
 ├── asgi.py                   # 本番の ASGI エントリポイント
 └── run.py                    # 開発サーバー起動
+```
 
 ## 主要コンポーネントの説明
 
@@ -403,6 +422,16 @@ pytest tests/test_generator.py -v
 
 # 特集キーワード機能のテストのみ実行
 pytest tests/test_featured_keywords.py tests/test_featured_integration.py -v
+```
+
+### Lint と整形
+
+設定は `pyproject.toml` にあります。
+
+```bash
+ruff check .          # lint
+ruff check . --fix    # 自動修正できるものを直す
+ruff format .         # 整形
 ```
 
 ## パフォーマンス特性
