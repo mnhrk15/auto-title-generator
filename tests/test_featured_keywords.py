@@ -11,8 +11,6 @@ FeaturedKeywordsManagerのユニットテスト
 import json
 import logging
 import os
-import shutil
-import tempfile
 from unittest.mock import patch
 
 import pytest
@@ -28,31 +26,6 @@ from app.featured_keywords import (
 
 class TestFeaturedKeywordsManager:
     """FeaturedKeywordsManagerのテストクラス"""
-
-    @pytest.fixture
-    def temp_dir(self):
-        """テスト用の一時ディレクトリを作成"""
-        temp_dir = tempfile.mkdtemp()
-        yield temp_dir
-        shutil.rmtree(temp_dir)
-
-    @pytest.fixture
-    def valid_keywords_data(self):
-        """有効な特集キーワードデータ"""
-        return [
-            {
-                "name": "テスト用くびれヘア",
-                "keyword": "くびれヘア",
-                "gender": "ladies",
-                "condition": "テスト用の掲載条件です。",
-            },
-            {
-                "name": "テスト用韓国風マッシュ",
-                "keyword": "韓国風マッシュ",
-                "gender": "mens",
-                "condition": "テスト用のメンズ掲載条件です。",
-            },
-        ]
 
     @pytest.fixture
     def valid_keywords_file(self, temp_dir, valid_keywords_data):
@@ -643,54 +616,28 @@ class TestFeaturedKeywordsExceptions:
 class TestFeaturedKeywordsIntegration:
     """FeaturedKeywordsManagerの統合テスト"""
 
-    @pytest.fixture
-    def temp_dir(self):
-        """テスト用の一時ディレクトリを作成"""
-        temp_dir = tempfile.mkdtemp()
-        yield temp_dir
-        shutil.rmtree(temp_dir)
-
-    @pytest.fixture
-    def valid_keywords_data(self):
-        """有効な特集キーワードデータ"""
-        return [
-            {
-                "name": "テスト用くびれヘア",
-                "keyword": "くびれヘア",
-                "gender": "ladies",
-                "condition": "テスト用の掲載条件です。",
-            },
-            {
-                "name": "テスト用韓国風マッシュ",
-                "keyword": "韓国風マッシュ",
-                "gender": "mens",
-                "condition": "テスト用のメンズ掲載条件です。",
-            },
-        ]
-
     def test_real_data_file_integration(self):
-        """実際のデータファイルとの統合テスト"""
-        # 実際のfeatured_keywords.jsonファイルを使用
-        real_data_path = 'app/data/featured_keywords.json'
+        """同梱している実データが読み込めること
 
-        if os.path.exists(real_data_path):
-            manager = FeaturedKeywordsManager(real_data_path)
+        パスは config が持つ絶対パスを使う。以前は相対パス + os.path.exists で
+        囲っていたため、実行ディレクトリ次第で assert が丸ごとスキップされ、
+        ファイルが壊れていてもテストは緑のまま通っていた。
+        """
+        manager = FeaturedKeywordsManager(config.get_settings().featured_keywords_path)
 
-            # 基本的な動作確認
-            assert manager.is_available() is True
-            assert len(manager.keywords) > 0
+        assert manager.is_available() is True
+        assert len(manager.keywords) > 0
 
-            # 実際のキーワードでテスト
-            keywords = manager.get_all_keywords()
-            if keywords:
-                first_keyword = keywords[0]
-                assert manager.is_featured_keyword(first_keyword['keyword']) is True
+        keywords = manager.get_all_keywords()
+        assert keywords
+        first_keyword = keywords[0]
+        assert manager.is_featured_keyword(first_keyword['keyword']) is True
 
-                info = manager.get_keyword_info(first_keyword['keyword'])
-                assert info is not None
-                assert info['name'] == first_keyword['name']
-                assert info['gender'] in ['ladies', 'mens']
-                assert len(info['condition']) > 0
+        info = manager.get_keyword_info(first_keyword['keyword'])
+        assert info is not None
+        assert info['name'] == first_keyword['name']
+        assert info['gender'] in ['ladies', 'mens']
+        assert len(info['condition']) > 0
 
     def test_concurrent_access(self, temp_dir, valid_keywords_data):
         """並行アクセスのテスト"""

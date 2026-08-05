@@ -1,26 +1,9 @@
 import json
 import logging
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app import config, create_app
-
-
-@pytest.fixture
-def app():
-    app = create_app()
-    app.config.update(
-        {
-            "TESTING": True,
-        }
-    )
-    return app
-
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
 
 
 def test_setup_logging_is_idempotent():
@@ -100,9 +83,8 @@ def test_index_route(client):
     assert 'ヘアスタイルタイトルジェネレーター' in response.data.decode('utf-8')
 
 
-def test_generate_templates_route_success(client):
+def test_generate_templates_route_success(client, fake_pipeline):
     """正常系: テンプレート生成が成功するケース"""
-    mock_titles = ["★髪質改善トリートメントで艶髪ストレート"]
     mock_templates = [
         {
             "title": "★新テンプレート",
@@ -112,18 +94,7 @@ def test_generate_templates_route_success(client):
         }
     ]
 
-    with (
-        patch(
-            'app.services.template_service.HotPepperScraper.scrape_titles_async',
-            new_callable=AsyncMock,
-            return_value=mock_titles,
-        ),
-        patch(
-            'app.services.template_service.TemplateGenerator.generate_templates_async',
-            new_callable=AsyncMock,
-            return_value=(mock_templates, []),
-        ),
-    ):
+    with fake_pipeline(templates=mock_templates):
         response = client.post('/api/generate', json={'keyword': '髪質改善', 'gender': 'ladies'})
         assert response.status_code == 200
         data = json.loads(response.data)
@@ -131,34 +102,13 @@ def test_generate_templates_route_success(client):
         assert data['templates'] == mock_templates
 
 
-def test_generate_response_shape_is_stable(client):
+def test_generate_response_shape_is_stable(client, fake_pipeline):
     """/api/generate 成功レスポンスのキー集合が変わっていないこと
 
     フロントエンド (app/static/js) がこれらのキーに直接依存しているため、
     リファクタリングでレスポンス形状が壊れていないことをここで担保する。
     """
-    mock_titles = ["★髪質改善トリートメントで艶髪ストレート"]
-    mock_templates = [
-        {
-            "title": "★新テンプレート",
-            "menu": "カット+トリートメント",
-            "comment": "サンプルコメント",
-            "hashtag": ["髪質改善"],
-        }
-    ]
-
-    with (
-        patch(
-            'app.services.template_service.HotPepperScraper.scrape_titles_async',
-            new_callable=AsyncMock,
-            return_value=mock_titles,
-        ),
-        patch(
-            'app.services.template_service.TemplateGenerator.generate_templates_async',
-            new_callable=AsyncMock,
-            return_value=(mock_templates, []),
-        ),
-    ):
+    with fake_pipeline():
         response = client.post('/api/generate', json={'keyword': '髪質改善', 'gender': 'ladies'})
 
     data = json.loads(response.data)
@@ -204,7 +154,7 @@ def test_featured_keywords_response_shape_is_stable(client):
     assert set(data['keywords'][0].keys()) == {'name', 'keyword', 'gender', 'condition'}
 
 
-def test_missing_api_key_is_server_error_not_validation_error(client, monkeypatch):
+def test_missing_api_key_is_server_error_not_validation_error(client, monkeypatch, fake_scraper):
     """API キー未設定はサーバー設定の不備なので 500 で返す
 
     以前は generator が ValueError を送出し、それをルートが一律 400
@@ -217,11 +167,7 @@ def test_missing_api_key_is_server_error_not_validation_error(client, monkeypatc
     )
     monkeypatch.setattr(config, 'get_settings', lambda: settings_without_key)
 
-    with patch(
-        'app.services.template_service.HotPepperScraper.scrape_titles_async',
-        new_callable=AsyncMock,
-        return_value=["★髪質改善トリートメント"],
-    ):
+    with fake_scraper():
         response = client.post('/api/generate', json={'keyword': '髪質改善', 'gender': 'ladies'})
 
     assert response.status_code == 500
@@ -230,15 +176,11 @@ def test_missing_api_key_is_server_error_not_validation_error(client, monkeypatc
     assert data['error']['code'] == 'CONFIGURATION_ERROR'
 
 
-def test_scraping_failure_is_not_reported_as_no_results(client):
+def test_scraping_failure_is_not_reported_as_no_results(client, fake_scraper):
     """通信障害は「該当なし」ではなく 502 SCRAPING_ERROR として返す"""
     from app.errors import ScrapingError
 
-    with patch(
-        'app.services.template_service.HotPepperScraper.scrape_titles_async',
-        new_callable=AsyncMock,
-        side_effect=ScrapingError(),
-    ):
+    with fake_scraper(error=ScrapingError()):
         response = client.post('/api/generate', json={'keyword': '髪質改善', 'gender': 'ladies'})
 
     assert response.status_code == 502
@@ -253,71 +195,34 @@ def test_generate_templates_route_no_keyword(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert data['success'] is False
-    assert 'キーワードを入力してください' in data['error']['message']
+    assert data['error']['code'] == 'VALIDATION_ERROR'
 
 
-def test_generate_templates_route_no_results(client):
+def test_generate_templates_route_no_results(client, fake_scraper):
     """検索結果が0件の場合のテスト"""
-    with patch(
-        'app.services.template_service.HotPepperScraper.scrape_titles_async',
-        new_callable=AsyncMock,
-        return_value=[],
-    ):
+    with fake_scraper(titles=[]):
         response = client.post(
             '/api/generate', json={'keyword': '存在しないキーワード', 'gender': 'ladies'}
         )
         assert response.status_code == 404
         data = json.loads(response.data)
         assert data['success'] is False
-        assert '一致するヘアスタイルが見つかりませんでした' in data['error']['message']
+        assert data['error']['code'] == 'NO_RESULTS_FOUND'
 
 
-def test_generate_templates_route_generation_error(client):
+def test_generate_templates_route_generation_error(client, fake_pipeline):
     """テンプレート生成エラー時のテスト"""
-    mock_titles = ["★髪質改善トリートメントで艶髪ストレート"]
-    with (
-        patch(
-            'app.services.template_service.HotPepperScraper.scrape_titles_async',
-            new_callable=AsyncMock,
-            return_value=mock_titles,
-        ),
-        patch(
-            'app.services.template_service.TemplateGenerator.generate_templates_async',
-            new_callable=AsyncMock,
-            side_effect=Exception("Generation failed"),
-        ),
-    ):
+    with fake_pipeline(generate_error=Exception("Generation failed")):
         response = client.post('/api/generate', json={'keyword': '髪質改善', 'gender': 'ladies'})
         assert response.status_code == 500
         data = json.loads(response.data)
         assert data['success'] is False
-        assert '予期せぬエラーが発生しました' in data['error']['message']
+        assert data['error']['code'] == 'INTERNAL_SERVER_ERROR'
 
 
-def test_generate_templates_route_passes_seasons(client):
+def test_generate_templates_route_passes_seasons(client, fake_pipeline):
     """季節・カラー選択が正規化されてジェネレーターに渡されるテスト"""
-    mock_titles = ["★髪質改善トリートメントで艶髪ストレート"]
-    mock_templates = [
-        {
-            "title": "★新テンプレート",
-            "menu": "カット",
-            "comment": "コメント",
-            "hashtag": ["髪質改善"],
-        }
-    ]
-
-    with (
-        patch(
-            'app.services.template_service.HotPepperScraper.scrape_titles_async',
-            new_callable=AsyncMock,
-            return_value=mock_titles,
-        ),
-        patch(
-            'app.services.template_service.TemplateGenerator.generate_templates_async',
-            new_callable=AsyncMock,
-            return_value=(mock_templates, []),
-        ) as mock_generate,
-    ):
+    with fake_pipeline() as mock_generate:
         response = client.post(
             '/api/generate',
             json={
@@ -331,25 +236,9 @@ def test_generate_templates_route_passes_seasons(client):
         assert mock_generate.call_args.args[2] == ['spring', 'bleach_free']
 
 
-def test_generate_templates_route_ignores_seasons_for_mens(client):
+def test_generate_templates_route_ignores_seasons_for_mens(client, fake_pipeline):
     """メンズでは季節・カラー選択が無視されるテスト"""
-    mock_titles = ["★メンズマッシュ×ニュアンスパーマ"]
-    mock_templates = [
-        {"title": "★新テンプレート", "menu": "カット", "comment": "コメント", "hashtag": ["メンズ"]}
-    ]
-
-    with (
-        patch(
-            'app.services.template_service.HotPepperScraper.scrape_titles_async',
-            new_callable=AsyncMock,
-            return_value=mock_titles,
-        ),
-        patch(
-            'app.services.template_service.TemplateGenerator.generate_templates_async',
-            new_callable=AsyncMock,
-            return_value=(mock_templates, []),
-        ) as mock_generate,
-    ):
+    with fake_pipeline() as mock_generate:
         response = client.post(
             '/api/generate',
             json={
@@ -380,4 +269,4 @@ def test_generate_templates_route_invalid_json(client):
     assert response.status_code == 400
     data = json.loads(response.data)
     assert data['success'] is False
-    assert 'INVALID_JSON' in data['error']['code']
+    assert data['error']['code'] == 'INVALID_JSON'
