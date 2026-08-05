@@ -3,6 +3,7 @@ import os
 import pytest
 
 from app import config
+from app.errors import ValidationError
 from app.generator import TemplateGenerator
 
 # 実 Gemini API を呼び出すため、デフォルトの pytest 実行からは除外される。
@@ -87,6 +88,7 @@ class TestTemplateGeneratorIntegration:
     @pytest.mark.asyncio
     async def test_api_error_handling(self, generator):
         """APIエラー時の処理をテスト"""
-        # 無効な入力を使用してエラーを発生させる
-        with pytest.raises(ValueError):
+        # 入力検証は ValidationError（AppError のサブクラス）。
+        # 以前は生の ValueError を送出していた。
+        with pytest.raises(ValidationError):
             await generator.generate_templates_async([], "")  # 空のタイトルリストと空のキーワード

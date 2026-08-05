@@ -10,6 +10,7 @@ build_generation_prompt は純関数なので API キーなしでテストでき
 import pytest
 
 from app.prompts import build_generation_prompt
+from app.seasons import normalize_seasons
 
 
 class TestBuildGenerationPrompt:
@@ -42,8 +43,13 @@ class TestBuildGenerationPrompt:
         titles = ["★メンズマッシュ×ニュアンスパーマ"]
         keyword = "メンズパーマ"
 
+        # 実際のパイプラインと同じく、正規化を通した値を渡す
+        # （メンズでは normalize_seasons が空リストにする）
         prompt = build_generation_prompt(
-            titles, keyword, seasons=["spring", "bleach_free"], gender="mens"
+            titles,
+            keyword,
+            seasons=normalize_seasons(["spring", "bleach_free"], "mens"),
+            gender="mens",
         )
 
         for ng_word in ("春カラー", "夏カラー", "秋カラー", "冬カラー", "ブリーチなし", "ブリーチ"):
@@ -100,10 +106,18 @@ class TestBuildGenerationPrompt:
         assert "- title: **25〜28文字**を目標" in prompt
 
     def test_create_prompt_no_short_slots_for_mens(self):
-        """メンズは seasons を渡しても短尺タイトル枠の指示は入らない"""
+        """メンズは seasons を選んでも短尺タイトル枠の指示は入らない
+
+        normalize_seasons がメンズの選択を落とすので、プロンプト側には空が届く。
+        """
         titles = ["★メンズマッシュ×ニュアンスパーマ"]
 
-        prompt = build_generation_prompt(titles, "メンズパーマ", seasons=["spring"], gender="mens")
+        prompt = build_generation_prompt(
+            titles,
+            "メンズパーマ",
+            seasons=normalize_seasons(["spring"], "mens"),
+            gender="mens",
+        )
 
         assert "後から語句を追記するための余白" not in prompt
         assert "- title: **25〜28文字**を目標" in prompt

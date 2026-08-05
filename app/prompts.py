@@ -256,7 +256,7 @@ def build_generation_prompt(
     vocabulary = GENDER_VOCABULARY.get(gender, LADIES_VOCABULARY)
     gender_name = vocabulary.display_name
 
-    selected_seasons = config.normalize_seasons(seasons, gender)
+    selected_seasons = seasons or []
 
     # 混在キーワード処理のための生成コンテキスト解析
     context = generation_context or {}

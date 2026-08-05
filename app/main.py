@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from flask import Blueprint, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
 
-from .config import DEFAULT_MODEL, GENDERS, normalize_seasons
+from .config import DEFAULT_MODEL, GENDERS
 from .errors import InvalidJsonError, ValidationError
 from .featured_keywords import get_featured_repository
+from .seasons import normalize_seasons
 from .services.featured_service import list_featured_keywords
 from .services.template_service import GenerationOutcome, generate_templates_for_request
 
