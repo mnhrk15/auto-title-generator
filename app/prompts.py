@@ -197,7 +197,10 @@ def build_featured_instruction(
 指定されたキーワードや表現を必ず含めるようにしてください。
 
 """
-    except Exception as e:
+    except (KeyError, TypeError, AttributeError) as e:
+        # featured_info は外部 JSON 由来なので形が崩れうる。特集の指示を落としても
+        # 通常のテンプレート生成は続けられるので、ここは握りつぶしてよい。
+        # ただし except Exception にすると組み立てロジックのバグまで隠れるため広げない。
         logger.error(f"特集プロンプト生成中にエラー: {str(e)} - 特集機能をスキップ")
         return ""
 

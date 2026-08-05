@@ -6,6 +6,7 @@
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_MODEL
 from ..errors import NoResultsError
@@ -16,6 +17,9 @@ from .keyword_analysis import (
     KeywordAnalysis,
     analyze_keyword,
 )
+
+if TYPE_CHECKING:
+    from ..featured_keywords import FeaturedKeywordRepository
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +67,7 @@ def _attach_metadata(templates: list[dict], analysis: KeywordAnalysis) -> None:
 async def generate_templates_for_request(
     keyword: str,
     gender: str,
-    repository,
+    repository: 'FeaturedKeywordRepository',
     seasons: list[str] | None = None,
     model: str = DEFAULT_MODEL,
 ) -> GenerationOutcome:
@@ -114,8 +118,8 @@ async def generate_templates_for_request(
     templates, trending_keywords = await generator.generate_templates_async(
         titles,
         keyword,
-        seasons,
-        gender,
+        seasons=seasons,
+        gender=gender,
         featured_info=analysis.featured_info,
         generation_context=analysis.to_generation_context(),
     )

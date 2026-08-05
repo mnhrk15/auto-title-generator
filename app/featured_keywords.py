@@ -8,23 +8,36 @@ JSONの読み込みと検証は featured_loader に委譲し、ここは保持�
 import copy
 import logging
 import os
-import traceback
-from typing import Any
+from typing import Any, Protocol
 
 from flask import current_app
 
 from . import config
-from .errors import (  # noqa: F401  （このモジュール経由での import を維持する）
-    FeaturedKeywordsError,
-    FeaturedKeywordsLoadError,
-    FeaturedKeywordsValidationError,
-)
 from .featured_loader import load_featured_keywords
 
 logger = logging.getLogger(__name__)
 
 # Flask の app.extensions に登録する際のキー
 EXTENSION_KEY = 'featured_keywords'
+
+
+class FeaturedKeywordRepository(Protocol):
+    """サービス層が依存する特集キーワードリポジトリの契約。
+
+    型検査器は入れていないので強制力はない。実効的な検証は
+    tests/conftest.py の FakeRepository が担う。
+    ここに書く価値は「サービス層が実際に呼ぶのはこの 5 つだけ」を明示すること。
+    """
+
+    def is_available(self) -> bool: ...
+
+    def get_keyword_info(self, keyword: str) -> dict | None: ...
+
+    def get_all_keywords(self) -> list[dict]: ...
+
+    def get_last_error(self) -> Exception | None: ...
+
+    def get_health_status(self) -> dict[str, Any]: ...
 
 
 class FeaturedKeywordsManager:
@@ -82,23 +95,20 @@ class FeaturedKeywordsManager:
             logger.debug("特集キーワードが読み込まれていません")
             return None
 
-        try:
-            keyword_lower = keyword.lower().strip()
-            if not keyword_lower:
-                logger.debug("空のキーワードです")
-                return None
-
-            for item in self.keywords:
-                if item['keyword'].lower().strip() == keyword_lower:
-                    logger.debug(f"特集キーワード情報取得成功: '{keyword}' -> '{item['name']}'")
-                    return copy.deepcopy(item)
-
-            logger.debug(f"特集キーワード情報が見つかりません: '{keyword}'")
+        keyword_lower = keyword.lower().strip()
+        if not keyword_lower:
+            logger.debug("空のキーワードです")
             return None
-        except Exception as e:
-            logger.error(f"特集キーワード情報取得中にエラー: {str(e)}")
-            logger.debug(f"特集キーワード情報取得エラー詳細: {traceback.format_exc()}")
-            return None
+
+        # keywords の各要素が keyword / name を持つ dict であることは
+        # featured_loader._validate_item が保証済みなので、ここでの防御は不要。
+        for item in self.keywords:
+            if item['keyword'].lower().strip() == keyword_lower:
+                logger.debug(f"特集キーワード情報取得成功: '{keyword}' -> '{item['name']}'")
+                return copy.deepcopy(item)
+
+        logger.debug(f"特集キーワード情報が見つかりません: '{keyword}'")
+        return None
 
     def get_all_keywords(self) -> list[dict]:
         """すべての特集キーワード情報を取得する
@@ -115,26 +125,6 @@ class FeaturedKeywordsManager:
             bool: 利用可能な場合True、そうでなければFalse
         """
         return len(self.keywords) > 0
-
-    def reload_keywords(self) -> bool:
-        """特集キーワードを再読み込みする
-
-        Returns:
-            bool: 再読み込みが成功した場合True、そうでなければFalse
-        """
-        old_count = len(self.keywords)
-
-        logger.info("特集キーワードの再読み込みを開始します")
-        self._load_keywords()
-
-        if self._last_error is None:
-            logger.info(
-                f"特集キーワードを正常に再読み込みしました: {old_count}件 -> {len(self.keywords)}件"
-            )
-            return True
-
-        logger.warning(f"特集キーワード再読み込み中にエラーが発生しました: {self._last_error}")
-        return False
 
     def get_last_error(self) -> Exception | None:
         """最後に発生したエラーを取得する

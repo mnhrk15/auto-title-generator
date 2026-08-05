@@ -16,12 +16,12 @@ from unittest.mock import patch
 import pytest
 
 from app import config, create_app
-from app.featured_keywords import (
+from app.errors import (
     FeaturedKeywordsError,
     FeaturedKeywordsLoadError,
-    FeaturedKeywordsManager,
     FeaturedKeywordsValidationError,
 )
+from app.featured_keywords import FeaturedKeywordsManager
 
 
 class TestFeaturedKeywordsManager:
@@ -347,48 +347,6 @@ class TestFeaturedKeywordsManager:
         nonexistent_path = os.path.join(temp_dir, 'nonexistent.json')
         manager_invalid = FeaturedKeywordsManager(nonexistent_path)
         assert manager_invalid.is_available() is False
-
-    def test_reload_keywords(self, temp_dir, valid_keywords_data):
-        """reload_keywordsメソッドのテスト"""
-        keywords_file = os.path.join(temp_dir, 'reload_test.json')
-
-        # 初期データでファイル作成
-        with open(keywords_file, 'w', encoding='utf-8') as f:
-            json.dump(valid_keywords_data[:1], f, ensure_ascii=False, indent=2)
-
-        manager = FeaturedKeywordsManager(keywords_file)
-        assert len(manager.keywords) == 1
-
-        # ファイルを更新
-        with open(keywords_file, 'w', encoding='utf-8') as f:
-            json.dump(valid_keywords_data, f, ensure_ascii=False, indent=2)
-
-        # 再読み込み
-        result = manager.reload_keywords()
-        assert result is True
-        assert len(manager.keywords) == 2
-        assert manager.get_last_error() is None
-
-    def test_reload_keywords_with_error(self, temp_dir):
-        """reload_keywordsメソッドのエラーケースのテスト"""
-        keywords_file = os.path.join(temp_dir, 'reload_error_test.json')
-
-        # 初期は有効なファイル
-        with open(keywords_file, 'w', encoding='utf-8') as f:
-            json.dump([], f)
-
-        manager = FeaturedKeywordsManager(keywords_file)
-        assert manager.get_last_error() is None
-
-        # ファイルを不正な形式に変更
-        with open(keywords_file, 'w', encoding='utf-8') as f:
-            f.write('{"invalid": "json"')
-
-        # 再読み込み（エラーが発生するはず）
-        result = manager.reload_keywords()
-        assert result is False
-        assert manager.get_last_error() is not None
-        assert isinstance(manager.get_last_error(), FeaturedKeywordsLoadError)
 
     def test_get_last_error(self, temp_dir):
         """get_last_errorメソッドのテスト"""

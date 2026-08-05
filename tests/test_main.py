@@ -212,7 +212,7 @@ def test_generate_templates_route_passes_seasons(client, fake_pipeline):
             },
         )
         assert response.status_code == 200
-        assert mock_generate.call_args.args[2] == ['spring', 'bleach_free']
+        assert mock_generate.call_args.kwargs['seasons'] == ['spring', 'bleach_free']
 
 
 def test_generate_templates_route_ignores_seasons_for_mens(client, fake_pipeline):
@@ -227,7 +227,7 @@ def test_generate_templates_route_ignores_seasons_for_mens(client, fake_pipeline
             },
         )
         assert response.status_code == 200
-        assert mock_generate.call_args.args[2] == []
+        assert mock_generate.call_args.kwargs['seasons'] == []
 
 
 def test_generate_templates_route_invalid_seasons_type(client):

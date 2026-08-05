@@ -6,8 +6,12 @@ Flask に依存しないので、アプリケーションコンテキストな�
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..errors import AppError, FeaturedKeywordsError
+
+if TYPE_CHECKING:
+    from ..featured_keywords import FeaturedKeywordRepository
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +46,9 @@ def _degraded_message(last_error: Exception | None) -> str:
     return NO_KEYWORDS_MESSAGE
 
 
-def list_featured_keywords(repository, gender: str) -> FeaturedKeywordsView:
+def list_featured_keywords(
+    repository: 'FeaturedKeywordRepository', gender: str
+) -> FeaturedKeywordsView:
     """指定された性別の特集キーワード一覧を返す。
 
     Args:
