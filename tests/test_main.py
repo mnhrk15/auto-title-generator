@@ -117,9 +117,39 @@ def test_generate_response_shape_is_stable(client, fake_pipeline):
         'templates',
         'is_featured',
         'featured_keyword_info',
+        'unapplied_season_keywords',
     }
     # app/static/js がテンプレート1件ごとに参照するメタデータ
     assert 'is_featured' in data['templates'][0]
+
+
+def test_generate_returns_unapplied_season_keywords_as_labels(client, fake_pipeline):
+    """付加できなかった季節・カラーは、キーではなく付加語文言で全件・順序どおり返る
+
+    フロントエンドの注釈バナーは「タイトルに付くはずだった語」をそのまま表示するため、
+    API 境界で 'spring' → '春カラー' に変換する。
+    """
+    with fake_pipeline(unapplied=('spring', 'bleach_free')):
+        response = client.post(
+            '/api/generate',
+            json={
+                'keyword': '髪質改善',
+                'gender': 'ladies',
+                'seasons': ['spring', 'bleach_free'],
+            },
+        )
+
+    data = json.loads(response.data)
+    assert data['unapplied_season_keywords'] == ['春カラー', 'ブリーチなしカラー']
+
+
+def test_generate_returns_empty_unapplied_season_keywords_by_default(client, fake_pipeline):
+    """未付与がなければ空配列（フロントエンドは常にこのキーを読む）"""
+    with fake_pipeline():
+        response = client.post('/api/generate', json={'keyword': '髪質改善', 'gender': 'ladies'})
+
+    data = json.loads(response.data)
+    assert data['unapplied_season_keywords'] == []
 
 
 def test_featured_keywords_response_shape_is_stable(client):

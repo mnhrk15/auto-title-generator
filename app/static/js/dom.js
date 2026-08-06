@@ -43,6 +43,8 @@ export const el = {
     seasonCheckboxes: document.querySelectorAll('input[name="season"]'),
     seasonSelection: document.getElementById('season-selection'),
     mensNotice: document.getElementById('mens-title-notice'),
+    seasonUnappliedNotice: document.getElementById('season-unapplied-notice'),
+    seasonUnappliedKeywords: document.getElementById('season-unapplied-keywords'),
     featuredContainer: document.getElementById('featured-keywords-container'),
 };
 

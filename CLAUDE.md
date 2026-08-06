@@ -120,8 +120,8 @@ The application is configured for Render deployment:
 2. `HotPepperScraper.scrape_titles_async()` scrapes relevant hairstyle titles
 3. `TemplateGenerator.generate_templates_async()` sends titles + context to the Gemini API
 4. Generated templates are validated against character limits and requirements
-5. `TemplateGenerator._apply_season_keywords()` appends the selected season/color keywords to short titles (ladies only)
-6. Results returned as JSON to frontend
+5. `apply_season_keywords()` (`app/seasons.py`) appends the selected season/color keywords to short titles (ladies only) and returns the keys of keywords that ended up in no title
+6. Results returned as JSON to frontend. `unapplied_season_keywords` carries the display names (「春カラー」 etc.) of selected keywords contained in no title; the frontend shows a notice banner (`#season-unapplied-notice`) above the results when it is non-empty
 
 ### Key Design Patterns
 - **Async Context Managers**: Both scraper and session management use `async with`
@@ -206,7 +206,7 @@ The application uses async extensively throughout the entire pipeline:
 ### Japanese Text Handling
 - All templates and content are in Japanese
 - Character counting is critical for social media compliance
-- Season/color keywords are never injected into the prompt; they are appended in Python after generation (`_apply_season_keywords`), and only for ladies
+- Season/color keywords are never injected into the prompt; they are appended in Python after generation (`apply_season_keywords` in `app/seasons.py`), and only for ladies
 - Prompt vocabulary, title/menu/comment/hashtag examples are branched by gender so that ladies-oriented color words never reach the mens prompt
 
 ### Production Deployment Notes

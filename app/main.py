@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from flask import Blueprint, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
 
-from .config import CHAR_LIMITS, DEFAULT_MODEL, GENDERS, SEASON_UI_LABELS
+from .config import CHAR_LIMITS, DEFAULT_MODEL, GENDERS, SEASON_COLOR_CHOICES, SEASON_UI_LABELS
 from .errors import InvalidJsonError, ValidationError
 from .featured_keywords import get_featured_repository
 from .seasons import normalize_seasons
@@ -141,5 +141,10 @@ async def generate() -> ResponseReturnValue:
             'templates': outcome.templates,
             'is_featured': outcome.is_featured,
             'featured_keyword_info': _featured_keyword_info(outcome),
+            # どのタイトルにも含まれなかった季節・カラーの付加語文言（「春カラー」など）。
+            # フロントエンドは常にこのキーを読み、空なら注釈バナーを隠す。
+            'unapplied_season_keywords': [
+                SEASON_COLOR_CHOICES[key] for key in outcome.unapplied_seasons
+            ],
         }
     )

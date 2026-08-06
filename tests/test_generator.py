@@ -76,13 +76,14 @@ class TestGenerateTemplatesAsync:
         with patch.object(
             generator.client.aio.models, 'generate_content', new=AsyncMock(return_value=response)
         ):
-            templates, trending = await generator.generate_templates_async(
+            templates, trending, unapplied = await generator.generate_templates_async(
                 ['既存タイトル'], '髪質改善'
             )
 
         assert len(templates) == 1
         assert templates[0]['title'] == '★髪質改善×艶髪ストレート'
         assert trending == []
+        assert unapplied == []
 
     @pytest.mark.asyncio
     async def test_seasons_are_appended_after_generation(self, generator):
@@ -108,14 +109,46 @@ class TestGenerateTemplatesAsync:
         with patch.object(
             generator.client.aio.models, 'generate_content', new=AsyncMock(return_value=response)
         ) as mock_generate:
-            templates, _ = await generator.generate_templates_async(
+            templates, _, unapplied = await generator.generate_templates_async(
                 ['既存タイトル'], 'ボブ', seasons=['spring']
             )
 
         assert '春カラー' in templates[0]['title']
+        assert unapplied == []
         # プロンプトには季節・カラーを入れない
         prompt = mock_generate.call_args.kwargs['contents']
         assert '春カラー' not in prompt
+
+    @pytest.mark.asyncio
+    async def test_unapplied_seasons_are_returned(self, generator):
+        """長いタイトルばかりで付加できなかったキーワードが unapplied として返る"""
+        parsed = GenerationResult(
+            trending_keywords=[],
+            templates=[
+                GeneratedTemplate(
+                    title='あ' * 26,  # SEASON_APPEND_THRESHOLD 以上なので付加対象外
+                    menu='カット',
+                    comment='コメント',
+                    hashtag=['ボブ', 'カット', '髪型', 'ヘア', 'サロン', 'スタイル', 'トレンド'],
+                )
+            ],
+        )
+        response = SimpleNamespace(
+            candidates=[SimpleNamespace(finish_reason=types.FinishReason.STOP)],
+            parsed=parsed,
+            text=None,
+            usage_metadata=None,
+        )
+
+        with patch.object(
+            generator.client.aio.models, 'generate_content', new=AsyncMock(return_value=response)
+        ):
+            templates, _, unapplied = await generator.generate_templates_async(
+                ['既存タイトル'], 'ボブ', seasons=['spring']
+            )
+
+        assert templates[0]['title'] == 'あ' * 26
+        assert unapplied == ['spring']
 
     @pytest.mark.asyncio
     async def test_empty_titles_is_validation_error(self, generator):
