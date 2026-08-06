@@ -180,13 +180,17 @@ def fake_pipeline():
     """
 
     @contextmanager
-    def _patch(titles=None, templates=None, scrape_error=None, generate_error=None):
+    def _patch(titles=None, templates=None, scrape_error=None, generate_error=None, unapplied=()):
         scrape = AsyncMock(
             return_value=DEFAULT_SCRAPED_TITLES if titles is None else titles,
             side_effect=scrape_error,
         )
         generate = AsyncMock(
-            return_value=(DEFAULT_TEMPLATES if templates is None else templates, []),
+            return_value=(
+                DEFAULT_TEMPLATES if templates is None else templates,
+                [],
+                list(unapplied),
+            ),
             side_effect=generate_error,
         )
         with (

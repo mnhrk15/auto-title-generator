@@ -80,7 +80,7 @@ class TemplateGenerator:
         gender: str = 'ladies',
         featured_info: dict | None = None,
         generation_context: dict | None = None,
-    ) -> tuple[list[dict[str, str]], list[dict]]:
+    ) -> tuple[list[dict[str, str]], list[dict], list[str]]:
         """テンプレートの非同期生成
 
         Args:
@@ -92,7 +92,8 @@ class TemplateGenerator:
             generation_context: キーワード解析の結果
 
         Returns:
-            (valid_templates, trending_keywords) のタプル
+            (valid_templates, trending_keywords, unapplied_seasons) のタプル。
+            unapplied_seasons はどのタイトルにも含まれなかった季節・カラーのキー。
         """
         if not titles:
             logger.error("タイトルリストが空です")
@@ -156,10 +157,10 @@ class TemplateGenerator:
             # 季節・カラーはプロンプトに入れず、ここで後処理として付加する。
             # apply_season_keywords は上限文字数を超えない範囲でしか付加しないので、
             # 付加後の再チェックは不要（不変条件は seasons.py 側が持つ）。
-            apply_season_keywords(result_templates, selected_seasons)
+            unapplied_seasons = apply_season_keywords(result_templates, selected_seasons)
 
             logger.info(f"テンプレート生成完了: {len(result_templates)} 件の有効なテンプレート")
-            return result_templates, trending_keywords
+            return result_templates, trending_keywords, unapplied_seasons
 
         except AppError:
             # ユーザー向けメッセージが確定済みなのでそのまま通す

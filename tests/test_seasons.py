@@ -203,6 +203,60 @@ class TestSeasonKeywordAppend:
         # 付加自体は行われている（上限チェックが空振りしていないこと）
         assert sum(len(t["title"]) > n for t, n in zip(templates, range(10, 30), strict=True)) > 0
 
+    def test_returns_empty_when_all_applied(self):
+        """全キーワードが付加できたら未付与リストは空"""
+        templates = self._templates("あ" * 15)
+
+        unapplied = apply_season_keywords(templates, ["spring"])
+
+        assert unapplied == []
+
+    def test_returns_key_when_no_title_fits(self):
+        """全タイトルが閾値以上なら、そのキーワードは未付与として返る"""
+        templates = self._templates("あ" * 26, "あ" * 28)
+
+        unapplied = apply_season_keywords(templates, ["spring"])
+
+        assert unapplied == ["spring"]
+
+    def test_returns_only_partially_unapplied_keys(self):
+        """付加枠が足りない場合、付加できなかったキーワードだけが返る"""
+        # 付加できるタイトルは1件だけ。spring が先に枠を取り、summer が未付与になる
+        templates = self._templates("あ" * 15, "あ" * 26)
+
+        unapplied = apply_season_keywords(templates, ["spring", "summer"])
+
+        assert unapplied == ["summer"]
+
+    def test_already_present_keyword_is_not_reported_unapplied(self):
+        """付加できなくても既にタイトルに含まれていれば未付与に数えない
+
+        検索キーワード自体が「春カラー」などの場合、全タイトルに含まれて
+        重複回避でスキップされるが、ユーザーから見れば「含まれている」。
+        """
+        templates = self._templates("春カラー透明感レイヤー")
+
+        unapplied = apply_season_keywords(templates, ["spring"])
+
+        assert unapplied == []
+
+    def test_already_present_keyword_is_found_in_any_template(self):
+        """既含有の判定は先頭だけでなく全テンプレートを見る"""
+        # どちらも閾値以上で付加対象外。キーワードは 2 件目にだけ元から含まれる
+        templates = self._templates("あ" * 26, "春カラー" + "あ" * 22)
+
+        unapplied = apply_season_keywords(templates, ["spring"])
+
+        assert unapplied == []
+
+    def test_returns_empty_without_seasons(self):
+        """未選択なら未付与リストも空"""
+        assert apply_season_keywords(self._templates("あ" * 15), []) == []
+
+    def test_returns_all_keys_for_empty_templates(self):
+        """テンプレートが空なら全キーワードが未付与として返る（防御的挙動）"""
+        assert apply_season_keywords([], ["spring", "summer"]) == ["spring", "summer"]
+
 
 class TestNormalizeSeasons:
     def test_normalizes_order_and_removes_unknown_and_duplicates(self):

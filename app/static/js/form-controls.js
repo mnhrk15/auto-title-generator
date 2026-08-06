@@ -47,6 +47,15 @@ export function updateMensNotice(gender) {
     }
 }
 
+/** 季節・カラーが1件も付与できなかったときの注釈バナーを更新する */
+export function updateSeasonUnappliedNotice(keywords) {
+    if (!el.seasonUnappliedNotice || !el.seasonUnappliedKeywords) return;
+
+    const list = Array.isArray(keywords) ? keywords : [];
+    el.seasonUnappliedKeywords.textContent = list.join('・');
+    el.seasonUnappliedNotice.classList.toggle('hidden', list.length === 0);
+}
+
 /** 初期表示時のフェードイン */
 function animateElements() {
     const target = document.querySelector('.search-section');

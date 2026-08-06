@@ -48,7 +48,7 @@ def _pick_separator(title: str, rotation_index: int) -> tuple[str, int]:
     return separator, rotation_index
 
 
-def apply_season_keywords(templates: list[dict[str, str]], seasons: Sequence[str]) -> None:
+def apply_season_keywords(templates: list[dict[str, str]], seasons: Sequence[str]) -> list[str]:
     """選択された季節・カラーキーワードをタイトルへ付加する（テンプレートを直接書き換える）
 
     - SEASON_APPEND_THRESHOLD 文字未満のタイトルのみが対象
@@ -57,10 +57,19 @@ def apply_season_keywords(templates: list[dict[str, str]], seasons: Sequence[str
     - 各キーワードには、収まる範囲で最も長いタイトル＝上限文字数に最も近づくものを割り当てる
     - 区切り記号はタイトルが使っている記号に合わせ、記号がなければローテーションする
 
-    呼び出し側は渡したリストの中身が書き換わることを前提にしている（戻り値はない）。
+    呼び出し側は渡したリストの中身が書き換わることを前提にしている。
+
+    Returns:
+        どのタイトルにも含まれなかったキーワードのキー（'spring' など）のリスト。
+        付加できなくても既にタイトルに含まれていれば未付与とは数えない
+        （検索キーワード自体が「春カラー」などの場合）。選択がなければ空。
     """
-    if not seasons or not templates:
-        return
+    if not seasons:
+        return []
+    if not templates:
+        # 実運用では generator が空テンプレートで先に GenerationError を投げるため
+        # 到達しないが、防御的に「全キーワード未付与」として返す
+        return list(dict.fromkeys(seasons))
 
     # 重複があると割り当てループのキーワード集合が空になりうるため、ここでも重複を除く
     seasons = list(dict.fromkeys(seasons))
@@ -112,3 +121,18 @@ def apply_season_keywords(templates: list[dict[str, str]], seasons: Sequence[str
 
     applied = sum(counts.values())
     logger.info(f"季節・カラーキーワードを {applied} 件のタイトルに付加しました: {counts}")
+
+    # 付加件数 0 でも、重複回避でスキップしただけでタイトルに既に含まれている場合は
+    # 「未付与」ではない（バナーの文言が事実と矛盾してしまう）
+    unapplied = [
+        key
+        for key in seasons
+        if counts[key] == 0 and not any(keywords[key] in t.get('title', '') for t in templates)
+    ]
+    if unapplied:
+        # 自動リトライはしない（generator.py の要求数未達 warning と同じ方針）。
+        # 付加できなかった事実は運用で追えるようログに残し、呼び出し側へ返す。
+        logger.warning(
+            f"選択された季節・カラーのうち付加先が見つからなかったものがあります: {unapplied}"
+        )
+    return unapplied

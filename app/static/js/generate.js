@@ -7,7 +7,7 @@ import {
 } from './progress.js';
 import { hideError, hideLoading, hideResults, showError, showLoading, showResults } from './status.js';
 import { showToast } from './toast.js';
-import { updateMensNotice } from './form-controls.js';
+import { updateMensNotice, updateSeasonUnappliedNotice } from './form-controls.js';
 import { displayTemplates } from './template-list.js';
 import {
     clearSelection, getSelectedKeyword, showFeaturedErrorFallbackNotification,
@@ -91,6 +91,7 @@ async function generate() {
         completeProgress();
         notifySuccess(data);
         updateMensNotice(gender);
+        updateSeasonUnappliedNotice(data.unapplied_season_keywords);
         displayTemplates(data.templates);
         showResults();
         el.results.scrollIntoView({ behavior: 'smooth', block: 'start' });

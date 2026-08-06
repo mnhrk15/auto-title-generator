@@ -25,7 +25,7 @@ class TestTemplateGeneratorIntegration:
         titles = ["★髪質改善トリートメントで艶髪ストレート"]
         keyword = "髪質改善"
 
-        templates, _trending = await generator.generate_templates_async(titles, keyword)
+        templates, _trending, _unapplied = await generator.generate_templates_async(titles, keyword)
 
         # 基本的な検証
         assert isinstance(templates, list)
@@ -60,7 +60,7 @@ class TestTemplateGeneratorIntegration:
         ]
         keyword = "髪質改善"
 
-        templates, _trending = await generator.generate_templates_async(titles, keyword)
+        templates, _trending, _unapplied = await generator.generate_templates_async(titles, keyword)
 
         assert isinstance(templates, list)
         assert len(templates) <= config.MAX_TEMPLATES
@@ -76,7 +76,9 @@ class TestTemplateGeneratorIntegration:
         keywords = ["髪質改善", "透明感カラー", "艶髪"]
 
         for keyword in keywords:
-            templates, _trending = await generator.generate_templates_async(titles, keyword)
+            templates, _trending, _unapplied = await generator.generate_templates_async(
+                titles, keyword
+            )
 
             assert isinstance(templates, list)
             assert len(templates) <= config.MAX_TEMPLATES

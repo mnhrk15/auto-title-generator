@@ -31,7 +31,7 @@ MAX_LOGGED_TITLES = 10
 class GenerationOutcome:
     """1 リクエスト分の生成結果。
 
-    is_featured / featured_info はリクエスト単位の情報なので、
+    is_featured / featured_info / unapplied_seasons はリクエスト単位の情報なので、
     テンプレートの中ではなくここに持たせる。以前はテンプレート 20 件全部に
     同じ値を書き込み、ルートが templates[0] から読み戻していた。
     """
@@ -39,6 +39,8 @@ class GenerationOutcome:
     templates: list[dict]
     is_featured: bool
     featured_info: dict | None
+    # どのタイトルにも含まれなかった季節・カラーのキー（'spring' など）
+    unapplied_seasons: tuple[str, ...] = ()
 
 
 def _log_scraped_titles(titles: list[str]) -> None:
@@ -115,7 +117,7 @@ async def generate_templates_for_request(
         f'処理モード: {analysis.processing_mode}'
     )
     generator = TemplateGenerator(model_name=model)
-    templates, trending_keywords = await generator.generate_templates_async(
+    templates, trending_keywords, unapplied_seasons = await generator.generate_templates_async(
         titles,
         keyword,
         seasons=seasons,
@@ -137,4 +139,5 @@ async def generate_templates_for_request(
         templates=templates,
         is_featured=analysis.is_featured,
         featured_info=analysis.featured_info,
+        unapplied_seasons=tuple(unapplied_seasons),
     )

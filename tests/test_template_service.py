@@ -127,10 +127,20 @@ class TestGenerateTemplatesForRequest:
 
         assert outcome.is_featured is True
         assert outcome.featured_info['name'] == 'テスト用くびれヘア'
+        assert outcome.unapplied_seasons == ()
         assert len(outcome.templates) == 2
         for template in outcome.templates:
             assert template['is_featured'] is True
             assert template['featured_keyword_name'] == 'テスト用くびれヘア'
+
+    async def test_unapplied_seasons_are_carried_to_outcome(self, fake_pipeline):
+        """付加できなかった季節・カラーのキーが outcome に載る"""
+        with fake_pipeline(templates=raw_templates(), unapplied=('spring',)):
+            outcome = await generate_templates_for_request(
+                'ボブ', 'ladies', repository=_FeaturedRepo(), seasons=['spring']
+            )
+
+        assert outcome.unapplied_seasons == ('spring',)
 
     async def test_normal_keyword_outcome(self, fake_pipeline):
         with fake_pipeline(templates=raw_templates()):
