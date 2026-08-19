@@ -226,6 +226,21 @@ def build_title_length_rule(selected_seasons: list[str]) -> tuple[str, str]:
         band_max = short_title_band_max(config.SEASON_COLOR_CHOICES[key])
         bands[band_max] = bands.get(band_max, 0) + slots_per_keyword
 
+    # 合体タイトル用の超短尺帯。季節カラーは現状全て4文字なので合体語は常に14文字＝帯は1本。
+    # 語長の異なる季節が将来増えても後処理の適合判定と食い違わないよう、最も短い帯に合わせる
+    combo_note = ""
+    combo_seasons = config.combo_season_keys(selected_seasons)
+    if combo_seasons:
+        combo_band_max = min(
+            short_title_band_max(config.season_combo_keyword(key)) for key in combo_seasons
+        )
+        bands[combo_band_max] = bands.get(combo_band_max, 0) + config.SEASON_COMBO_SLOTS
+        # 通常のタイトルより大幅に短いため、強調しないとモデルがこの帯を作らない
+        combo_note = (
+            f"特に**{combo_band_max - config.SHORT_TITLE_BAND_WIDTH}〜{combo_band_max}文字**の枠は"
+            "通常よりかなり短いですが、長い語句を追記する予定のため**必ず指定した個数**作成してください。"
+        )
+
     short_slots = sum(bands.values())
     band_rules = "、".join(
         f"**{slots}個は{band_max - config.SHORT_TITLE_BAND_WIDTH}〜{band_max}文字**"
@@ -238,7 +253,8 @@ def build_title_length_rule(selected_seasons: list[str]) -> tuple[str, str]:
     short_title_note = (
         "\n※ 短めの目標文字数を指定しているのは、後から語句を追記するための余白を残す目的です。"
         "追記する語句はこちらで決めるため、指定は不要です。"
-        "追記後に上限文字数いっぱいまで活用できるよう、指定した文字数の**上限側に寄せて**作成してください。\n"
+        "追記後に上限文字数いっぱいまで活用できるよう、指定した文字数の**上限側に寄せて**作成してください。"
+        f"{combo_note}\n"
     )
     logger.debug(f"短尺タイトル枠 {bands} をプロンプトに追加（選択: {selected_seasons}）")
 
