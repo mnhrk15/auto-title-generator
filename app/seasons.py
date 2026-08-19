@@ -48,11 +48,103 @@ def _pick_separator(title: str, rotation_index: int) -> tuple[str, int]:
     return separator, rotation_index
 
 
+def _append_best_fit(
+    remaining: list[dict[str, str]],
+    keyword: str,
+    avoid_words: Sequence[str],
+    rotation_index: int,
+    separator_length: int,
+    title_limit: int,
+) -> int | None:
+    """収まる中で最も長いタイトルへ keyword を付加する（合体・単独共通の中核処理）。
+
+    remaining は長い順である前提（next() が「収まる中で最も長い」タイトルを返す）。
+    avoid_words のいずれかを含むタイトルは重複回避のため飛ばす。
+    付加できたら対象を remaining から除き、更新後の rotation_index を返す。
+    付加先が無ければ None を返す（remaining は変更しない）。
+    """
+    target = next(
+        (
+            t
+            for t in remaining
+            if all(word not in t['title'] for word in avoid_words)
+            and len(t['title']) + separator_length + len(keyword) <= title_limit
+        ),
+        None,
+    )
+    if target is None:
+        return None
+
+    remaining.remove(target)
+    separator, rotation_index = _pick_separator(target['title'], rotation_index)
+    target['title'] = f"{target['title']}{separator}{keyword}"
+    return rotation_index
+
+
+def _apply_combo_keywords(
+    remaining: list[dict[str, str]],
+    seasons: Sequence[str],
+    counts: dict[str, int],
+    rotation_index: int,
+    separator_length: int,
+    title_limit: int,
+) -> int:
+    """季節×ブリーチなしの合体語を SEASON_COMBO_SLOTS 件を目安に付加する。
+
+    - 季節（春〜冬）と bleach_free の両方が選択されているときのみ動く
+    - 複数季節選択時は正規化順（config 定義順）にローテーションして配分する
+    - 付加は季節側・bleach_free 側の両方の counts に計上する（未付与判定と整合させる）
+    - 付加したタイトルは remaining から除くので、後続の単独配分には影響しない
+    - 合体が収まる超短尺タイトルが無ければ目安件数未満で終わる（確率的達成でよい）
+
+    Returns:
+        更新後の rotation_index
+    """
+    combo_seasons = config.combo_season_keys(seasons)
+    if not combo_seasons:
+        return rotation_index
+
+    bleach_word = config.SEASON_COLOR_CHOICES['bleach_free']
+    applied = 0
+    cycle = 0
+    # 合体語長は全季節で同一だが、重複回避で特定季節だけ付加先が尽きることがあるため
+    # break ではなく季節単位で管理し、残りの季節へ枠を回す
+    exhausted: set[str] = set()
+    while applied < config.SEASON_COMBO_SLOTS and len(exhausted) < len(combo_seasons):
+        key = combo_seasons[cycle % len(combo_seasons)]
+        cycle += 1
+        if key in exhausted:
+            continue
+        result = _append_best_fit(
+            remaining,
+            config.season_combo_keyword(key),
+            (config.SEASON_COLOR_CHOICES[key], bleach_word),
+            rotation_index,
+            separator_length,
+            title_limit,
+        )
+        if result is None:
+            exhausted.add(key)
+            continue
+
+        rotation_index = result
+        counts[key] += 1
+        counts['bleach_free'] += 1
+        applied += 1
+
+    if applied:
+        logger.info(f"季節×ブリーチなしの合体キーワードを {applied} 件のタイトルに付加しました")
+    return rotation_index
+
+
 def apply_season_keywords(templates: list[dict[str, str]], seasons: Sequence[str]) -> list[str]:
     """選択された季節・カラーキーワードをタイトルへ付加する（テンプレートを直接書き換える）
 
     - SEASON_APPEND_THRESHOLD 文字未満のタイトルのみが対象
     - 付加後に上限文字数を超える場合は付加しない
+    - 季節と bleach_free の両方が選択されている場合は、合体語
+      （「秋カラー×ブリーチなしカラー」など）を SEASON_COMBO_SLOTS 件を目安に先に付加し、
+      合体語入りテンプレートをリストの先頭へ並べ替える（それ以外の相対順は保つ）
     - 複数選択時は対象タイトルへ均等に配分する
     - 各キーワードには、収まる範囲で最も長いタイトル＝上限文字数に最も近づくものを割り当てる
     - 区切り記号はタイトルが使っている記号に合わせ、記号がなければローテーションする
@@ -91,6 +183,12 @@ def apply_season_keywords(templates: list[dict[str, str]], seasons: Sequence[str
         reverse=True,
     )
 
+    # 合体付加を単独付加より先に行う。合体の対象（超短尺タイトル）は単独付加でも
+    # 消費されうるため、先取りしないと合体枠が単独語に奪われてしまう
+    rotation_index = _apply_combo_keywords(
+        remaining, seasons, counts, rotation_index, separator_length, title_limit
+    )
+
     # タイトル側ではなくキーワード側から割り当てる。
     # 付加済み件数が最少のキーワードから順に処理することで均等配分になり、
     # かつ各キーワードが上限文字数に最も近づくタイトルを選べる
@@ -100,24 +198,22 @@ def apply_season_keywords(templates: list[dict[str, str]], seasons: Sequence[str
             (k for k in seasons if k not in exhausted), key=lambda k: (counts[k], priority[k])
         )
         keyword = keywords[key]
-        target = next(
-            (
-                t
-                for t in remaining
-                if keyword not in t['title']
-                and len(t['title']) + separator_length + len(keyword) <= title_limit
-            ),
-            None,
+        result = _append_best_fit(
+            remaining, keyword, (keyword,), rotation_index, separator_length, title_limit
         )
-        if target is None:
+        if result is None:
             # このキーワードを付加できるタイトルはもう残っていない
             exhausted.add(key)
             continue
 
-        remaining.remove(target)
-        separator, rotation_index = _pick_separator(target['title'], rotation_index)
-        target['title'] = f"{target['title']}{separator}{keyword}"
+        rotation_index = result
         counts[key] += 1
+
+    # 合体語入りテンプレートを生成結果の先頭に出す（ユーザー要望）。
+    # 安定ソートなので、先頭グループ内・それ以外の相対順はどちらも変わらない
+    combo_words = [config.season_combo_keyword(k) for k in config.combo_season_keys(seasons)]
+    if combo_words:
+        templates.sort(key=lambda t: not any(word in t.get('title', '') for word in combo_words))
 
     applied = sum(counts.values())
     logger.info(f"季節・カラーキーワードを {applied} 件のタイトルに付加しました: {counts}")

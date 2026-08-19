@@ -57,14 +57,20 @@ class TestBuildGenerationPrompt:
         # メンズ固有の語彙指示は維持されている
         assert "メンズ特有キーワードの活用" in prompt
 
-    def test_create_prompt_ladies_has_no_season_words(self):
-        """レディースでもプロンプトに季節語を注入しない（付加は後処理のみ）"""
+    @pytest.mark.parametrize("seasons", [["spring"], ["autumn", "bleach_free"]])
+    def test_create_prompt_ladies_has_no_season_words(self, seasons):
+        """レディースでもプロンプトに季節語を注入しない（付加は後処理のみ）。
+
+        ["autumn", "bleach_free"] は合体帯の分岐を通すケース。合体語は帯の文字数計算に
+        使うだけで、語そのものはプロンプトへ出さないことを保証する。
+        """
         titles = ["★髪質改善トリートメントで艶髪ストレート"]
         keyword = "髪質改善"
 
-        prompt = build_generation_prompt(titles, keyword, seasons=["spring"], gender="ladies")
+        prompt = build_generation_prompt(titles, keyword, seasons=seasons, gender="ladies")
 
-        assert "春カラー" not in prompt
+        for season_word in ("春カラー", "夏カラー", "秋カラー", "冬カラー", "ブリーチなしカラー"):
+            assert season_word not in prompt
 
     @pytest.mark.parametrize(
         "seasons,expected_rule,expected_rest",
@@ -74,13 +80,18 @@ class TestBuildGenerationPrompt:
             (["spring", "summer"], "20個中**8個は23〜25文字**", 12),
             # 「ブリーチなしカラー」(9文字)+区切り1文字 → 20文字までが目標帯
             (["bleach_free"], "20個中**4個は18〜20文字**", 16),
-            # 語の長さが異なる場合は帯を分ける（長いタイトル帯から順に提示）
-            (["winter", "bleach_free"], "20個中**4個は23〜25文字**、**4個は18〜20文字**", 12),
-            # 5つ選択時は1つあたりの枠が2に減り、合計10個に収まる
+            # 語の長さが異なる場合は帯を分ける（長いタイトル帯から順に提示）。
+            # 季節+bleach_free の両選択時は合体用の超短尺帯（13〜15文字）が3枠加わる
+            (
+                ["winter", "bleach_free"],
+                "20個中**4個は23〜25文字**、**4個は18〜20文字**、**3個は13〜15文字**",
+                9,
+            ),
+            # 5つ選択時は1つあたりの枠が2に減り、単独枠は合計10個に収まる（+合体3枠）
             (
                 ["spring", "summer", "autumn", "winter", "bleach_free"],
-                "20個中**8個は23〜25文字**、**2個は18〜20文字**",
-                10,
+                "20個中**8個は23〜25文字**、**2個は18〜20文字**、**3個は13〜15文字**",
+                7,
             ),
         ],
     )
@@ -95,6 +106,26 @@ class TestBuildGenerationPrompt:
         assert "上限側に寄せて" in prompt
         # 文字数目標の記述が矛盾しないこと（無条件の25〜28文字指定が残っていない）
         assert "- title: **25〜28文字**を目標" not in prompt
+
+    @pytest.mark.parametrize("seasons", [["bleach_free"], ["spring", "summer"]])
+    def test_no_combo_band_without_pair(self, seasons):
+        """季節と bleach_free が揃っていなければ合体用の超短尺帯は指示されない"""
+        titles = ["★髪質改善トリートメントで艶髪ストレート"]
+
+        prompt = build_generation_prompt(titles, "髪質改善", seasons=seasons, gender="ladies")
+
+        assert "13〜15文字" not in prompt
+        assert "通常よりかなり短い" not in prompt
+
+    def test_combo_band_has_emphasis_note(self):
+        """合体帯には個数厳守の強調文が付く（無いとモデルが超短尺枠を作らない）"""
+        titles = ["★髪質改善トリートメントで艶髪ストレート"]
+
+        prompt = build_generation_prompt(
+            titles, "髪質改善", seasons=["autumn", "bleach_free"], gender="ladies"
+        )
+
+        assert "特に**13〜15文字**の枠は通常よりかなり短いですが" in prompt
 
     def test_create_prompt_no_short_slots_without_seasons(self):
         """季節・カラー未選択なら短尺タイトル枠の指示は入らない"""

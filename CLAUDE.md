@@ -120,8 +120,8 @@ The application is configured for Render deployment:
 2. `HotPepperScraper.scrape_titles_async()` scrapes relevant hairstyle titles
 3. `TemplateGenerator.generate_templates_async()` sends titles + context to the Gemini API
 4. Generated templates are validated against character limits and requirements
-5. `apply_season_keywords()` (`app/seasons.py`) appends the selected season/color keywords to short titles (ladies only) and returns the keys of keywords that ended up in no title
-6. Results returned as JSON to frontend. `unapplied_season_keywords` carries the display names (「春カラー」 etc.) of selected keywords contained in no title; the frontend shows a notice banner (`#season-unapplied-notice`) above the results when it is non-empty
+5. `apply_season_keywords()` (`app/seasons.py`) appends the selected season/color keywords to short titles (ladies only) and returns the keys of keywords that ended up in no title. When a season (spring–winter) and `bleach_free` are both selected, a combined keyword (e.g. 「秋カラー×ブリーチなしカラー」, always 14 chars) is appended first to up to `SEASON_COMBO_SLOTS` (3) ultra-short titles, rotating across selected seasons, and counts as an application for both keywords. Templates whose title contains a combined keyword are then moved to the front of the list (stable — other relative order is preserved), so combo results show first in the UI
+6. Results returned as JSON to frontend. `unapplied_season_keywords` carries the display names (「春カラー」 etc.) of selected keywords contained in no title; the frontend shows a notice banner (`#season-unapplied-notice`) above the results when it is non-empty. The banner text also tells the user that regenerating usually applies the keyword
 
 ### Key Design Patterns
 - **Async Context Managers**: Both scraper and session management use `async with`
@@ -206,7 +206,7 @@ The application uses async extensively throughout the entire pipeline:
 ### Japanese Text Handling
 - All templates and content are in Japanese
 - Character counting is critical for social media compliance
-- Season/color keywords are never injected into the prompt; they are appended in Python after generation (`apply_season_keywords` in `app/seasons.py`), and only for ladies
+- Season/color keywords are never injected into the prompt; they are appended in Python after generation (`apply_season_keywords` in `app/seasons.py`), and only for ladies. This includes the season×bleach-free combined keyword — the prompt only reserves an extra ultra-short title band (13–15 chars) for it, never the words themselves
 - Prompt vocabulary, title/menu/comment/hashtag examples are branched by gender so that ladies-oriented color words never reach the mens prompt
 
 ### Production Deployment Notes

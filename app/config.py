@@ -9,6 +9,7 @@
 
 import logging
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -100,6 +101,39 @@ SEASON_APPEND_THRESHOLD = 26  # この文字数未満のタイトルのみ付加
 SHORT_TITLE_BAND_WIDTH = 2
 SHORT_TITLE_SLOTS_PER_CHOICE = 4  # チェック1つあたりの短尺枠数
 SHORT_TITLE_SLOTS_MAX = 12  # 短尺枠の合計上限（MAX_TEMPLATES のうち）
+
+# 季節キー（春〜冬）。合体語の対象になるのはこの4キーのみ。
+# 「bleach_free 以外」という除外形で導出すると、季節でない選択肢を将来追加したときに
+# 黙って合体対象へ紛れ込むため明示列挙にする（列挙し忘れは「合体されない」だけで安全側）
+SEASON_ONLY_KEYS = ("spring", "summer", "autumn", "winter")
+
+# 合体タイトル枠: 季節（春〜冬）と bleach_free の両方が選択されているときのみ、
+# 「秋カラー×ブリーチなしカラー」のような合体語を付加するタイトルを目安件数だけ混ぜる。
+# 超短尺帯（13〜15文字）は指示＝目標であり保証ではないため、3件未満でも許容する（確率的達成）。
+# SHORT_TITLE_SLOTS_MAX（単独枠上限12）とは別枠。最悪ケース（3〜4選択）は単独12+合体3=15枠で通常枠5が残る。
+SEASON_COMBO_JOINER = "×"
+SEASON_COMBO_SLOTS = 3
+
+
+def season_combo_keyword(season_key: str) -> str:
+    """「春カラー×ブリーチなしカラー」形式の合体語（現状は常に14文字）"""
+    return (
+        f"{SEASON_COLOR_CHOICES[season_key]}"
+        f"{SEASON_COMBO_JOINER}"
+        f"{SEASON_COLOR_CHOICES['bleach_free']}"
+    )
+
+
+def combo_season_keys(seasons: Sequence[str]) -> list[str]:
+    """合体語の対象となる季節キーを返す（bleach_free が未選択なら常に空）。
+
+    プロンプトの超短尺帯予約（prompts.build_title_length_rule）と後処理の合体付加
+    （seasons._apply_combo_keywords）は必ずこの判定を共有する。片側だけ条件を変えると
+    「帯を予約したのに付加されない」「付加したいのに枠がない」という不整合になるため。
+    """
+    if "bleach_free" not in seasons:
+        return []
+    return [k for k in seasons if k in SEASON_ONLY_KEYS]
 
 
 def normalize_seasons(seasons: list[str] | None, gender: str) -> list[str]:
