@@ -626,7 +626,7 @@ input[type="text"]:focus+.search-icon {
 
 .step-indicator.completed .step-dot::before {
     content: '\f00c';
-    font-family: 'Font Awesome 5 Free';
+    font-family: 'Font Awesome 6 Free';
     font-weight: 900;
     color: white;
     font-size: 12px;
