@@ -2,7 +2,6 @@
 
 import { copyToClipboard } from './clipboard.js';
 import { el } from './dom.js';
-import { showError } from './status.js';
 import { showToast } from './toast.js';
 import { formatTemplateForExport, hashtagToText } from './template-format.js';
 import { getAllTemplates } from './template-list.js';
@@ -94,7 +93,7 @@ export function initExport() {
     el.exportAllBtn.addEventListener('click', () => {
         const templates = getAllTemplates();
         if (!templates.length) {
-            showError('エクスポートするテンプレートがありません');
+            showToast({ message: 'エクスポートするテンプレートがありません', icon: 'fa-info-circle', variant: 'info' });
             return;
         }
         openExportDialog(templates);
@@ -103,7 +102,7 @@ export function initExport() {
     el.copyAllBtn.addEventListener('click', async () => {
         const templates = getAllTemplates();
         if (!templates.length) {
-            showError('コピーするテンプレートがありません');
+            showToast({ message: 'コピーするテンプレートがありません', icon: 'fa-info-circle', variant: 'info' });
             return;
         }
 
