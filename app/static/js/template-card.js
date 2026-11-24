@@ -26,7 +26,8 @@ export function updateCharCount(textarea, countElement) {
 
     countElement.textContent = `${length}/${maxLength}`;
     countElement.classList.remove('warning', 'error');
-    if (length >= maxLength) {
+    // 上限ちょうどは正しい値なので error にしない（超過は AI の生成結果をそのまま入れたときに起こりうる）
+    if (length > maxLength) {
         countElement.classList.add('error');
     } else if (length >= maxLength * 0.8) {
         countElement.classList.add('warning');

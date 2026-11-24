@@ -106,10 +106,6 @@ async function generate() {
         } else {
             showError(NETWORK_ERROR_MESSAGES.app);
         }
-
-        if (getSelectedKeyword()) {
-            setTimeout(showFeaturedErrorFallbackNotification, 2000);
-        }
     } finally {
         hideLoading();
         el.generateBtn.disabled = false;
@@ -121,10 +117,14 @@ async function generate() {
 export function initGenerate() {
     el.generateBtn.addEventListener('click', generate);
 
-    // 入力欄で Enter を押しても生成する
+    // 入力欄で Enter を押しても生成する。
+    // 日本語入力の変換を確定する Enter では送信しない（isComposing、古い Safari 向けに keyCode 229）。
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && document.activeElement === el.keywordInput) {
-            el.generateBtn.click();
-        }
+        if (event.key !== 'Enter' || document.activeElement !== el.keywordInput) return;
+        if (event.isComposing || event.keyCode === 229) return;
+        el.generateBtn.click();
     });
+
+    // エラー表示は自動で消さず、ユーザーが入力を直し始めた時点で消す
+    el.keywordInput.addEventListener('input', hideError);
 }
