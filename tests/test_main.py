@@ -421,6 +421,26 @@ class TestTemplateContext:
         for name in ('copy', 'check', 'close', 'alert'):
             assert f'id="icon-{name}"' in html
 
+    def test_index_has_result_actions_and_no_pagination(self, client):
+        """結果はページ送りせずに並べ、操作は下部のバーと注記の「再生成」から行うこと
+
+        generate.js / dom.js は id と data-action の文字列一致でこれらを引く。
+        """
+        html = client.get('/').data.decode('utf-8')
+
+        assert 'id="cancel-button"' in html
+        assert html.count('data-action="regenerate"') == 2
+        for element_id in (
+            'copy-all',
+            'export-all',
+            'results-count',
+            'results-featured',
+            'sr-status',
+        ):
+            assert f'id="{element_id}"' in html
+        assert 'class="pagination"' not in html
+        assert 'id="copied-toast"' not in html
+
     def test_index_renders_season_checkboxes(self, client):
         """季節・カラーのチェックボックスが config の定義順に並ぶこと"""
         html = client.get('/').data.decode('utf-8')

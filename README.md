@@ -477,9 +477,6 @@ CSS には、同じセレクタのベース定義が最大 5 重に重なる問�
 
 - 状態クラスの名前は `.active` / `.show` / `.copied` / `.hidden` / `.disabled` と `is-` 付きが
   混在しています。前者は JS が参照しているので、名前を変えるときは JS 側も合わせて直します。
-- ページ送り（`.pagination`）、進捗の 3 段階表示、画面下中央のコピー確認（`.copied-toast`）は
-  PR ③ で廃止する予定のため、最低限の見た目だけを付けています。
-
 ### その他
 
 - `Procfile` と `runtime.txt` は Heroku 由来で、`render.yaml` の `startCommand` と

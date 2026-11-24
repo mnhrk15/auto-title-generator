@@ -1,12 +1,14 @@
-// 「生成」ボタンのフロー。
+// 「生成」「再生成」のフロー。
+//
+// 生成中は前回の結果を薄く残して操作できないようにし、成功したら差し替える。
+// 失敗・中止したら前回の結果をそのまま戻す。
 
 import { ApiError, TIMEOUT_GENERATE_MS, requestJson } from './api.js';
 import { el, getSelectedGender, getSelectedSeasons } from './dom.js';
+import { startElapsedTimer, stopElapsedTimer } from './progress.js';
 import {
-    completeProgress, resetProgress, startProgressSimulation, stopProgressSimulation,
-} from './progress.js';
-import { hideError, hideLoading, hideResults, showError, showLoading, showResults } from './status.js';
-import { showToast } from './toast.js';
+    announce, hideError, hideLoading, setResultsBusy, showError, showLoading, showResults,
+} from './status.js';
 import { updateMensNotice, updateSeasonUnappliedNotice } from './form-controls.js';
 import { displayTemplates } from './template-list.js';
 import {
@@ -22,20 +24,24 @@ const NETWORK_ERROR_MESSAGES = {
 const BUTTON_IDLE_TEXT = '生成';
 const BUTTON_BUSY_TEXT = '生成中…';
 
-function notifySuccess(data) {
-    const featuredName = data.featured_keyword_info?.name;
+// 実行中の生成を中止するための controller。null なら生成中ではない。
+let activeController = null;
 
-    if (data.is_featured && featuredName) {
-        showToast({
-            message: `特集「${featuredName}」のテンプレートを${data.templates.length}件生成しました`,
-            variant: 'featured',
-            duration: 4000,
-        });
-    } else if (data.is_featured) {
-        showToast({ message: '特集キーワードのテンプレートを生成しました', variant: 'success' });
-    } else {
-        showToast({ message: 'テンプレートを生成しました', variant: 'success' });
-    }
+/** 結果見出しの件数と特集名 */
+function updateResultsSummary(data) {
+    const count = `${data.templates.length}件`;
+    el.resultsCount.textContent = count;
+    el.resultsActionsCount.textContent = count;
+
+    const featuredName = data.featured_keyword_info?.name;
+    el.resultsFeatured.textContent = featuredName ? `特集: ${featuredName}` : '特集キーワード';
+    el.resultsFeatured.classList.toggle('hidden', !data.is_featured);
+}
+
+function setBusy(isBusy) {
+    el.generateBtn.disabled = isBusy;
+    el.generateBtn.textContent = isBusy ? BUTTON_BUSY_TEXT : BUTTON_IDLE_TEXT;
+    setResultsBusy(isBusy);
 }
 
 /** サーバーが返したエラーコードに応じた案内を出す */
@@ -59,6 +65,8 @@ function handleApiError(error) {
 }
 
 async function generate() {
+    if (activeController) return;
+
     const keyword = el.keywordInput.value.trim();
     const gender = getSelectedGender();
     const seasons = getSelectedSeasons();
@@ -69,14 +77,19 @@ async function generate() {
         return;
     }
 
-    showLoading();
-    hideError();
-    hideResults();
-    resetProgress();
-    startProgressSimulation();
+    const controller = new AbortController();
+    activeController = controller;
 
-    el.generateBtn.disabled = true;
-    el.generateBtn.textContent = BUTTON_BUSY_TEXT;
+    // 結果欄の「再生成」から押された場合、結果欄は inert になってフォーカスが失われるので、
+    // 待ち表示の「中止」へ移しておく
+    const focusWasInResults = el.results.contains(document.activeElement);
+
+    hideError();
+    setBusy(true);
+    showLoading();
+    if (focusWasInResults) el.cancelBtn.focus();
+    startElapsedTimer();
+    announce('生成を開始しました');
 
     try {
         // model は送らない。UI にモデル選択が無く、サーバー側にデフォルトがあるため。
@@ -84,36 +97,58 @@ async function generate() {
             method: 'POST',
             body: { keyword, gender, seasons },
             timeoutMs: TIMEOUT_GENERATE_MS,
+            signal: controller.signal,
         });
 
-        completeProgress();
-        notifySuccess(data);
         updateMensNotice(gender);
         updateSeasonUnappliedNotice(data.unapplied_season_keywords);
-        displayTemplates(data.templates);
+        updateResultsSummary(data);
+        // 先に表示してから描画する。非表示（display: none）のままだと textarea の高さが測れず 0 になる
+        setResultsBusy(false);
         showResults();
+        displayTemplates(data.templates);
+        announce(`${data.templates.length}件の結果を表示しました`);
         el.results.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
+        if (error instanceof ApiError && error.kind === 'cancelled') {
+            // 自分で押した中止なので通知は出さず、前回の状態に戻すだけ
+            announce('生成を中止しました');
+            return;
+        }
+
         console.error('テンプレート生成中にエラー:', error);
-
-        // エラー時はシミュレーションのみ停止（一瞬「100% 完了」と見える不具合を回避）
-        stopProgressSimulation();
-
+        announce('生成に失敗しました');
         if (error instanceof ApiError) {
             handleApiError(error);
         } else {
             showError(NETWORK_ERROR_MESSAGES.app);
         }
     } finally {
+        activeController = null;
+        stopElapsedTimer();
+        // 「中止」にフォーカスがあったまま隠すと、フォーカスが body に落ちて見失う
+        const focusWasInLoading = el.loading.contains(document.activeElement);
         hideLoading();
-        el.generateBtn.disabled = false;
-        el.generateBtn.textContent = BUTTON_IDLE_TEXT;
-        stopProgressSimulation();
+        setBusy(false);
+        if (focusWasInLoading) el.generateBtn.focus({ preventScroll: true });
     }
+}
+
+/**
+ * 生成を中止する。サーバー側の処理は止まらない（結果を受け取らずに捨てるだけ）。
+ */
+function cancelGeneration() {
+    activeController?.abort();
 }
 
 export function initGenerate() {
     el.generateBtn.addEventListener('click', generate);
+    el.cancelBtn.addEventListener('click', cancelGeneration);
+
+    // 「再生成」は今の入力内容のまま生成し直す
+    el.regenerateButtons.forEach((button) => {
+        button.addEventListener('click', generate);
+    });
 
     // 入力欄で Enter を押しても生成する。
     // 日本語入力の変換を確定する Enter では送信しない（isComposing、古い Safari 向けに keyCode 229）。

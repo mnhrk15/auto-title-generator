@@ -101,8 +101,17 @@ The application is configured for Render deployment:
   elements are queried by whoever creates them — that is not a violation. A selector string
   appearing in two modules is. A startup assertion logs any `el` entry that came back null,
   because these are bound to `index.html` by string matching only.
-- `toast.js` documents the five notification surfaces and when to use each. They are not five
-  copies of the same thing; do not merge them.
+- `toast.js` documents the four notification surfaces and when to use each. They are not four
+  copies of the same thing; do not merge them. Outcomes the user can already see on screen
+  (generation succeeded, selection cleared, reload succeeded) get no notification, and copy
+  success is shown only on the pressed button (`flashCopyFeedback`).
+- Results are rendered all at once (no pagination). While generating, the previous results stay
+  visible but dimmed and `inert`; on failure or cancel they are restored as they were.
+  `displayTemplates()` must run after the results section is shown — textarea heights cannot be
+  measured under `display: none`.
+- Generation shows elapsed seconds, not a percentage (`progress.js`) — the server reports no
+  progress. The cancel button aborts the fetch via `requestJson({ signal })`, which surfaces as
+  `ApiError` kind `cancelled`; the server keeps running and its result is discarded.
 - Templates repeated in `index.html` live in `templates/_macros.html`. Character limits come from
   `config.CHAR_LIMITS` via `render_template` — never hardcode them in the template or in JS.
 - State lives in module scope (`progress.js`, `template-list.js`). There is no global store, and
@@ -291,8 +300,8 @@ The design rules are in the comment at the top of the file — read them before 
   `static/js/icons.js`. Do not add icons to labels or headings for decoration.
 - New state classes should use the `is-` prefix. Existing `.active` / `.show` / `.copied` /
   `.hidden` / `.disabled` are referenced from JS — renaming them means updating JS too.
-- Selected states of the gender toggle and season checkboxes are styled with
-  `:has(input:checked)`; JS does not toggle classes for them.
+- The selected gender is styled with `input:checked + .radio-label` (not `:has()`, so it still
+  shows on browsers without `:has()` support); JS does not toggle classes for it.
 
 ### Other guidelines
 - Do not change specified technology stack versions without approval

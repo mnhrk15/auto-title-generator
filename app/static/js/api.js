@@ -13,7 +13,8 @@ const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
  * API 呼び出しの失敗。
- * kind: 'timeout' | 'network' | 'server' | 'app'
+ * kind: 'timeout' | 'cancelled' | 'network' | 'server' | 'app'
+ *   - cancelled: 呼び出し側が渡した signal で中止された（ユーザーの「中止」）
  *   - server: HTTP が 2xx でなかった（サーバー側の障害・入力エラー）
  *   - app:    HTTP は成功したが body の success が false だった
  */
@@ -36,10 +37,28 @@ export class ApiError extends Error {
  */
 export async function requestJson(
     url,
-    { method = 'GET', body = null, timeoutMs = DEFAULT_TIMEOUT_MS } = {},
+    { method = 'GET', body = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null } = {},
 ) {
+    // タイムアウトと呼び出し側の中止を 1 つの controller にまとめる。
+    // AbortSignal.any は iOS 17.4 未満の Safari に無いので使わない。
     const controller = new AbortController();
+    let cancelledByCaller = false;
+    const onCallerAbort = () => {
+        cancelledByCaller = true;
+        controller.abort();
+    };
+    if (signal?.aborted) {
+        throw new ApiError('中止しました', 'cancelled');
+    }
+    signal?.addEventListener('abort', onCallerAbort, { once: true });
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    // タイムアウトと中止の監視は、本文を読み終えるまで続ける。
+    // fetch はヘッダーが届いた時点で解決するので、ここで外すと本文の読み込み中の中止が効かない。
+    const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onCallerAbort);
+    };
 
     let response;
     try {
@@ -53,24 +72,31 @@ export async function requestJson(
             body: body ? JSON.stringify(body) : undefined,
         });
     } catch (error) {
+        cleanup();
         if (error.name === 'AbortError') {
+            if (cancelledByCaller) throw new ApiError('中止しました', 'cancelled');
             throw new ApiError('リクエストがタイムアウトしました', 'timeout');
         }
         if (error.name === 'TypeError') {
             throw new ApiError('ネットワークエラーが発生しました', 'network');
         }
         throw new ApiError(error.message, 'app');
-    } finally {
-        clearTimeout(timer);
     }
 
     // 非 2xx でも body を読む。サーバーは {success:false, error:{message, code}} を返す。
     let data = null;
     try {
         data = await response.json();
-    } catch {
+    } catch (error) {
+        if (error.name === 'AbortError' && !cancelledByCaller) {
+            throw new ApiError('リクエストがタイムアウトしました', 'timeout');
+        }
         data = null;
+    } finally {
+        cleanup();
     }
+    // 本文の読み込み中に中止された場合も、結果は使わない
+    if (cancelledByCaller) throw new ApiError('中止しました', 'cancelled');
 
     const message = data?.error?.message || data?.message;
     const code = data?.error?.code || null;

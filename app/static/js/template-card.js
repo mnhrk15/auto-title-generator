@@ -5,13 +5,6 @@ import { el } from './dom.js';
 import { icon } from './icons.js';
 import { formatTemplateFields } from './template-format.js';
 
-const FIELD_LABELS = {
-    title: 'タイトル',
-    menu: 'メニュー',
-    comment: 'コメント',
-    hashtag: 'ハッシュタグ',
-};
-
 // ハッシュタグの上限はタグ 1 個あたり。textarea 全体を制限する maxlength は使えないので、
 // サーバーが data-max-length で渡す（出典は app/config.py の CHAR_LIMITS）。
 const HASHTAG_MAX_LENGTH_FALLBACK = 20;
@@ -105,23 +98,8 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
     const fragment = el.templateCardTemplate.content.cloneNode(true);
     const card = fragment.querySelector('.template-card');
 
-    const featuredIndicator = card.querySelector('.featured-indicator');
-    const isFeatured = Boolean(template.is_featured);
-
-    if (isFeatured) {
-        featuredIndicator.classList.remove('hidden');
-
-        const featuredKeywordName = template.featured_keyword_name;
-        if (featuredKeywordName) {
-            featuredIndicator.title = `特集キーワード: ${featuredKeywordName}`;
-            const indicatorText = featuredIndicator.querySelector('span');
-            if (indicatorText) {
-                indicatorText.textContent = `特集対応 (${featuredKeywordName})`;
-            }
-        }
-    } else {
-        featuredIndicator.classList.add('hidden');
-    }
+    // 全件コピー・書き出しの「■ テンプレート N」と同じ番号を振る（template-format.js）
+    card.querySelector('.card-title').textContent = `#${globalIndex + 1}`;
 
     const textareas = card.querySelectorAll('textarea[data-field]');
     textareas.forEach((textarea) => {
@@ -147,7 +125,7 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
             const textarea = card.querySelector(`textarea[data-field="${field}"]`);
             if (!textarea) return;
 
-            if (await copyToClipboard(textarea.value, FIELD_LABELS[field])) {
+            if (await copyToClipboard(textarea.value)) {
                 flashCopyFeedback(btn, icon('check'));
             }
         });
@@ -158,8 +136,8 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
         const values = {};
         textareas.forEach((textarea) => { values[textarea.dataset.field] = textarea.value; });
 
-        if (await copyToClipboard(formatTemplateFields(values), 'テンプレート全体')) {
-            flashCopyFeedback(copyBtn, `${icon('check')} コピー完了`);
+        if (await copyToClipboard(formatTemplateFields(values))) {
+            flashCopyFeedback(copyBtn, `${icon('check')} コピー済み`);
         }
     });
 

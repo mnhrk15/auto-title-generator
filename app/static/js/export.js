@@ -1,6 +1,6 @@
 // 生成結果のエクスポート（CSV / テキスト）と全件コピー。
 
-import { copyToClipboard } from './clipboard.js';
+import { copyToClipboard, flashCopyFeedback } from './clipboard.js';
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { showToast } from './toast.js';
@@ -61,11 +61,15 @@ function openExportDialog(templates) {
         if (event.key === 'Escape') closeDialog();
     };
 
+    // 開いたらダイアログの中へ、閉じたら開いたボタンへフォーカスを移す
+    const opener = document.activeElement;
     function closeDialog() {
         document.removeEventListener('keydown', onKeydown);
         dialog.remove();
+        if (opener instanceof HTMLElement) opener.focus();
     }
     document.addEventListener('keydown', onKeydown);
+    dialog.querySelector('.export-option').focus();
 
     dialog.querySelector('[data-format="csv"]').addEventListener('click', () => {
         downloadFile(toCsv(templates), 'hair_templates.csv', 'text/csv;charset=utf-8');
@@ -103,9 +107,8 @@ export function initExport() {
             return;
         }
 
-        await copyToClipboard(
-            templates.map(formatTemplateForExport).join('\n'),
-            'すべてのテンプレート',
-        );
+        if (await copyToClipboard(templates.map(formatTemplateForExport).join('\n'))) {
+            flashCopyFeedback(el.copyAllBtn, `${icon('check')} コピー済み`);
+        }
     });
 }

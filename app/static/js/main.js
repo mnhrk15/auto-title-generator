@@ -10,7 +10,6 @@ import { initExport } from './export.js';
 import { initFeaturedKeywords } from './featured-keywords.js';
 import { initFormControls } from './form-controls.js';
 import { initGenerate } from './generate.js';
-import { initPagination } from './template-list.js';
 
 const RESIZE_DEBOUNCE_MS = 150;
 
@@ -30,6 +29,5 @@ function initResizeHandler() {
 initFormControls();
 initFeaturedKeywords();
 initGenerate();
-initPagination();
 initExport();
 initResizeHandler();

@@ -1,23 +1,26 @@
 // クリップボードへのコピーと、ボタン上での完了表示。
 
-import { showCopyToast, showToast } from './toast.js';
+import { announce } from './status.js';
+import { showToast } from './toast.js';
 
 const COPY_FEEDBACK_MS = 1500;
 
 /**
  * クリップボードにコピーする。
  *
+ * 成功は押したボタンの表示（flashCopyFeedback）だけで知らせる。画面下の確認表示は
+ * ボタンの表示と二重になっていたので廃止した。ボタンの表示は読み上げられないので、
+ * 読み上げ用のお知らせ（#sr-status）にだけ流す。
  * 失敗時は右下のエラートーストを出す。以前は status.js の showError を使っており、
  * コピーに失敗しただけでページが結果セクションの先頭までスクロールしていた。
  *
  * @param {string} text
- * @param {string} [label] 成功時のピルに出すフィールド名
  * @returns {Promise<boolean>} 成功したか
  */
-export async function copyToClipboard(text, label = '') {
+export async function copyToClipboard(text) {
     try {
         await navigator.clipboard.writeText(text);
-        showCopyToast(label);
+        announce('クリップボードにコピーしました');
         return true;
     } catch (error) {
         showToast({ message: 'コピーに失敗しました', variant: 'error' });

@@ -46,35 +46,19 @@
         </ol>
     </details>
 
-    <!-- ローディングインジケーター -->
-    <div id="loading" class="loading hidden" role="status" aria-live="polite" aria-busy="false">
-        <p class="loading-message">データ取得中です</p>
-        <div class="progress-container">
-            <div class="progress-steps">
-                <div class="step-indicator" data-step="1">
-                    <div class="step-dot"></div>
-                    <span class="step-label">データ取得</span>
-                </div>
-                <div class="step-indicator" data-step="2">
-                    <div class="step-dot"></div>
-                    <span class="step-label">トレンド分析</span>
-                </div>
-                <div class="step-indicator" data-step="3">
-                    <div class="step-dot"></div>
-                    <span class="step-label">テンプレート生成</span>
-                </div>
-            </div>
-            <div class="progress-bar" role="progressbar"
-                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
-                 aria-label="生成の進捗">
-                <div class="progress-fill" id="progress-fill"></div>
-            </div>
-            <div class="progress-status">
-                <div class="progress-step" id="progress-step">データ取得中…</div>
-                <div class="progress-percent" id="progress-percent">0%</div>
-            </div>
+    <!-- 生成中の表示。実際の進み具合は取れないので、% は出さずに経過秒数と目安だけを出す -->
+    <div id="loading" class="loading hidden" aria-busy="false">
+        <div class="loading-head">
+            <p class="loading-message">生成中…</p>
+            {#- 秒数は毎秒変わるので読み上げない。開始・完了・中止は #sr-status で伝える -#}
+            <span class="loading-elapsed" id="loading-elapsed" aria-hidden="true">0秒経過</span>
+            <button type="button" id="cancel-button" class="secondary-button loading-cancel">中止</button>
         </div>
+        <div class="progress-bar" aria-hidden="true"><div class="progress-fill"></div></div>
+        <p class="loading-note">通常 20〜40 秒、混雑時は最大 2 分かかります</p>
     </div>
+
+    <p id="sr-status" class="visually-hidden" role="status" aria-live="polite"></p>
 
     <section id="error-message" class="error-message hidden" role="alert">
         {{ icon('alert') }}
@@ -83,7 +67,11 @@
 
     <!-- 結果セクション -->
     <section id="results" class="results-section hidden" aria-labelledby="results-header">
-        <h2 class="results-header" id="results-header">生成結果</h2>
+        <div class="results-header-row">
+            <h2 class="results-header" id="results-header">生成結果</h2>
+            <span class="results-count" id="results-count"></span>
+            <span class="results-featured hidden" id="results-featured"></span>
+        </div>
 
         <!-- メンズ生成時のみ表示する注釈 -->
         <div id="mens-title-notice" class="mens-notice hidden" role="note">
@@ -115,35 +103,21 @@
         <div id="season-unapplied-notice" class="mens-notice hidden" role="note">
             <div class="mens-notice-body">
                 <p class="mens-notice-text">選択した「<span id="season-unapplied-keywords"></span>」はタイトルの文字数制約により今回の結果には付与されませんでした。もう一度生成すると付与されることが多いため、再生成をお試しください</p>
+                <button type="button" class="secondary-button notice-action" data-action="regenerate">再生成</button>
             </div>
         </div>
 
-        <!-- ローディングスピナー -->
-        <div id="templates-loading" class="loading-spinner">
-            <div class="spinner"></div>
-        </div>
-            
         <div id="template-container" class="template-container"></div>
-            
-        <!-- ページネーション -->
-        <div class="pagination">
-            <button type="button" class="page-btn nav-btn disabled" id="prev-page">前へ</button>
-            <div id="pagination-numbers"></div>
-            <button type="button" class="page-btn nav-btn disabled" id="next-page">次へ</button>
-        </div>
 
-        <div class="export-buttons">
-            <button type="button" id="export-all" class="primary-button">全てエクスポート</button>
+        {#- 結果欄が画面に入っている間だけ、画面の下端に固定する（position: sticky） -#}
+        <div class="results-actions" role="toolbar" aria-label="生成結果の操作">
+            <span class="results-actions-count" id="results-actions-count" aria-hidden="true"></span>
+            <button type="button" class="secondary-button" data-action="regenerate">再生成</button>
             <button type="button" id="copy-all" class="secondary-button">全てコピー</button>
+            <button type="button" id="export-all" class="primary-button">書き出し</button>
         </div>
     </section>
 
-    <!-- コピー完了トースト。
-         #results の内側に置くと、再生成時の hideResults() で表示途中のまま消えてしまう。
-         （以前は結果セクションの登場アニメーションの transform で表示位置もずれていた） -->
-    <div id="copied-toast" class="copied-toast" role="status" aria-live="polite">
-        クリップボードにコピーしました
-    </div>
 </main>
 
 <footer class="footer">
@@ -154,9 +128,7 @@
 <template id="template-card">
     <div class="template-card">
         <div class="card-header">
-            <span class="card-title">テンプレート</span>
-            <!-- 特集対応テンプレート識別マーク -->
-            <span class="featured-indicator hidden"><span>特集対応</span></span>
+            <span class="card-title"></span>
         </div>
         <div class="card-content">
             {{ card_field('title', 'タイトル', 'タイトルを入力してください',
