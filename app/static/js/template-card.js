@@ -66,8 +66,11 @@ function refreshCount(textarea) {
 export function autoResizeTextarea(textarea) {
     const minHeight = parseInt(window.getComputedStyle(textarea).getPropertyValue('min-height'), 10) || 0;
 
+    // box-sizing: border-box なので、scrollHeight（罫線を含まない）に上下の罫線の幅を足す。
+    // 足さないと常に 2px 足りず、クラシックスクロールバーの環境で縦バーが出る。
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.max(textarea.scrollHeight, minHeight)}px`;
+    const borderHeight = textarea.offsetHeight - textarea.clientHeight;
+    textarea.style.height = `${Math.max(textarea.scrollHeight + borderHeight, minHeight)}px`;
 
     // 収まらない場合だけスクロールバーを出す
     textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';

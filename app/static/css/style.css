@@ -8,8 +8,10 @@
  * - 影はポップアップ（トースト・通知・ダイアログ）の --shadow-popup だけ。面は罫線で区切る。
  * - 角丸は --radius-sm / --radius-md の 2 種類。円形が必要な所だけ 50%。
  * - 動きは色・透明度の transition だけ。常時ループ、hover で浮かせる・拡大する動きは使わない。
- *   例外は「読み込み中」を示すスピナーの回転のみ。
+ *   例外は「読み込み中」を示すスピナーの回転と、進捗バーの幅の変化だけ。
+ * - 入力欄のフォーカスリングは box-shadow（--focus-ring）で描く。これは影ではなく枠の扱い。
  * - 文字サイズは --text-* の 5 段階、余白は --space-* の刻みを使う。
+ *   ボタンの高さやアイコンの大きさなど、部品の寸法は px で直接書いてよい。
  * - 状態クラスを新しく作るときは is- を付ける。既存の .active / .show / .copied / .hidden /
  *   .disabled / .warning / .error は JS が参照しているので名前を変えない。
  */
@@ -483,7 +485,8 @@ button:disabled {
 
 .progress-steps {
     display: flex;
-    gap: var(--space-4);
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
     margin-bottom: var(--space-3);
 }
 
@@ -491,12 +494,14 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    white-space: nowrap;
     font-size: var(--text-xs);
     color: var(--color-text-muted);
 }
 
 .step-dot {
     position: relative;
+    flex-shrink: 0;
     width: 14px;
     height: 14px;
     border: 2px solid var(--color-border-strong);
@@ -701,6 +706,7 @@ button:disabled {
 }
 
 .card-title {
+    flex-shrink: 0;
     font-size: var(--text-sm);
     font-weight: 700;
     color: var(--color-text-muted);
@@ -723,6 +729,7 @@ button:disabled {
 
 .field-label {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-2);
@@ -914,13 +921,16 @@ button:disabled {
     position: fixed;
     bottom: var(--space-4);
     left: 50%;
-    z-index: var(--z-toast);
+    /* 右下のトーストと同時に出ても隠れないよう、1 つ上に置く */
+    z-index: calc(var(--z-toast) + 1);
     padding: var(--space-2) var(--space-3);
     background-color: var(--color-text);
     border-radius: var(--radius-sm);
     color: #ffffff;
     font-size: var(--text-sm);
-    white-space: nowrap;
+    text-align: center;
+    width: max-content;
+    max-width: calc(100vw - var(--space-5));
     transform: translateX(-50%);
     opacity: 0;
     pointer-events: none;
@@ -946,11 +956,13 @@ button:disabled {
     box-shadow: var(--shadow-popup);
     font-size: var(--text-sm);
     opacity: 0;
+    pointer-events: none;
     transition: opacity var(--transition);
 }
 
 .toast.show {
     opacity: 1;
+    pointer-events: auto;
 }
 
 .toast--success,
@@ -983,11 +995,13 @@ button:disabled {
     box-shadow: var(--shadow-popup);
     font-size: var(--text-sm);
     opacity: 0;
+    pointer-events: none;
     transition: opacity var(--transition);
 }
 
 .featured-fallback-notification.show {
     opacity: 1;
+    pointer-events: auto;
 }
 
 .featured-error-fallback-notification {
@@ -1002,7 +1016,8 @@ button:disabled {
 }
 
 .notification-text {
-    flex: 1;
+    /* 幅が足りないときはボタン列を下の行へ送る（flex: 1 だと basis が 0 になり折り返さない） */
+    flex: 1 1 12em;
     min-width: 0;
 }
 
