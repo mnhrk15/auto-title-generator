@@ -562,6 +562,8 @@ button:disabled {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    /* 生成後に見出しへフォーカスしたとき、枠の上辺が画面外に切れないよう少し余白を取る */
+    scroll-margin-top: var(--space-2);
 }
 
 .results-header-row {
