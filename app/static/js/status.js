@@ -50,7 +50,13 @@ export function setResultsBusy(isBusy) {
     el.results.inert = isBusy;
 }
 
-/** 読み上げ用のお知らせ（画面には出さない）。秒数のような頻繁に変わる値は流さない */
+/**
+ * 読み上げ用のお知らせ（画面には出さない）。秒数のような頻繁に変わる値は流さない。
+ * 同じ文言を続けて入れても変化と見なされず読み上げられないので、一度空にしてから入れる。
+ */
 export function announce(message) {
-    el.srStatus.textContent = message;
+    el.srStatus.textContent = '';
+    requestAnimationFrame(() => {
+        el.srStatus.textContent = message;
+    });
 }

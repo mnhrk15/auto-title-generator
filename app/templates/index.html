@@ -68,7 +68,7 @@
     <!-- 結果セクション -->
     <section id="results" class="results-section hidden" aria-labelledby="results-header">
         <div class="results-header-row">
-            <h2 class="results-header" id="results-header">生成結果</h2>
+            <h2 class="results-header" id="results-header" tabindex="-1">生成結果</h2>
             <span class="results-count" id="results-count"></span>
             <span class="results-featured hidden" id="results-featured"></span>
         </div>
@@ -110,7 +110,7 @@
         <div id="template-container" class="template-container"></div>
 
         {#- 結果欄が画面に入っている間だけ、画面の下端に固定する（position: sticky） -#}
-        <div class="results-actions" role="toolbar" aria-label="生成結果の操作">
+        <div class="results-actions" role="group" aria-label="生成結果の操作">
             <span class="results-actions-count" id="results-actions-count" aria-hidden="true"></span>
             <button type="button" class="secondary-button" data-action="regenerate">再生成</button>
             <button type="button" id="copy-all" class="secondary-button">全てコピー</button>

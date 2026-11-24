@@ -80,9 +80,13 @@ async function generate() {
     const controller = new AbortController();
     activeController = controller;
 
-    // 結果欄の「再生成」から押された場合、結果欄は inert になってフォーカスが失われるので、
-    // 待ち表示の「中止」へ移しておく
-    const focusWasInResults = el.results.contains(document.activeElement);
+    // フォーカスの行き先。押したボタンは無効化（生成）または inert（結果欄の再生成）になり、
+    // そのままだとフォーカスが body に落ちてキーボードで現在地を見失う。
+    // 生成中は「中止」へ移し、終わったら成功時は結果の見出しへ、失敗・中止時は押したボタンへ戻す。
+    const startedFrom = document.activeElement;
+    const focusWasInResults = el.results.contains(startedFrom);
+    const focusWasOnButton = focusWasInResults || startedFrom === el.generateBtn;
+    let succeeded = false;
 
     hideError();
     setBusy(true);
@@ -103,12 +107,17 @@ async function generate() {
         updateMensNotice(gender);
         updateSeasonUnappliedNotice(data.unapplied_season_keywords);
         updateResultsSummary(data);
+        // 待ち表示は結果欄より上にあるので、スクロール位置を決める前に消す。
+        // 後で消すと、消えた高さの分だけ結果欄が上へずれ、見出しが画面の外に隠れる。
+        stopElapsedTimer();
+        hideLoading();
         // 先に表示してから描画する。非表示（display: none）のままだと textarea の高さが測れず 0 になる
         setResultsBusy(false);
         showResults();
         displayTemplates(data.templates);
         announce(`${data.templates.length}件の結果を表示しました`);
         el.results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        succeeded = true;
     } catch (error) {
         if (error instanceof ApiError && error.kind === 'cancelled') {
             // 自分で押した中止なので通知は出さず、前回の状態に戻すだけ
@@ -126,11 +135,15 @@ async function generate() {
     } finally {
         activeController = null;
         stopElapsedTimer();
-        // 「中止」にフォーカスがあったまま隠すと、フォーカスが body に落ちて見失う
-        const focusWasInLoading = el.loading.contains(document.activeElement);
+        const focusIsLost = el.loading.contains(document.activeElement)
+            || document.activeElement === document.body;
         hideLoading();
         setBusy(false);
-        if (focusWasInLoading) el.generateBtn.focus({ preventScroll: true });
+        if (focusWasOnButton && focusIsLost) {
+            // 成功時は画面が結果欄へスクロールするので、フォーカスもそこへ合わせる
+            const target = succeeded ? el.resultsHeader : startedFrom;
+            target.focus({ preventScroll: true });
+        }
     }
 }
 

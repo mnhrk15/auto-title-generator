@@ -56,6 +56,7 @@
     --space-6: 48px;
 
     --control-height: 44px;
+    --results-actions-height: 62px;  /* 下部の操作バー。トーストとスクロール余白もこれを参照する */
     --container-max-width: 1200px;
     --transition: 150ms ease;
 
@@ -777,7 +778,7 @@ button:disabled {
     border: 0;
     border-radius: var(--radius-sm);
     color: var(--color-text-muted);
-    transition: opacity var(--transition), background-color var(--transition), color var(--transition);
+    transition: background-color var(--transition), color var(--transition);
 }
 
 .field-copy-btn:hover {
@@ -822,8 +823,9 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    height: var(--results-actions-height);
     margin: 0 calc(-1 * var(--space-3));
-    padding: var(--space-2) var(--space-3);
+    padding: 0 var(--space-3);
     background-color: var(--color-surface);
     border-top: 1px solid var(--color-border);
 }
@@ -890,9 +892,14 @@ button:disabled {
     border-left-color: var(--color-error);
 }
 
-/* 結果の操作バー（高さ 60px）が下端にある間は、トーストをその上に出す */
+/* 結果の操作バーが下端にある間は、トーストをその上に出す */
 body:has(#results:not(.hidden)) .toast {
-    bottom: calc(60px + var(--space-3));
+    bottom: calc(var(--results-actions-height) + var(--space-3));
+}
+
+/* Tab で移動したとき、フォーカスした欄やボタンが操作バーの裏に隠れないようにする */
+html:has(#results:not(.hidden)) {
+    scroll-padding-bottom: calc(var(--results-actions-height) + var(--space-3));
 }
 
 .toast-title {
@@ -1065,7 +1072,6 @@ body:has(#results:not(.hidden)) .toast {
 
     .results-actions {
         margin: 0;
-        padding: var(--space-2) var(--space-3);
         border: 1px solid var(--color-border);
         border-radius: var(--radius-md) var(--radius-md) 0 0;
     }
@@ -1087,7 +1093,7 @@ body:has(#results:not(.hidden)) .toast {
     }
 
     body:has(#results:not(.hidden)) .toast {
-        bottom: calc(60px + var(--space-4));
+        bottom: calc(var(--results-actions-height) + var(--space-4));
     }
 
     .featured-fallback-notification {

@@ -22,6 +22,7 @@ export const el = {
     errorText: document.querySelector('#error-message .error-text'),
 
     results: document.getElementById('results'),
+    resultsHeader: document.getElementById('results-header'),
     resultsCount: document.getElementById('results-count'),
     resultsActionsCount: document.getElementById('results-actions-count'),
     resultsFeatured: document.getElementById('results-featured'),
