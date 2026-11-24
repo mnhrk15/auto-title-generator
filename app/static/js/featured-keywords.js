@@ -7,6 +7,7 @@
 
 import { TIMEOUT_FEATURED_KEYWORDS_MS, errorKind, requestJson } from './api.js';
 import { el, getSelectedGender } from './dom.js';
+import { icon } from './icons.js';
 import { showNotification, showToast } from './toast.js';
 
 const GENDER_LABELS = {
@@ -110,7 +111,6 @@ async function retry() {
     if (await loadAndRender(null, RETRY_ERROR_MESSAGES)) {
         showToast({
             message: '特集キーワードを正常に読み込みました',
-            icon: 'fa-check-circle',
             variant: 'success',
         });
     }
@@ -120,10 +120,7 @@ async function retry() {
 
 function renderLoadingState() {
     el.featuredContainer.innerHTML = `
-        <div class="featured-keywords-loading">
-            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-            <span>特集キーワードを読み込み中...</span>
-        </div>
+        <div class="featured-keywords-loading">特集キーワードを読み込み中…</div>
     `;
 }
 
@@ -134,8 +131,7 @@ function renderFeaturedKeywords() {
     if (state.keywords.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'featured-keywords-empty';
-        empty.innerHTML = '<i class="fas fa-info-circle" aria-hidden="true"></i>';
-        empty.append('現在、特集キーワードはありません');
+        empty.textContent = '現在、特集キーワードはありません';
         container.appendChild(empty);
     } else {
         state.keywords.forEach((keyword) => {
@@ -158,13 +154,8 @@ function createKeywordButton(keyword) {
     button.dataset.gender = keyword.gender;
     button.setAttribute('aria-pressed', 'false');
 
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-star';
-    icon.setAttribute('aria-hidden', 'true');
-    const label = document.createElement('span');
     // JSON 由来の文字列なので textContent で入れる
-    label.textContent = keyword.name;
-    button.append(icon, label);
+    button.textContent = keyword.name;
 
     button.addEventListener('click', () => {
         button.disabled = true;
@@ -174,7 +165,6 @@ function createKeywordButton(keyword) {
             console.error('特集キーワード選択エラー:', error);
             showToast({
                 message: 'キーワードの選択に失敗しました',
-                icon: 'fa-exclamation-triangle',
                 variant: 'error',
                 duration: 2500,
             });
@@ -195,21 +185,18 @@ function renderErrorState(message) {
 
     const content = document.createElement('div');
     content.className = 'error-content';
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-exclamation-triangle';
-    icon.setAttribute('aria-hidden', 'true');
     const text = document.createElement('span');
     // グローバルエラー用の .error-message とクラス名が衝突していたため改名
     text.className = 'featured-keywords-error-text';
     text.textContent = message;
-    content.append(icon, text);
+    content.innerHTML = icon('alert');
+    content.append(text);
     wrapper.appendChild(content);
 
     const retryButton = document.createElement('button');
     retryButton.type = 'button';
     retryButton.className = 'featured-keywords-retry-btn';
-    retryButton.innerHTML = '<i class="fas fa-redo" aria-hidden="true"></i>';
-    retryButton.append('再試行');
+    retryButton.textContent = '再試行';
     // インライン onclick はモジュールスコープの変数を参照できず動かないため
     // addEventListener で結線する
     retryButton.addEventListener('click', retry);
@@ -221,12 +208,7 @@ function renderErrorState(message) {
 function showFallbackMessage(message) {
     const warning = document.createElement('div');
     warning.className = 'featured-keywords-warning';
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-info-circle';
-    icon.setAttribute('aria-hidden', 'true');
-    const span = document.createElement('span');
-    span.textContent = message;
-    warning.append(icon, span);
+    warning.textContent = message;
 
     el.featuredContainer.insertBefore(warning, el.featuredContainer.firstChild);
     setTimeout(() => warning.remove(), WARNING_DURATION_MS);
@@ -260,7 +242,6 @@ function deselectFeaturedKeyword() {
     if (state.selectedKeyword) {
         showToast({
             message: `特集キーワード「${state.selectedKeyword.name}」の選択を解除しました`,
-            icon: 'fa-times-circle',
             variant: 'info',
             duration: 2000,
         });
@@ -304,7 +285,6 @@ function applyGender(gender) {
 
     showToast({
         message: `性別を「${GENDER_LABELS[gender]}」に設定しました`,
-        icon: gender === 'ladies' ? 'fa-female' : 'fa-male',
         variant: 'primary',
         duration: 1500,
     });
@@ -347,7 +327,6 @@ export function showFeaturedErrorFallbackNotification() {
         duration: 15000,
         actions: [{
             label: '選択を解除',
-            icon: 'fa-times-circle',
             onClick: clearSelection,
         }],
     });
@@ -372,7 +351,6 @@ function setupGenderChangeListeners() {
             if (hadSelection) {
                 showToast({
                     message: `性別を手動で「${GENDER_LABELS[event.target.value]}」に変更しました`,
-                    icon: 'fa-hand-pointer',
                     variant: 'accent',
                     duration: 2000,
                 });

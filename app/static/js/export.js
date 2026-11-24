@@ -2,6 +2,7 @@
 
 import { copyToClipboard } from './clipboard.js';
 import { el } from './dom.js';
+import { icon } from './icons.js';
 import { showToast } from './toast.js';
 import { formatTemplateForExport, hashtagToText } from './template-format.js';
 import { getAllTemplates } from './template-list.js';
@@ -37,17 +38,13 @@ function buildDialog() {
         <div class="export-dialog-content">
             <div class="export-dialog-header">
                 <h3>エクスポート形式を選択</h3>
-                <button type="button" class="close-btn" aria-label="閉じる">
-                    <i class="fas fa-times" aria-hidden="true"></i>
-                </button>
+                <button type="button" class="close-btn" aria-label="閉じる">${icon('close')}</button>
             </div>
             <div class="export-dialog-body">
                 <button type="button" class="export-option" data-format="csv">
-                    <i class="fas fa-file-csv" aria-hidden="true"></i>
                     <span>CSV形式</span>
                 </button>
                 <button type="button" class="export-option" data-format="txt">
-                    <i class="fas fa-file-alt" aria-hidden="true"></i>
                     <span>テキスト形式</span>
                 </button>
             </div>
@@ -72,14 +69,14 @@ function openExportDialog(templates) {
 
     dialog.querySelector('[data-format="csv"]').addEventListener('click', () => {
         downloadFile(toCsv(templates), 'hair_templates.csv', 'text/csv;charset=utf-8');
-        showToast({ message: 'CSVファイルをダウンロードしました', icon: 'fa-check-circle', variant: 'success' });
+        showToast({ message: 'CSVファイルをダウンロードしました', variant: 'success' });
         closeDialog();
     });
 
     dialog.querySelector('[data-format="txt"]').addEventListener('click', () => {
         const text = templates.map(formatTemplateForExport).join('\n');
         downloadFile(text, 'hair_templates.txt', 'text/plain');
-        showToast({ message: 'テキストファイルをダウンロードしました', icon: 'fa-check-circle', variant: 'success' });
+        showToast({ message: 'テキストファイルをダウンロードしました', variant: 'success' });
         closeDialog();
     });
 
@@ -93,7 +90,7 @@ export function initExport() {
     el.exportAllBtn.addEventListener('click', () => {
         const templates = getAllTemplates();
         if (!templates.length) {
-            showToast({ message: 'エクスポートするテンプレートがありません', icon: 'fa-info-circle', variant: 'info' });
+            showToast({ message: 'エクスポートするテンプレートがありません', variant: 'info' });
             return;
         }
         openExportDialog(templates);
@@ -102,7 +99,7 @@ export function initExport() {
     el.copyAllBtn.addEventListener('click', async () => {
         const templates = getAllTemplates();
         if (!templates.length) {
-            showToast({ message: 'コピーするテンプレートがありません', icon: 'fa-info-circle', variant: 'info' });
+            showToast({ message: 'コピーするテンプレートがありません', variant: 'info' });
             return;
         }
 

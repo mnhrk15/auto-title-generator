@@ -1,85 +1,59 @@
 {% extends "base.html" %}
-{% from "_macros.html" import card_field, gender_option, guide_step, mens_word_group, season_option %}
+{% from "_macros.html" import card_field, gender_option, icon, mens_word_group, season_option %}
 
 {% block content %}
 <header class="app-header">
-    <div class="app-header-content">
-        <div class="logo">
-            <i class="fas fa-cut" aria-hidden="true"></i>
-        </div>
-        <h1>ヘアスタイルタイトルジェネレーター</h1>
-    </div>
+    <h1>ヘアスタイルタイトルジェネレーター</h1>
 </header>
 
 <main class="app-main">
-    <!-- 検索セクションを独立させる -->
-    <div class="search-section">
-        <div class="search-container">
-            <div class="gender-selection">
-                {{ gender_option('ladies', 'レディース', 'fa-female', checked=true) }}
-                {{ gender_option('mens', 'メンズ', 'fa-male') }}
-            </div>
-            <div class="search-box">
-                <div class="input-wrapper">
-                    <i class="fas fa-search search-icon" aria-hidden="true"></i>
-                    <label for="keyword" class="visually-hidden">キーワード</label>
-                    <input type="text" id="keyword" placeholder="例：髪質改善" maxlength="50">
-                </div>
-                <button type="button" id="generate-button" class="primary-button">
-                    <i class="fas fa-magic" aria-hidden="true"></i> 生成
-                </button>
-            </div>
-            <div class="season-selection" id="season-selection" role="group" aria-labelledby="season-selection-label">
-                <span class="season-selection-label" id="season-selection-label">
-                    <i class="fas fa-palette" aria-hidden="true"></i> 季節・カラー<small>（複数選択可・任意）</small>
-                </span>
-                <div class="season-options">
-                    {%- for value, label in season_labels.items() %}
-                    {{ season_option(value, label) }}
-                    {%- endfor %}
-                </div>
+    <section class="search-section" aria-label="生成条件">
+        <div class="gender-selection" role="radiogroup" aria-label="性別">
+            {{ gender_option('ladies', 'レディース', checked=true) }}
+            {{ gender_option('mens', 'メンズ') }}
+        </div>
+        <div class="search-box">
+            <label for="keyword" class="visually-hidden">キーワード</label>
+            <input type="text" id="keyword" placeholder="例：髪質改善" maxlength="50">
+            <button type="button" id="generate-button" class="primary-button">生成</button>
+        </div>
+        <div class="season-selection" id="season-selection" role="group" aria-labelledby="season-selection-label">
+            <span class="season-selection-label" id="season-selection-label">
+                季節・カラー<small>（複数選択可・任意）</small>
+            </span>
+            <div class="season-options">
+                {%- for value, label in season_labels.items() %}
+                {{ season_option(value, label) }}
+                {%- endfor %}
             </div>
         </div>
-    </div>
 
-    <!-- 特集キーワードセクション -->
-    <div class="featured-keywords-section">
-        <h3 class="featured-keywords-title">
-            今月の特集キーワード
-        </h3>
-        <div class="featured-keywords-container" id="featured-keywords-container">
-            <!-- JavaScriptで動的に生成 -->
-            <div class="featured-keywords-loading">
-                <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-                特集キーワードを読み込み中...
+        <div class="featured-keywords-section">
+            <h2 class="featured-keywords-title">今月の特集キーワード</h2>
+            <div class="featured-keywords-container" id="featured-keywords-container">
+                <!-- JavaScriptで動的に生成 -->
+                <div class="featured-keywords-loading">特集キーワードを読み込み中…</div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- ガイドセクションを折りたたみ可能に変更 -->
     <details class="guide-collapsible">
-        <summary class="guide-summary">
-            <i class="fas fa-lightbulb" aria-hidden="true"></i>
-            <span>使い方</span>
-        </summary>
-        <div class="guide-content">
-            {{ guide_step(1, 'fa-keyboard', '検索したいキーワードを入力してください') }}
-            {{ guide_step(2, 'fa-search', '「生成」ボタンを押すと、HotPepper Beautyから関連タイトルを取得し、新しいテンプレート案を生成します') }}
-            {{ guide_step(3, 'fa-clipboard', '結果が表示されたら、内容を編集したり、コピーやファイル出力ができます') }}
-        </div>
+        <summary class="guide-summary">使い方</summary>
+        <ol class="guide-steps">
+            <li>キーワードを入力して「生成」を押す</li>
+            <li>HotPepper Beauty の掲載タイトルをもとに、約20件の案を作る</li>
+            <li>結果はそのまま編集でき、コピーやファイル出力もできる</li>
+        </ol>
     </details>
 
     <!-- ローディングインジケーター -->
     <div id="loading" class="loading hidden" role="status" aria-live="polite" aria-busy="false">
-    <div class="loading-content">
-        <div class="spinner"></div>
         <p class="loading-message">データ取得中です</p>
-            
         <div class="progress-container">
             <div class="progress-steps">
                 <div class="step-indicator" data-step="1">
                     <div class="step-dot"></div>
-                    <span class="step-label">スクレイピング</span>
+                    <span class="step-label">データ取得</span>
                 </div>
                 <div class="step-indicator" data-step="2">
                     <div class="step-dot"></div>
@@ -96,33 +70,23 @@
                 <div class="progress-fill" id="progress-fill"></div>
             </div>
             <div class="progress-status">
-                <div class="progress-step" id="progress-step">データ取得中...</div>
+                <div class="progress-step" id="progress-step">データ取得中…</div>
                 <div class="progress-percent" id="progress-percent">0%</div>
             </div>
         </div>
     </div>
-    </div>
 
     <section id="error-message" class="error-message hidden" role="alert">
-        <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        {{ icon('alert') }}
         <span class="error-text"></span>
     </section>
 
     <!-- 結果セクション -->
-    <div id="results" class="results-section hidden">
-    <h2 class="results-header">
-        <i class="fas fa-check-circle" aria-hidden="true"></i>
-        生成結果
-    </h2>
-        
-    <section class="templates-section">
-        <div class="template-heading">
-            <h2>あなたのキーワードに最適化されたテンプレート</h2>
-        </div>
+    <section id="results" class="results-section hidden" aria-labelledby="results-header">
+        <h2 class="results-header" id="results-header">生成結果</h2>
 
         <!-- メンズ生成時のみ表示する注釈 -->
         <div id="mens-title-notice" class="mens-notice hidden" role="note">
-            <i class="fas fa-circle-info" aria-hidden="true"></i>
             <div class="mens-notice-body">
                 <p class="mens-notice-text">スタイル名が30文字のキーワードになるよう、キーワードが少ない言葉を選んだ場合はご自身で1〜2語足して活用ください</p>
                 <details class="mens-notice-collapsible">
@@ -149,7 +113,6 @@
 
         <!-- 季節・カラーが1件も付与できなかったときの注釈（.mens-notice のスタイルを再利用） -->
         <div id="season-unapplied-notice" class="mens-notice hidden" role="note">
-            <i class="fas fa-circle-info" aria-hidden="true"></i>
             <div class="mens-notice-body">
                 <p class="mens-notice-text">選択した「<span id="season-unapplied-keywords"></span>」はタイトルの文字数制約により今回の結果には付与されませんでした。もう一度生成すると付与されることが多いため、再生成をお試しください</p>
             </div>
@@ -164,77 +127,54 @@
             
         <!-- ページネーション -->
         <div class="pagination">
-            <button type="button" class="page-btn nav-btn disabled" id="prev-page">
-                <i class="fas fa-chevron-left" aria-hidden="true"></i> 前へ
-            </button>
+            <button type="button" class="page-btn nav-btn disabled" id="prev-page">前へ</button>
             <div id="pagination-numbers"></div>
-            <button type="button" class="page-btn nav-btn disabled" id="next-page">
-                次へ <i class="fas fa-chevron-right" aria-hidden="true"></i>
-            </button>
+            <button type="button" class="page-btn nav-btn disabled" id="next-page">次へ</button>
+        </div>
+
+        <div class="export-buttons">
+            <button type="button" id="export-all" class="primary-button">全てエクスポート</button>
+            <button type="button" id="copy-all" class="secondary-button">全てコピー</button>
         </div>
     </section>
-        
-    <div class="export-buttons">
-        <button type="button" id="export-all" class="primary-button">
-            <i class="fas fa-file-export" aria-hidden="true"></i> 全てエクスポート
-        </button>
-        <button type="button" id="copy-all" class="secondary-button">
-            <i class="fas fa-copy" aria-hidden="true"></i> 全てコピー
-        </button>
-    </div>
-    </div>
 
     <!-- コピー完了トースト。
-         #results の内側に置くと、結果セクションの fadeInUp アニメーション中は
-         transform が position:fixed の包含ブロックになって表示位置がずれ、
-         再生成時の hideResults() で表示途中のまま消えてしまう。 -->
+         #results の内側に置くと、再生成時の hideResults() で表示途中のまま消えてしまう。
+         （以前は結果セクションの登場アニメーションの transform で表示位置もずれていた） -->
     <div id="copied-toast" class="copied-toast" role="status" aria-live="polite">
         クリップボードにコピーしました
     </div>
 </main>
 
 <footer class="footer">
-    <div class="footer-copyright">
-        © 2025 ヘアスタイルタイトルジェネレーター All Rights Reserved.
-    </div>
+    <small class="footer-copyright">© {{ current_year }} ヘアスタイルタイトルジェネレーター</small>
 </footer>
 
 <!-- テンプレートカード用テンプレート -->
 <template id="template-card">
     <div class="template-card">
         <div class="card-header">
-            <span>
-                <i class="fas fa-bookmark" aria-hidden="true"></i>
-                <span>テンプレート</span>
-            </span>
+            <span class="card-title">テンプレート</span>
             <!-- 特集対応テンプレート識別マーク -->
-            <div class="featured-indicator hidden">
-                <i class="fas fa-star" aria-hidden="true"></i>
-                <span>特集対応</span>
-            </div>
-            <div class="card-actions-mini">
-                <i class="fas fa-pen-fancy" title="編集中" aria-hidden="true"></i>
-            </div>
+            <span class="featured-indicator hidden"><span>特集対応</span></span>
         </div>
         <div class="card-content">
-            {{ card_field('title', 'タイトル', 'fa-heading', 'タイトルを入力してください',
+            {{ card_field('title', 'タイトル', 'タイトルを入力してください',
                           maxlength=char_limits.title) }}
-            {{ card_field('menu', 'メニュー', 'fa-list', 'メニューを入力してください',
+            {{ card_field('menu', 'メニュー', 'メニューを入力してください',
                           maxlength=char_limits.menu) }}
-            {{ card_field('comment', 'コメント', 'fa-comment', 'コメントを入力してください',
+            {{ card_field('comment', 'コメント', 'コメントを入力してください',
                           maxlength=char_limits.comment, rows=3) }}
             {#- ハッシュタグの上限はタグ 1 個あたりなので maxlength は付けず、
                 data-max-length で JS に伝える -#}
-            {{ card_field('hashtag', 'ハッシュタグ', 'fa-hashtag',
+            {{ card_field('hashtag', 'ハッシュタグ',
                           'ハッシュタグをカンマ区切りで入力してください',
                           info='カンマ区切り, 各%d文字以内'|format(char_limits.hashtag),
                           count_init='',
                           data_max_length=char_limits.hashtag) }}
         </div>
         <div class="card-actions">
-            <button type="button" class="copy-btn">
-                <i class="fas fa-copy" aria-hidden="true"></i> コピー
-            </button>
+            <button type="button" class="copy-btn">{{ icon('copy') }} コピー</button>
         </div>
     </div>
 </template>

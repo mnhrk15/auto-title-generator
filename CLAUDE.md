@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 3.1 Flash Lite AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, streamlined UI with blue color theme, and real-time keyword updates.
+This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 3.1 Flash Lite AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, a plain single-blue UI (no gradients, shadows only on popups), and real-time keyword updates.
 
 ## Common Development Commands
 
@@ -277,18 +277,24 @@ All tests use pytest with async support (`@pytest.mark.asyncio` for async functi
 
 ### CSS
 
-`app/static/css/style.css` (3010 lines) is the one file that was never split. Sections are stacked
-in historical order, so **several selectors have more than one base definition and the final
-appearance is decided by "last one wins"** (`.featured-keyword-btn` has five). Before touching it,
-read the "既知の技術的負債" section of README.md — in particular:
+`app/static/css/style.css` was rewritten from scratch in Nov 2026 (`docs/ui-redesign.md`, PR ②).
+The design rules are in the comment at the top of the file — read them before adding styles:
 
-- Merge duplicate base definitions **at the first occurrence**, not the last. Moving them later
-  makes properties that only existed in the early definition win over `@media` blocks in between.
-- Do not reorder `@media` blocks before collapsing the duplicates. Some `@media` rules are
-  currently dead because a later base definition overrides them; reordering revives them.
-- New state classes should use the `is-` prefix (`.is-focused`, `.is-priority`). The existing mix
-  of `.active` / `.show` / `.copied` / `.hidden` / `.gender-option-active` is historical. Renaming
-  them means auditing 20+ string references in JS, which is not worth it — leave them alone.
+- One blue (`--color-primary`) plus `--color-error` / `--color-warning`. No gradients, no
+  `backdrop-filter`, no `text-shadow`, no looping animations except the loading spinner, no
+  hover lift/scale. Shadows only on popups (`--shadow-popup`).
+- Font sizes come from `--text-*`, spacing from `--space-*`, radii from `--radius-sm` / `--radius-md`.
+- Mobile first: base rules are for phones, wider screens are added with `min-width: 640px` /
+  `min-width: 1024px`.
+- Icons: Font Awesome is no longer loaded. The only icons are the SVG sprite in `base.html`
+  (`copy` / `check` / `close` / `alert`), referenced via `icon()` in `_macros.html` and
+  `static/js/icons.js`. Do not add icons to labels or headings for decoration.
+- New state classes should use the `is-` prefix. Existing `.active` / `.show` / `.copied` /
+  `.hidden` / `.disabled` are referenced from JS — renaming them means updating JS too.
+- Selected states of the gender toggle and season checkboxes are styled with
+  `:has(input:checked)`; JS does not toggle classes for them.
+
+### Other guidelines
 - Do not change specified technology stack versions without approval
 - Follow the existing async patterns when adding new functionality
 

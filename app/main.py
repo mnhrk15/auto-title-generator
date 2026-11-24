@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, render_template, request
 from flask.typing import ResponseReturnValue
@@ -15,6 +16,9 @@ from .services.template_service import GenerationOutcome, generate_templates_for
 # current_app.logger を使わなくても出力先は同じになる。
 # モジュールロガーにしておくと、ルートの処理をアプリコンテキストなしでも呼べる。
 logger = logging.getLogger(__name__)
+
+# 日本は夏時間が無いので固定オフセットで足りる
+JST = timezone(timedelta(hours=9))
 
 main_bp = Blueprint('main', __name__)
 
@@ -93,6 +97,9 @@ def index() -> str:
         'index.html',
         char_limits=CHAR_LIMITS,
         season_labels=SEASON_UI_LABELS,
+        # フッターの著作権表示。直書きすると年が古いまま残るため、日本時間の現在年を渡す。
+        # ZoneInfo('Asia/Tokyo') は tzdata の無い環境（Windows など）で例外になるため固定オフセットを使う
+        current_year=datetime.now(JST).year,
     )
 
 
