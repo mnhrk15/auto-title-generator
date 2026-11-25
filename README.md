@@ -532,7 +532,7 @@ CSS には、同じセレクタのベース定義が最大 5 重に重なる問�
 
 4. デプロイを開始
    - 「Create Web Service」をクリックしてデプロイを開始します
-   - デプロイが完了すると、Renderが提供するURLでアプリにアクセスできます（例：https://template-generator.onrender.com）
+   - デプロイが完了すると、Renderが提供するURLでアプリにアクセスできます（本番：<https://auto-title-generator-73aj.onrender.com/>）
 
 5. カスタムドメインの設定（オプション）
    - 「Settings」タブの「Custom Domain」セクションからカスタムドメインを設定できます
