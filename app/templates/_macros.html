@@ -20,9 +20,10 @@
 {%- endmacro -%}
 
 
-{#- 季節・カラー選択のチェックボックス 1 個 -#}
+{#- 季節・カラー選択のチェックボックス 1 個。見た目はピル型のチップで、
+    data-season で季節ごとの色の点を付ける（style.css の --season-color） -#}
 {%- macro season_option(value, label) -%}
-<label class="season-option">
+<label class="season-option" data-season="{{ value }}">
     <input type="checkbox" name="season" value="{{ value }}">
     <span class="checkbox-label">{{ label }}</span>
 </label>

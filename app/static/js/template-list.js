@@ -37,7 +37,12 @@ export function displayTemplates(templates) {
 
     const fragment = document.createDocumentFragment();
     templates.forEach((template, index) => {
-        fragment.appendChild(createTemplateCard(template, index, updateTemplateField));
+        const card = createTemplateCard(template, index, updateTemplateField);
+        // 届いた直後だけ、上から順に現れる動きを付ける（CSS の .is-entering と --i）
+        card.classList.add('is-entering');
+        card.style.setProperty('--i', String(index));
+        card.addEventListener('animationend', () => card.classList.remove('is-entering'), { once: true });
+        fragment.appendChild(card);
     });
     el.templateContainer.replaceChildren(fragment);
     initializeTextareas();

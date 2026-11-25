@@ -3,7 +3,15 @@
 
 {% block content %}
 <header class="app-header">
-    <h1>ヘアスタイルタイトルジェネレーター</h1>
+    {#- はさみの線画。飾りなので読み上げない -#}
+    <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+            <path d="M8.6 7.6 20 18M8.6 16.4 20 6"/>
+        </svg>
+    </span>
+    {#- 狭い画面で単語の途中で折れないよう、折り返してよい位置を <wbr> で示す（CSS の word-break: keep-all と組） -#}
+    <h1>ヘアスタイル<wbr>タイトル<wbr>ジェネレーター</h1>
 </header>
 
 <main class="app-main">
