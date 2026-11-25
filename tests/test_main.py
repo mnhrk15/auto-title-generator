@@ -441,6 +441,13 @@ class TestTemplateContext:
         assert 'class="pagination"' not in html
         assert 'id="copied-toast"' not in html
 
+    def test_index_has_whats_new_dialog(self, client):
+        """UI 刷新のお知らせのダイアログがあり、whats-new.js が id で引けること"""
+        html = client.get('/').data.decode('utf-8')
+
+        assert 'id="whats-new-dialog"' in html
+        assert '画面が新しくなりました' in html
+
     def test_index_renders_season_checkboxes(self, client):
         """季節・カラーのチェックボックスが config の定義順に並ぶこと"""
         html = client.get('/').data.decode('utf-8')

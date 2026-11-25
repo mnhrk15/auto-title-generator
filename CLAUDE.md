@@ -101,14 +101,16 @@ The application is configured for Render deployment:
   elements are queried by whoever creates them — that is not a violation. A selector string
   appearing in two modules is. A startup assertion logs any `el` entry that came back null,
   because these are bound to `index.html` by string matching only.
-- `toast.js` documents the four notification surfaces and when to use each. They are not four
-  copies of the same thing; do not merge them. Outcomes the user can already see on screen
+- `toast.js` documents the five notification surfaces (including the one-time what's-new dialog)
+  and when to use each. They are not five copies of the same thing; do not merge them. Outcomes the user can already see on screen
   (generation succeeded, selection cleared, reload succeeded) get no notification, and copy
   success is shown only on the pressed button (`flashCopyFeedback`).
 - Results are rendered all at once (no pagination). While generating, the previous results stay
   visible but dimmed and `inert`; on failure or cancel they are restored as they were.
   `displayTemplates()` must run after the results section is shown — textarea heights cannot be
   measured under `display: none`.
+- `whats-new.js` opens the "画面が新しくなりました" `<dialog>` once per browser, remembered in
+  localStorage under a dated key. Bump the date in `STORAGE_KEY` to announce a future change.
 - Generation shows elapsed seconds, not a percentage (`progress.js`) — the server reports no
   progress. The cancel button aborts the fetch via `requestJson({ signal })`, which surfaces as
   `ApiError` kind `cancelled`; the server keeps running and its result is discarded.

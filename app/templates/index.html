@@ -128,6 +128,26 @@
 
 </main>
 
+{#- UI 刷新のお知らせ。ブラウザごとに 1 回だけ開く（static/js/whats-new.js）。
+    <dialog> の showModal() を使うので、フォーカスの閉じ込め・Escape・閉じた後の復帰はブラウザに任せる -#}
+<dialog id="whats-new-dialog" class="whats-new-dialog" aria-labelledby="whats-new-title">
+    <form method="dialog" class="whats-new-form">
+        <div class="whats-new-header">
+            <h2 class="whats-new-title" id="whats-new-title">画面が新しくなりました</h2>
+            <button type="submit" class="close-btn" aria-label="閉じる">{{ icon('close') }}</button>
+        </div>
+        <ul class="whats-new-list">
+            <li>結果は 1 ページに番号付きで並びます</li>
+            <li>「再生成」「全てコピー」「書き出し」は画面下のボタンからどうぞ</li>
+            <li>生成中は経過時間が出て、途中で中止もできます</li>
+            <li>コピーはボタンが ✓ に変われば完了です</li>
+        </ul>
+        <div class="whats-new-actions">
+            <button type="submit" class="primary-button" autofocus>はじめる</button>
+        </div>
+    </form>
+</dialog>
+
 <footer class="footer">
     <small class="footer-copyright">© {{ current_year }} ヘアスタイルタイトルジェネレーター</small>
 </footer>

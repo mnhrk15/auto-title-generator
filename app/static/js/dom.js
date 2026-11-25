@@ -41,6 +41,7 @@ export const el = {
     seasonUnappliedNotice: document.getElementById('season-unapplied-notice'),
     seasonUnappliedKeywords: document.getElementById('season-unapplied-keywords'),
     featuredContainer: document.getElementById('featured-keywords-container'),
+    whatsNewDialog: document.getElementById('whats-new-dialog'),
 };
 
 // 上のセレクタと index.html は文字列一致でしか結ばれていない。id や class を
