@@ -198,7 +198,8 @@ button:disabled {
 }
 
 .primary-button:hover:not(:disabled) {
-    filter: brightness(1.08);
+    /* 明るくすると白文字が読みにくくなる（AA を割る）ので、濃い方へ寄せる */
+    background-color: var(--color-primary-depth);
 }
 
 .secondary-button {
@@ -412,8 +413,10 @@ button:disabled {
     justify-content: center;
     width: 100%;
     min-height: 52px;
-    padding: 0 var(--space-4);
+    gap: var(--space-2);
+    padding: 0 var(--space-2);
     font-size: var(--text-md);
+    white-space: nowrap;
 }
 
 .gender-option input:focus-visible + .radio-label,
@@ -442,7 +445,7 @@ button:disabled {
 
 #keyword::placeholder {
     color: var(--color-text-muted);
-    opacity: 0.85;
+    opacity: 1;
 }
 
 #keyword:focus {
@@ -487,8 +490,10 @@ button:disabled {
     background-color: var(--season-color);
 }
 
-/* 選んだチップには末尾に ✓ を出す */
-.season-option input:checked + .checkbox-label::after {
+/* 選んだチップ・タイルには末尾に ✓ を出し、色だけに頼らず選択を示す */
+.season-option input:checked + .checkbox-label::after,
+.gender-option input:checked + .radio-label::after,
+.featured-keyword-btn.active::after {
     content: '';
     width: 9px;
     height: 5px;
@@ -512,6 +517,9 @@ button:disabled {
 }
 
 .featured-keyword-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
     min-height: 40px;
     padding: 0 var(--space-3);
     font-size: var(--text-sm);
@@ -556,6 +564,17 @@ button:disabled {
     font-size: var(--text-sm);
     font-weight: 700;
     color: var(--color-primary-strong);
+}
+
+.featured-keywords-retry-btn:hover,
+.notification-action-btn:hover {
+    background-color: var(--color-bg-subtle);
+}
+
+.featured-keywords-retry-btn:active,
+.notification-action-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 0 0 transparent;
 }
 
 .featured-keywords-warning {
@@ -971,7 +990,9 @@ button:disabled {
 
 .field-copy-btn.copied .icon,
 .copy-btn.copied .icon,
-.season-option input:checked + .checkbox-label::after {
+.season-option input:checked + .checkbox-label::after,
+.gender-option input:checked + .radio-label::after,
+.featured-keyword-btn.active::after {
     animation: check-pop 300ms var(--ease-bounce);
 }
 
