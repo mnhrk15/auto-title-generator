@@ -4,14 +4,19 @@
     呼び出し側は `{% from "_macros.html" import ... %}` で必要なものだけを持ち込む。
 -#}
 
-{#- 性別選択のラジオ 1 個 -#}
-{%- macro gender_option(value, label, icon, checked=false) -%}
-<div class="gender-option-wrapper">
-    <label class="gender-option">
-        <input type="radio" name="gender" value="{{ value }}"{% if checked %} checked{% endif %}>
-        <span class="radio-label"><i class="fas {{ icon }}" aria-hidden="true"></i> {{ label }}</span>
-    </label>
-</div>
+{#- base.html の SVG スプライトを参照するアイコン。name は copy / check / close / alert。
+    JS 側の同じ役割は static/js/icons.js の icon()。 -#}
+{%- macro icon(name) -%}
+<svg class="icon" aria-hidden="true" focusable="false"><use href="#icon-{{ name }}"></use></svg>
+{%- endmacro -%}
+
+
+{#- 性別選択のラジオ 1 個（セグメント型の切り替えの 1 区画） -#}
+{%- macro gender_option(value, label, checked=false) -%}
+<label class="gender-option">
+    <input type="radio" name="gender" value="{{ value }}"{% if checked %} checked{% endif %}>
+    <span class="radio-label">{{ label }}</span>
+</label>
 {%- endmacro -%}
 
 
@@ -21,18 +26,6 @@
     <input type="checkbox" name="season" value="{{ value }}">
     <span class="checkbox-label">{{ label }}</span>
 </label>
-{%- endmacro -%}
-
-
-{#- 使い方ガイドの 1 ステップ -#}
-{%- macro guide_step(number, icon, text) -%}
-<div class="guide-step">
-    <div class="guide-step-number">{{ number }}</div>
-    <div class="guide-step-text">
-        <i class="fas {{ icon }}" aria-hidden="true"></i>
-        <span>{{ text }}</span>
-    </div>
-</div>
 {%- endmacro -%}
 
 
@@ -47,21 +40,20 @@
     count_init  … 文字数カウンタの初期表示。省略時は "0/{maxlength}"。
     data_max_length … data-max-length 属性の値（ハッシュタグ用）
 -#}
-{%- macro card_field(name, label, icon, placeholder, maxlength=none, info=none, rows=2,
+{%- macro card_field(name, label, placeholder, maxlength=none, info=none, rows=2,
                      count_init=none, data_max_length=none) -%}
 <div class="field">
     <div class="field-label">
         <div class="field-label-group">
-            <i class="fas {{ icon }}" aria-hidden="true"></i>
-            <span>{{ label }}</span>
+            <span class="field-name">{{ label }}</span>
             <span class="field-info">（{{ info if info is not none else '%d文字以内'|format(maxlength) }}）</span>
         </div>
         <span class="char-count {{ name }}-count">{{ count_init if count_init is not none else '0/%d'|format(maxlength) }}</span>
     </div>
     <div class="textarea-container">
         <textarea class="{{ name }}" data-field="{{ name }}" aria-label="{{ label }}"{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if data_max_length %} data-max-length="{{ data_max_length }}"{% endif %} rows="{{ rows }}" placeholder="{{ placeholder }}"></textarea>
-        <button type="button" class="field-copy-btn" data-field="{{ name }}" title="{{ label }}をコピー">
-            <i class="fas fa-copy" aria-hidden="true"></i>
+        <button type="button" class="field-copy-btn" data-field="{{ name }}" title="{{ label }}をコピー" aria-label="{{ label }}をコピー">
+            {{ icon('copy') }}
         </button>
     </div>
 </div>

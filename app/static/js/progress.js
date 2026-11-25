@@ -6,9 +6,9 @@
 import { el } from './dom.js';
 
 const STEPS = [
-    { name: 'スクレイピング中...', percent: 25, duration: 7000 },
-    { name: 'トレンド分析中...', percent: 35, duration: 3000 },
-    { name: 'テンプレート生成中...', percent: 90, duration: 14000 },
+    { name: 'データ取得中…', percent: 25, duration: 7000 },
+    { name: 'トレンド分析中…', percent: 35, duration: 3000 },
+    { name: 'テンプレート生成中…', percent: 90, duration: 14000 },
 ];
 
 const SUB_ANIMATION_TICK_MS = 100;
@@ -77,7 +77,7 @@ function startCreepPhase() {
         const remaining = CREEP_CEILING - state.currentPercent;
         if (remaining <= 0.1) return;
         state.currentPercent += remaining * 0.10;
-        updateProgressUI(Math.floor(state.currentPercent), 'テンプレート生成中...');
+        updateProgressUI(Math.floor(state.currentPercent), 'テンプレート生成中…');
     }, CREEP_TICK_MS);
 }
 

@@ -19,24 +19,22 @@ const NETWORK_ERROR_MESSAGES = {
     app: 'テンプレートの生成中にエラーが発生しました。',
 };
 
-const BUTTON_IDLE_HTML = '<i class="fas fa-magic" aria-hidden="true"></i> 生成';
-const BUTTON_BUSY_HTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> 生成中...';
+const BUTTON_IDLE_TEXT = '生成';
+const BUTTON_BUSY_TEXT = '生成中…';
 
 function notifySuccess(data) {
     const featuredName = data.featured_keyword_info?.name;
 
     if (data.is_featured && featuredName) {
         showToast({
-            title: '特集対応テンプレート生成完了！',
-            message: `「${featuredName}」の特集テンプレート ${data.templates.length}件を生成しました`,
-            icon: 'fa-star',
+            message: `特集「${featuredName}」のテンプレートを${data.templates.length}件生成しました`,
             variant: 'featured',
             duration: 4000,
         });
     } else if (data.is_featured) {
-        showToast({ message: '特集対応テンプレートを生成しました ⭐', icon: 'fa-check-circle', variant: 'success' });
+        showToast({ message: '特集キーワードのテンプレートを生成しました', variant: 'success' });
     } else {
-        showToast({ message: 'テンプレートを生成しました', icon: 'fa-check-circle', variant: 'success' });
+        showToast({ message: 'テンプレートを生成しました', variant: 'success' });
     }
 }
 
@@ -78,7 +76,7 @@ async function generate() {
     startProgressSimulation();
 
     el.generateBtn.disabled = true;
-    el.generateBtn.innerHTML = BUTTON_BUSY_HTML;
+    el.generateBtn.textContent = BUTTON_BUSY_TEXT;
 
     try {
         // model は送らない。UI にモデル選択が無く、サーバー側にデフォルトがあるため。
@@ -109,7 +107,7 @@ async function generate() {
     } finally {
         hideLoading();
         el.generateBtn.disabled = false;
-        el.generateBtn.innerHTML = BUTTON_IDLE_HTML;
+        el.generateBtn.textContent = BUTTON_IDLE_TEXT;
         stopProgressSimulation();
     }
 }

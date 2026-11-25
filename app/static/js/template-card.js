@@ -2,6 +2,7 @@
 
 import { copyToClipboard, flashCopyFeedback } from './clipboard.js';
 import { el } from './dom.js';
+import { icon } from './icons.js';
 import { formatTemplateFields } from './template-format.js';
 
 const FIELD_LABELS = {
@@ -65,8 +66,11 @@ function refreshCount(textarea) {
 export function autoResizeTextarea(textarea) {
     const minHeight = parseInt(window.getComputedStyle(textarea).getPropertyValue('min-height'), 10) || 0;
 
+    // box-sizing: border-box なので、scrollHeight（罫線を含まない）に上下の罫線の幅を足す。
+    // 足さないと常に 2px 足りず、クラシックスクロールバーの環境で縦バーが出る。
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.max(textarea.scrollHeight, minHeight)}px`;
+    const borderHeight = textarea.offsetHeight - textarea.clientHeight;
+    textarea.style.height = `${Math.max(textarea.scrollHeight + borderHeight, minHeight)}px`;
 
     // 収まらない場合だけスクロールバーを出す
     textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
@@ -106,7 +110,6 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
 
     if (isFeatured) {
         featuredIndicator.classList.remove('hidden');
-        card.classList.add('featured');
 
         const featuredKeywordName = template.featured_keyword_name;
         if (featuredKeywordName) {
@@ -118,7 +121,6 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
         }
     } else {
         featuredIndicator.classList.add('hidden');
-        card.classList.remove('featured');
     }
 
     const textareas = card.querySelectorAll('textarea[data-field]');
@@ -137,14 +139,7 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
             // 編集が失われ、エクスポートにも反映されない。
             onFieldChange?.(globalIndex, field, textarea.value);
         });
-
-        const container = textarea.closest('.textarea-container');
-        textarea.addEventListener('focus', () => container?.classList.add('is-focused'));
-        textarea.addEventListener('blur', () => container?.classList.remove('is-focused'));
     });
-
-    // カードごとに表示タイミングを少しずらす
-    card.style.animationDelay = `${(globalIndex % 6) * 0.05}s`;
 
     card.querySelectorAll('.field-copy-btn').forEach((btn) => {
         btn.addEventListener('click', async () => {
@@ -153,7 +148,7 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
             if (!textarea) return;
 
             if (await copyToClipboard(textarea.value, FIELD_LABELS[field])) {
-                flashCopyFeedback(btn, '<i class="fas fa-check" aria-hidden="true"></i>');
+                flashCopyFeedback(btn, icon('check'));
             }
         });
     });
@@ -164,7 +159,7 @@ export function createTemplateCard(template, globalIndex, onFieldChange) {
         textareas.forEach((textarea) => { values[textarea.dataset.field] = textarea.value; });
 
         if (await copyToClipboard(formatTemplateFields(values), 'テンプレート全体')) {
-            flashCopyFeedback(copyBtn, '<i class="fas fa-check" aria-hidden="true"></i> コピー完了');
+            flashCopyFeedback(copyBtn, `${icon('check')} コピー完了`);
         }
     });
 

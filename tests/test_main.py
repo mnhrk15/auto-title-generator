@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 
 import pytest
 
@@ -401,6 +402,24 @@ class TestTemplateContext:
         assert f'（{config.CHAR_LIMITS["menu"]}文字以内）' in html
         # ハッシュタグはタグ1個あたりの上限なので data 属性で渡す
         assert f'data-max-length="{config.CHAR_LIMITS["hashtag"]}"' in html
+
+    def test_index_footer_shows_current_year_in_jst(self, client):
+        """フッターの年が直書きではなく、日本時間の現在年になっていること"""
+        from app.main import JST
+
+        html = client.get('/').data.decode('utf-8')
+
+        assert f'© {datetime.now(JST).year} ヘアスタイルタイトルジェネレーター' in html
+        assert 'All Rights Reserved' not in html
+
+    def test_index_does_not_load_font_awesome(self, client):
+        """アイコンは base.html の SVG スプライトだけで描き、Font Awesome を読み込まないこと"""
+        html = client.get('/').data.decode('utf-8')
+
+        assert 'font-awesome' not in html
+        assert 'class="fas ' not in html
+        for name in ('copy', 'check', 'close', 'alert'):
+            assert f'id="icon-{name}"' in html
 
     def test_index_renders_season_checkboxes(self, client):
         """季節・カラーのチェックボックスが config の定義順に並ぶこと"""

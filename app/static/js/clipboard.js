@@ -20,7 +20,7 @@ export async function copyToClipboard(text, label = '') {
         showCopyToast(label);
         return true;
     } catch (error) {
-        showToast({ message: 'コピーに失敗しました', icon: 'fa-times-circle', variant: 'error' });
+        showToast({ message: 'コピーに失敗しました', variant: 'error' });
         console.error('コピーに失敗:', error);
         return false;
     }
