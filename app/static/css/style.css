@@ -13,11 +13,12 @@
  * - 立体感は「下側の厚み」で出す。ボタンとタイルは下に濃い色の帯（--depth）を持ち、押すと沈む。
  *   ぼかした影はポップアップの --shadow-popup だけ。
  * - 角丸は --radius-sm / md / lg の 3 種類。円形が必要な所だけ 50% / 999px。
- * - 見出し・ボタン・ラベルは太い丸ゴシック（--font-display）。生成された文章は読みやすさを優先して
+ * - 見出し・ボタン・ラベルは丸ゴシック（--font-display、700）。生成された文章は読みやすさを優先して
  *   --font-body のまま。
  * - 動きは「操作や状態の変化に応える」ものだけ。押したときの沈み、選んだときの弾み、
  *   コピー時の ✓ の弾み、ページを開いたときと結果が届いたときの登場（各 1 回）、操作バーのせり上がり。
- *   ループの例外は「生成中」の進行表示だけ。prefers-reduced-motion では動きを止める。
+ *   弾みは控えめにする（行き過ぎ 2% 程度）。ループの例外は「生成中」の進行表示だけ。
+ *   prefers-reduced-motion では動きを止める。
  * - 文字サイズは --text-* の 5 段階、余白は --space-* の刻みを使う。
  *   ボタンの高さやアイコンの大きさなど、部品の寸法は px で直接書いてよい。
  * - 状態クラスを新しく作るときは is- を付ける。既存の .active / .show / .copied / .hidden /
@@ -49,7 +50,7 @@
     --color-warning-soft: #fff5d3;
     --color-warning-border: #ffdf8a;
 
-    --depth: 4px;                      /* ボタン・タイルの下側の厚み */
+    --depth: 3px;                      /* ボタン・タイルの下側の厚み */
     --shadow-popup: 0 12px 32px rgba(0, 0, 0, 0.16);
 
     --radius-sm: 10px;
@@ -77,7 +78,7 @@
     --container-max-width: 1200px;
     --transition: 150ms ease;
     --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-bounce: cubic-bezier(0.34, 1.3, 0.64, 1);   /* 行き過ぎを控えめにした弾み */
 
     --z-overlay: 1000;
     --z-toast: 10000;
@@ -183,7 +184,7 @@ button:disabled {
     border-radius: var(--radius-md);
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0.04em;
     white-space: nowrap;
     transition: background-color var(--transition), border-color var(--transition), color var(--transition),
@@ -245,7 +246,7 @@ button:disabled {
     background-color: var(--color-primary);
     box-shadow: 0 var(--depth) 0 var(--color-primary-depth);
     color: #ffffff;
-    transform: rotate(-6deg);
+    transform: rotate(-4deg);
 }
 
 .brand-mark svg {
@@ -256,7 +257,7 @@ button:disabled {
 .app-header h1 {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 800;
+    font-weight: 700;
     line-height: 1.35;
     word-break: keep-all;
 }
@@ -312,7 +313,7 @@ button:disabled {
     margin-bottom: var(--space-2);
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-text);
 }
 
@@ -334,7 +335,7 @@ button:disabled {
     border-radius: var(--radius-md);
     box-shadow: 0 var(--depth) 0 var(--color-border);
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-text);
     cursor: pointer;
     transition: background-color var(--transition), border-color var(--transition), color var(--transition),
@@ -353,7 +354,7 @@ button:disabled {
 .featured-keyword-btn:active:not(:disabled),
 .export-option:active {
     transform: translateY(2px);
-    box-shadow: 0 2px 0 var(--color-border);
+    box-shadow: 0 1px 0 var(--color-border);
 }
 
 .gender-option input:checked + .radio-label,
@@ -372,7 +373,7 @@ button:disabled {
         scale: 1;
     }
     50% {
-        scale: 1.05;
+        scale: 1.02;
     }
     100% {
         scale: 1;
@@ -546,7 +547,7 @@ button:disabled {
     box-shadow: 0 2px 0 var(--color-border);
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-primary-strong);
 }
 
@@ -572,7 +573,7 @@ button:disabled {
     padding: var(--space-3) var(--space-4);
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-primary-strong);
     cursor: pointer;
 }
@@ -608,13 +609,13 @@ button:disabled {
 .loading-message {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .loading-elapsed {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-text-muted);
     font-variant-numeric: tabular-nums;
 }
@@ -712,7 +713,7 @@ button:disabled {
 .results-header {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .results-count,
@@ -721,7 +722,7 @@ button:disabled {
     border-radius: 999px;
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     line-height: 32px;
 }
 
@@ -762,7 +763,7 @@ button:disabled {
 
 .mens-notice-summary {
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-primary-text);
     cursor: pointer;
 }
@@ -784,7 +785,7 @@ button:disabled {
 .mens-word-group-title {
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-primary-text);
 }
 
@@ -838,7 +839,7 @@ button:disabled {
 @keyframes card-in {
     from {
         opacity: 0;
-        transform: translateY(16px) scale(0.97);
+        transform: translateY(10px);
     }
     to {
         opacity: 1;
@@ -861,7 +862,7 @@ button:disabled {
     background-color: var(--color-primary-soft);
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     line-height: 32px;
     text-align: center;
     color: var(--color-primary-text);
@@ -885,7 +886,7 @@ button:disabled {
 .field-name {
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .field-info {
@@ -897,7 +898,7 @@ button:disabled {
     flex-shrink: 0;
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-text-muted);
     font-variant-numeric: tabular-nums;
 }
@@ -969,7 +970,7 @@ button:disabled {
 
 @keyframes check-pop {
     0% {
-        scale: 0.4;
+        scale: 0.6;
     }
     100% {
         scale: 1;
@@ -993,7 +994,7 @@ button:disabled {
     box-shadow: 0 var(--depth) 0 var(--color-border);
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-primary-strong);
     transition: background-color var(--transition), transform 80ms ease, box-shadow 80ms ease;
 }
@@ -1052,7 +1053,7 @@ button:disabled {
     margin-right: auto;
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-text-muted);
 }
 
@@ -1084,7 +1085,7 @@ button:disabled {
     box-shadow: 0 var(--depth) 0 var(--color-border), var(--shadow-popup);
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     opacity: 0;
     pointer-events: none;
     transform: translateY(8px);
@@ -1165,7 +1166,7 @@ html:has(#results:not(.hidden)) {
 .notification-text strong {
     display: block;
     font-family: var(--font-display);
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .notification-text p {
@@ -1187,7 +1188,7 @@ html:has(#results:not(.hidden)) {
     box-shadow: 0 2px 0 var(--color-border);
     font-family: var(--font-display);
     font-size: var(--text-sm);
-    font-weight: 800;
+    font-weight: 700;
     color: var(--color-primary-strong);
 }
 
@@ -1252,7 +1253,7 @@ html:has(#results:not(.hidden)) {
 .export-dialog-header h3 {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 800;
+    font-weight: 700;
 }
 
 .export-dialog-body {
