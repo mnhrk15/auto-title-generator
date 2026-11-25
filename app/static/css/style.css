@@ -1315,6 +1315,11 @@ html:has(#results:not(.hidden)) {
     color: var(--color-text);
 }
 
+/* <dialog> に対応していない古いブラウザでは、閉じたダイアログがページ内に見えてしまうので隠す */
+.whats-new-dialog:not([open]) {
+    display: none;
+}
+
 .whats-new-dialog[open] {
     animation: dialog-in 250ms var(--ease-bounce);
 }
@@ -1350,7 +1355,7 @@ html:has(#results:not(.hidden)) {
     font-size: var(--text-sm);
 }
 
-/* 箇条書きの印は、選択中のタイルと同じ淡い青の丸 */
+/* 箇条書きの印は明るい青の丸（飾り） */
 .whats-new-list li {
     position: relative;
     padding-left: var(--space-4);

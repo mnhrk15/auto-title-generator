@@ -30,15 +30,27 @@ export function initWhatsNew() {
     if (!dialog || typeof dialog.showModal !== 'function' || hasSeen()) return;
 
     // ボタン・✕・Escape のどれで閉じても close イベントが来る
-    dialog.addEventListener('close', markSeen, { once: true });
-    // 背景（ダイアログの外側）を押したときも閉じる。
-    // 押し始めも背景だったときに限る。本文の文字を選んで背景で離しただけで閉じないように
+    dialog.addEventListener('close', () => {
+        markSeen();
+        // 閉じるとブラウザが元のフォーカス（キーワード欄）へ戻す。スマホではその瞬間に
+        // ソフトキーボードが開いてしまうので、指で操作する端末ではフォーカスを外しておく
+        if (window.matchMedia('(pointer: coarse)').matches) {
+            document.activeElement?.blur();
+        }
+    }, { once: true });
+
+    // 背景（ダイアログの外側）を押したときも閉じる。押し始めと離した位置の両方が背景のときに限る。
+    // 文字の選択などで、片方だけが背景になったドラッグでは閉じない
     let pressedOnBackdrop = false;
+    let releasedOnBackdrop = false;
     dialog.addEventListener('pointerdown', (event) => {
         pressedOnBackdrop = event.target === dialog;
     });
+    dialog.addEventListener('pointerup', (event) => {
+        releasedOnBackdrop = event.target === dialog;
+    });
     dialog.addEventListener('click', (event) => {
-        if (pressedOnBackdrop && event.target === dialog) dialog.close();
+        if (pressedOnBackdrop && releasedOnBackdrop && event.target === dialog) dialog.close();
     });
     dialog.showModal();
 }

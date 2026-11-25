@@ -447,6 +447,10 @@ class TestTemplateContext:
 
         assert 'id="whats-new-dialog"' in html
         assert '画面が新しくなりました' in html
+        # 見出しで名前を付け、ボタンでダイアログを閉じられること
+        assert 'aria-labelledby="whats-new-title"' in html
+        assert 'id="whats-new-title"' in html
+        assert '<form method="dialog"' in html
 
     def test_index_renders_season_checkboxes(self, client):
         """季節・カラーのチェックボックスが config の定義順に並ぶこと"""
