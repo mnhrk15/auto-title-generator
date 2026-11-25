@@ -449,3 +449,6 @@ class TestTemplateContext:
         assert positions == sorted(positions)
         for label in config.SEASON_UI_LABELS.values():
             assert f'>{label}</span>' in html
+        # 季節ごとの色の点は data-season で CSS から付ける
+        for key in config.SEASON_UI_LABELS:
+            assert f'data-season="{key}"' in html

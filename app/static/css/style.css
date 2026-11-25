@@ -8,8 +8,8 @@
  * ロゴ・キャラクター・独自書体は使わない。
  *
  * - 色は明るい水色の青 1 系統と、状態色の error / warning だけ。グラデーションは使わない。
- *   明るい青（--color-primary）は枠・進行表示・飾りに使い、白文字を載せる面には
- *   読みやすさ（AA 4.5:1）を満たす --color-primary-strong を使う。
+ *   明るい青（--color-primary）は選択中の枠・進行表示・飾りに使い、白文字を載せる面と
+ *   フォーカスを示す枠には、読みやすさ・見つけやすさの基準を満たす --color-primary-strong を使う。
  * - 立体感は「下側の厚み」で出す。ボタンとタイルは下に濃い色の帯（--depth）を持ち、押すと沈む。
  *   ぼかした影はポップアップの --shadow-popup だけ。
  * - 角丸は --radius-sm / md / lg の 3 種類。円形が必要な所だけ 50% / 999px。
@@ -128,7 +128,7 @@ button:disabled {
 }
 
 :focus-visible {
-    outline: 3px solid var(--color-primary);
+    outline: 3px solid var(--color-primary-strong);
     outline-offset: 2px;
 }
 
@@ -268,7 +268,7 @@ button:disabled {
     gap: var(--space-4);
 }
 
-/* ページを開いたとき、上から順に一度だけ現れる（合計 0.5 秒以内） */
+/* ページを開いたとき、上から順に一度だけ現れる（合計 約 0.5 秒） */
 .app-header,
 .search-section,
 .guide-collapsible {
@@ -344,7 +344,7 @@ button:disabled {
 
 .gender-option:hover .radio-label,
 .season-option:hover .checkbox-label,
-.featured-keyword-btn:hover:not(:disabled),
+.featured-keyword-btn:hover:not(:disabled):not(.active),
 .export-option:hover {
     background-color: var(--color-bg-subtle);
 }
@@ -365,6 +365,13 @@ button:disabled {
     box-shadow: 0 var(--depth) 0 var(--color-primary-border);
     color: var(--color-primary-text);
     animation: pop 250ms var(--ease-bounce);
+}
+
+/* 選択中のタイルを押したときも、厚みを青のまま沈める（上の選択中の指定が :active の厚みを上書きするため） */
+.gender-option:active input:checked + .radio-label,
+.season-option:active input:checked + .checkbox-label,
+.featured-keyword-btn.active:active:not(:disabled) {
+    box-shadow: 0 1px 0 var(--color-primary-border);
 }
 
 /* 選んだ瞬間に一度だけ弾む */
@@ -411,7 +418,7 @@ button:disabled {
 
 .gender-option input:focus-visible + .radio-label,
 .season-option input:focus-visible + .checkbox-label {
-    outline: 3px solid var(--color-primary);
+    outline: 3px solid var(--color-primary-strong);
     outline-offset: 2px;
 }
 
@@ -441,7 +448,7 @@ button:disabled {
 #keyword:focus {
     outline: none;
     background-color: var(--color-surface);
-    border-color: var(--color-primary);
+    border-color: var(--color-primary-strong);
 }
 
 /* 季節・カラー: チップ。季節ごとに色の点を付ける（飾りなのでコントラストの基準とは関係しない） */
@@ -932,7 +939,7 @@ button:disabled {
 .textarea-container textarea:focus {
     outline: none;
     background-color: var(--color-surface);
-    border-color: var(--color-primary);
+    border-color: var(--color-primary-strong);
 }
 
 /* 欄ごとのコピー。どの端末でも常に出す */
@@ -1110,6 +1117,12 @@ button:disabled {
     border-color: var(--color-error-border);
     box-shadow: 0 var(--depth) 0 var(--color-error-border), var(--shadow-popup);
     color: var(--color-error);
+}
+
+/* 見出し付きのトーストでは、本文を本文用の書体・太さに戻して見出しと区別する */
+.toast-message {
+    font-family: var(--font-body);
+    font-weight: 400;
 }
 
 /* 結果の操作バーが下端にある間は、トーストをその上に出す */
