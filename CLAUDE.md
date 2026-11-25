@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 3.1 Flash Lite AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, a plain single-blue UI (no gradients, shadows only on popups), and real-time keyword updates.
+This is a Japanese hairstyle template generator web application that scrapes hairstyle data from HotPepper Beauty and uses Google's Gemini 3.1 Flash Lite AI to generate marketing templates (titles, menus, comments, hashtags) for beauty salons. The application is built with Flask 3.0.2 (ASGI-enabled) and designed for deployment on Render with optimized performance. Features include Beauty Selection featured keyword integration with gender-based filtering, a playful UI modelled on Duolingo's design language (3D buttons, tile choices, rounded type; no gradients), and real-time keyword updates.
 
 ## Common Development Commands
 
@@ -101,14 +101,16 @@ The application is configured for Render deployment:
   elements are queried by whoever creates them — that is not a violation. A selector string
   appearing in two modules is. A startup assertion logs any `el` entry that came back null,
   because these are bound to `index.html` by string matching only.
-- `toast.js` documents the four notification surfaces and when to use each. They are not four
-  copies of the same thing; do not merge them. Outcomes the user can already see on screen
+- `toast.js` documents the five notification surfaces (including the one-time what's-new dialog)
+  and when to use each. They are not five copies of the same thing; do not merge them. Outcomes the user can already see on screen
   (generation succeeded, selection cleared, reload succeeded) get no notification, and copy
   success is shown only on the pressed button (`flashCopyFeedback`).
 - Results are rendered all at once (no pagination). While generating, the previous results stay
   visible but dimmed and `inert`; on failure or cancel they are restored as they were.
   `displayTemplates()` must run after the results section is shown — textarea heights cannot be
   measured under `display: none`.
+- `whats-new.js` opens the "画面が新しくなりました" `<dialog>` once per browser, remembered in
+  localStorage under a dated key. Bump the date in `STORAGE_KEY` to announce a future change.
 - Generation shows elapsed seconds, not a percentage (`progress.js`) — the server reports no
   progress. The cancel button aborts the fetch via `requestJson({ signal })`, which surfaces as
   `ApiError` kind `cancelled`; the server keeps running and its result is discarded.
@@ -286,13 +288,20 @@ All tests use pytest with async support (`@pytest.mark.asyncio` for async functi
 
 ### CSS
 
-`app/static/css/style.css` was rewritten from scratch in Nov 2026 (`docs/ui-redesign.md`, PR ②).
+`app/static/css/style.css` was rewritten from scratch in Nov 2026 (`docs/ui-redesign.md`, PR ② and
+PR ④). The look follows Duolingo's design language — never its logo, mascot or typeface.
 The design rules are in the comment at the top of the file — read them before adding styles:
 
-- One blue (`--color-primary`) plus `--color-error` / `--color-warning`. No gradients, no
-  `backdrop-filter`, no `text-shadow`, no looping animations except the loading spinner, no
-  hover lift/scale. Shadows only on popups (`--shadow-popup`).
-- Font sizes come from `--text-*`, spacing from `--space-*`, radii from `--radius-sm` / `--radius-md`.
+- Bright blue `--color-primary` (#1cb0f6) is for borders, progress and decoration only. White text
+  sits on `--color-primary-strong`; text on the pale blue uses `--color-primary-text` (both AA 4.5:1).
+  Plus `--color-error` / `--color-warning`. No gradients, no `backdrop-filter`, no `text-shadow`.
+- Depth comes from a solid bottom band (`box-shadow: 0 var(--depth) 0 ...`) on buttons and tiles,
+  which collapses on `:active`. Blurred shadows only on popups (`--shadow-popup`).
+- Headings, buttons and labels use `--font-display` (M PLUS Rounded 1c 700); generated text stays in
+  `--font-body` for readability.
+- Motion only responds to actions or state changes (press, select, copy, results arriving, page
+  open once). The only loop is the generation progress bar. `prefers-reduced-motion` stops motion.
+- Font sizes come from `--text-*`, spacing from `--space-*`, radii from `--radius-sm` / `md` / `lg`.
 - Mobile first: base rules are for phones, wider screens are added with `min-width: 640px` /
   `min-width: 1024px`.
 - Icons: Font Awesome is no longer loaded. The only icons are the SVG sprite in `base.html`

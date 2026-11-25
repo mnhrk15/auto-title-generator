@@ -10,6 +10,7 @@ import { initExport } from './export.js';
 import { initFeaturedKeywords } from './featured-keywords.js';
 import { initFormControls } from './form-controls.js';
 import { initGenerate } from './generate.js';
+import { initWhatsNew } from './whats-new.js';
 
 const RESIZE_DEBOUNCE_MS = 150;
 
@@ -31,3 +32,5 @@ initFeaturedKeywords();
 initGenerate();
 initExport();
 initResizeHandler();
+// 入力欄への自動フォーカス（initFormControls）の後に開く。閉じるとフォーカスは入力欄に戻る
+initWhatsNew();

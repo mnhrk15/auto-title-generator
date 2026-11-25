@@ -37,7 +37,18 @@ export function displayTemplates(templates) {
 
     const fragment = document.createDocumentFragment();
     templates.forEach((template, index) => {
-        fragment.appendChild(createTemplateCard(template, index, updateTemplateField));
+        const card = createTemplateCard(template, index, updateTemplateField);
+        // 届いた直後だけ、上から順に現れる動きを付ける（CSS の .is-entering と --i）
+        card.classList.add('is-entering');
+        card.style.setProperty('--i', String(index));
+        // animationend は子要素（コピー時の ✓ の弾み）からも伝わってくるので、カード自身の分だけを拾う
+        const onEnterEnd = (event) => {
+            if (event.target !== card) return;
+            card.classList.remove('is-entering');
+            card.removeEventListener('animationend', onEnterEnd);
+        };
+        card.addEventListener('animationend', onEnterEnd);
+        fragment.appendChild(card);
     });
     el.templateContainer.replaceChildren(fragment);
     initializeTextareas();

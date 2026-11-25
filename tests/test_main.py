@@ -441,6 +441,17 @@ class TestTemplateContext:
         assert 'class="pagination"' not in html
         assert 'id="copied-toast"' not in html
 
+    def test_index_has_whats_new_dialog(self, client):
+        """UI 刷新のお知らせのダイアログがあり、whats-new.js が id で引けること"""
+        html = client.get('/').data.decode('utf-8')
+
+        assert 'id="whats-new-dialog"' in html
+        assert '画面が新しくなりました' in html
+        # 見出しで名前を付け、ボタンでダイアログを閉じられること
+        assert 'aria-labelledby="whats-new-title"' in html
+        assert 'id="whats-new-title"' in html
+        assert '<form method="dialog"' in html
+
     def test_index_renders_season_checkboxes(self, client):
         """季節・カラーのチェックボックスが config の定義順に並ぶこと"""
         html = client.get('/').data.decode('utf-8')
@@ -449,3 +460,6 @@ class TestTemplateContext:
         assert positions == sorted(positions)
         for label in config.SEASON_UI_LABELS.values():
             assert f'>{label}</span>' in html
+        # 季節ごとの色の点は data-season で CSS から付ける
+        for key in config.SEASON_UI_LABELS:
+            assert f'data-season="{key}"' in html
