@@ -11,13 +11,10 @@ export const el = {
     generateBtn: document.getElementById('generate-button'),
     keywordInput: document.getElementById('keyword'),
     loading: document.getElementById('loading'),
-    loadingMessage: document.querySelector('.loading-message'),
-
-    progressBar: document.querySelector('.progress-bar'),
-    progressFill: document.getElementById('progress-fill'),
-    progressStep: document.getElementById('progress-step'),
-    progressPercent: document.getElementById('progress-percent'),
-    stepIndicators: document.querySelectorAll('.step-indicator'),
+    loadingElapsed: document.getElementById('loading-elapsed'),
+    cancelBtn: document.getElementById('cancel-button'),
+    // 読み上げ専用のお知らせ欄（生成の開始・完了・中止だけを流す）
+    srStatus: document.getElementById('sr-status'),
 
     // グローバルエラー表示。id で引くのは、特集キーワード欄にも
     // .error-message というクラス名の要素があり、DOM 順に依存してしまうため。
@@ -25,19 +22,17 @@ export const el = {
     errorText: document.querySelector('#error-message .error-text'),
 
     results: document.getElementById('results'),
+    resultsHeader: document.getElementById('results-header'),
+    resultsCount: document.getElementById('results-count'),
+    resultsActionsCount: document.getElementById('results-actions-count'),
+    resultsFeatured: document.getElementById('results-featured'),
     templateContainer: document.getElementById('template-container'),
-    templatesLoading: document.getElementById('templates-loading'),
     templateCardTemplate: document.querySelector('#template-card'),
 
     exportAllBtn: document.getElementById('export-all'),
     copyAllBtn: document.getElementById('copy-all'),
-
-    pagination: document.querySelector('.pagination'),
-    prevPageBtn: document.getElementById('prev-page'),
-    nextPageBtn: document.getElementById('next-page'),
-    paginationNumbers: document.getElementById('pagination-numbers'),
-
-    copiedToast: document.getElementById('copied-toast'),
+    // 下部の操作バーと、季節キーワード未付与の注記の 2 か所にある
+    regenerateButtons: document.querySelectorAll('[data-action="regenerate"]'),
 
     genderRadios: document.querySelectorAll('input[name="gender"]'),
     seasonCheckboxes: document.querySelectorAll('input[name="season"]'),

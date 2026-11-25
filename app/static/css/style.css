@@ -8,7 +8,7 @@
  * - 影はポップアップ（トースト・通知・ダイアログ）の --shadow-popup だけ。面は罫線で区切る。
  * - 角丸は --radius-sm / --radius-md の 2 種類。円形が必要な所だけ 50%。
  * - 動きは色・透明度の transition だけ。常時ループ、hover で浮かせる・拡大する動きは使わない。
- *   例外は「読み込み中」を示すスピナーの回転と、進捗バーの幅の変化だけ。
+ *   例外は「生成中」を示す、流れ続けるバー（.progress-fill）だけ。
  * - 入力欄のフォーカスリングは box-shadow（--focus-ring）で描く。これは影ではなく枠の扱い。
  * - 文字サイズは --text-* の 5 段階、余白は --space-* の刻みを使う。
  *   ボタンの高さやアイコンの大きさなど、部品の寸法は px で直接書いてよい。
@@ -56,6 +56,7 @@
     --space-6: 48px;
 
     --control-height: 44px;
+    --results-actions-height: 62px;  /* 下部の操作バー。トーストとスクロール余白もこれを参照する */
     --container-max-width: 1200px;
     --transition: 150ms ease;
 
@@ -223,7 +224,7 @@ button:disabled {
     border-radius: var(--radius-md);
 }
 
-/* 性別: セグメント型の切り替え。選択中の見た目は :has(input:checked) で付ける */
+/* 性別: セグメント型の切り替え。選択中の見た目は input:checked + .radio-label で付ける（:has() 非対応の環境でも選択が見えるように） */
 .gender-selection {
     display: flex;
     border: 1px solid var(--color-border-strong);
@@ -265,13 +266,13 @@ button:disabled {
     color: var(--color-text);
 }
 
-.gender-option:has(input:checked) .radio-label {
+.gender-option input:checked + .radio-label {
     background-color: var(--color-primary-soft);
     color: var(--color-primary-strong);
     font-weight: 700;
 }
 
-.gender-option:has(input:focus-visible) .radio-label {
+.gender-option input:focus-visible + .radio-label {
     outline: 2px solid var(--color-primary);
     outline-offset: -2px;
 }
@@ -471,95 +472,70 @@ button:disabled {
 /* ------------------------------------------------------------ 生成中 */
 
 .loading {
-    padding: var(--space-4);
+    padding: var(--space-3) var(--space-4);
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
 }
 
-.loading-message {
+.loading-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
     margin-bottom: var(--space-3);
+}
+
+.loading-message {
     font-size: var(--text-md);
     font-weight: 700;
 }
 
-.progress-steps {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-4);
-    margin-bottom: var(--space-3);
-}
-
-.step-indicator {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    white-space: nowrap;
-    font-size: var(--text-xs);
+.loading-elapsed {
+    font-size: var(--text-sm);
     color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
 }
 
-.step-dot {
-    position: relative;
-    flex-shrink: 0;
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--color-border-strong);
-    border-radius: 50%;
-    background-color: var(--color-surface);
+.loading-cancel {
+    min-height: 36px;
+    margin-left: auto;
+    padding: 0 var(--space-3);
 }
 
-.step-indicator.active {
-    color: var(--color-primary);
-    font-weight: 700;
-}
-
-.step-indicator.active .step-dot {
-    border-color: var(--color-primary);
-}
-
-.step-indicator.completed .step-dot {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-}
-
-/* 完了したステップのチェック。フォントに頼らず罫線で描く */
-.step-indicator.completed .step-dot::after {
-    content: '';
-    position: absolute;
-    left: 3px;
-    top: 0;
-    width: 4px;
-    height: 7px;
-    border: solid #ffffff;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-}
-
+/* 進み具合は分からないので、端から端へ流れ続けるバーで「動いている」ことだけを示す */
 .progress-bar {
-    height: 6px;
+    position: relative;
+    height: 4px;
     background-color: var(--color-border);
     border-radius: var(--radius-sm);
     overflow: hidden;
 }
 
 .progress-fill {
-    width: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 30%;
     height: 100%;
     background-color: var(--color-primary);
-    transition: width 200ms linear;
+    border-radius: var(--radius-sm);
+    animation: progress-indeterminate 1.4s ease-in-out infinite;
 }
 
-.progress-status {
-    display: flex;
-    justify-content: space-between;
+@keyframes progress-indeterminate {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(340%);
+    }
+}
+
+.loading-note {
     margin-top: var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     color: var(--color-text-muted);
-}
-
-.progress-percent {
-    font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------ エラー */
@@ -586,11 +562,39 @@ button:disabled {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    /* 生成後に見出しへフォーカスしたとき、枠の上辺が画面外に切れないよう少し余白を取る */
+    scroll-margin-top: var(--space-2);
+}
+
+.results-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
 }
 
 .results-header {
     font-size: var(--text-lg);
     font-weight: 700;
+}
+
+.results-count {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+.results-featured {
+    padding: 0 var(--space-2);
+    background-color: var(--color-primary-soft);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    line-height: 24px;
+    color: var(--color-primary-strong);
+}
+
+/* 生成中は前回の結果を薄く残す（操作は JS の inert で止める） */
+.results-section.is-busy {
+    opacity: 0.45;
 }
 
 /* 注記（メンズの補足・季節キーワード未付与）。左の線で示し、アイコンは付けない */
@@ -601,6 +605,12 @@ button:disabled {
     border-left: 3px solid var(--color-primary);
     border-radius: var(--radius-sm);
     font-size: var(--text-sm);
+}
+
+.notice-action {
+    min-height: 36px;
+    margin-top: var(--space-2);
+    padding: 0 var(--space-3);
 }
 
 .mens-notice-collapsible {
@@ -655,32 +665,6 @@ button:disabled {
     background-color: var(--color-primary-soft);
 }
 
-/* ページ切り替え中のスピナー */
-.loading-spinner {
-    display: none;
-    justify-content: center;
-    padding: var(--space-4) 0;
-}
-
-.loading-spinner.active {
-    display: flex;
-}
-
-.spinner {
-    width: 24px;
-    height: 24px;
-    border: 3px solid var(--color-border);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 800ms linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 /* カード一覧 */
 .template-container {
     display: grid;
@@ -710,15 +694,6 @@ button:disabled {
     font-size: var(--text-sm);
     font-weight: 700;
     color: var(--color-text-muted);
-}
-
-.featured-indicator {
-    padding: 0 var(--space-2);
-    background-color: var(--color-primary-soft);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-xs);
-    line-height: 24px;
-    color: var(--color-primary-strong);
 }
 
 .card-content {
@@ -790,8 +765,7 @@ button:disabled {
     box-shadow: var(--focus-ring);
 }
 
-/* 欄ごとのコピー。マウスのある端末ではカードに触れたときだけ出す（PR ③ で常時表示にする）。
-   タッチ端末では hover が無いので常に出す */
+/* 欄ごとのコピー。どの端末でも常に出す */
 .field-copy-btn {
     position: absolute;
     top: var(--space-1);
@@ -806,7 +780,7 @@ button:disabled {
     border: 0;
     border-radius: var(--radius-sm);
     color: var(--color-text-muted);
-    transition: opacity var(--transition), background-color var(--transition), color var(--transition);
+    transition: background-color var(--transition), color var(--transition);
 }
 
 .field-copy-btn:hover {
@@ -843,63 +817,32 @@ button:disabled {
     color: var(--color-primary);
 }
 
-/* ページ送り（PR ③ で廃止予定） */
-.pagination {
+/* 結果の操作バー。結果欄が画面に入っている間だけ画面の下端に固定される */
+.results-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
     gap: var(--space-2);
-}
-
-#pagination-numbers {
-    display: flex;
-    gap: var(--space-1);
-}
-
-.page-btn {
-    min-width: 36px;
-    min-height: 36px;
-    padding: 0 var(--space-2);
+    height: var(--results-actions-height);
+    margin: 0 calc(-1 * var(--space-3));
+    padding: 0 var(--space-3);
     background-color: var(--color-surface);
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
-    transition: border-color var(--transition), color var(--transition);
+    border-top: 1px solid var(--color-border);
 }
 
-.page-btn:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-.page-btn.current-page {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #ffffff;
-    font-weight: 700;
-}
-
-.page-btn.disabled {
-    opacity: 0.4;
-    pointer-events: none;
-}
-
-.pagination-ellipsis {
-    align-self: center;
-    padding: 0 var(--space-1);
-    color: var(--color-text-muted);
-}
-
-.export-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--space-2);
-}
-
-.export-buttons > button {
+.results-actions > button {
     flex: 1;
+    padding: 0 var(--space-2);
+}
+
+/* スマホでは見出しの件数で足りるので、バーの件数は広い画面だけで出す */
+.results-actions-count {
+    display: none;
+    margin-right: auto;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
 }
 
 /* ------------------------------------------------------------ フッター */
@@ -915,31 +858,6 @@ button:disabled {
 }
 
 /* ------------------------------------------------------------ ポップアップ */
-
-/* コピー確認（PR ③ で廃止予定） */
-.copied-toast {
-    position: fixed;
-    bottom: var(--space-4);
-    left: 50%;
-    /* 右下のトーストと同時に出ても隠れないよう、1 つ上に置く */
-    z-index: calc(var(--z-toast) + 1);
-    padding: var(--space-2) var(--space-3);
-    background-color: var(--color-text);
-    border-radius: var(--radius-sm);
-    color: #ffffff;
-    font-size: var(--text-sm);
-    text-align: center;
-    width: max-content;
-    max-width: calc(100vw - var(--space-5));
-    transform: translateX(-50%);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--transition);
-}
-
-.copied-toast.show {
-    opacity: 1;
-}
 
 /* 右下のトースト。種類は左の線の色で区別する */
 .toast {
@@ -974,6 +892,16 @@ button:disabled {
 
 .toast--error {
     border-left-color: var(--color-error);
+}
+
+/* 結果の操作バーが下端にある間は、トーストをその上に出す */
+body:has(#results:not(.hidden)) .toast {
+    bottom: calc(var(--results-actions-height) + var(--space-3));
+}
+
+/* Tab で移動したとき、フォーカスした欄やボタンが操作バーの裏に隠れないようにする */
+html:has(#results:not(.hidden)) {
+    scroll-padding-bottom: calc(var(--results-actions-height) + var(--space-3));
 }
 
 .toast-title {
@@ -1131,18 +1059,6 @@ button:disabled {
 
 /* 基本の指定はスマホ幅。広い画面の分だけをここで足す */
 
-@media (hover: hover) {
-    .field-copy-btn {
-        opacity: 0;
-    }
-
-    .template-card:hover .field-copy-btn,
-    .field-copy-btn:focus-visible,
-    .field-copy-btn.copied {
-        opacity: 1;
-    }
-}
-
 @media (min-width: 640px) {
     .search-section {
         padding: var(--space-4);
@@ -1156,8 +1072,19 @@ button:disabled {
         flex: none;
     }
 
-    .export-buttons > button {
+    .results-actions {
+        margin: 0;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+
+    .results-actions > button {
         flex: none;
+        padding: 0 var(--space-4);
+    }
+
+    .results-actions-count {
+        display: block;
     }
 
     .toast {
@@ -1165,6 +1092,10 @@ button:disabled {
         right: var(--space-4);
         bottom: var(--space-4);
         max-width: 360px;
+    }
+
+    body:has(#results:not(.hidden)) .toast {
+        bottom: calc(var(--results-actions-height) + var(--space-4));
     }
 
     .featured-fallback-notification {
@@ -1196,7 +1127,7 @@ button:disabled {
         transition-duration: 0.01ms !important;
     }
 
-    .spinner {
-        animation-duration: 2s;
+    .progress-fill {
+        animation-duration: 4s;
     }
 }

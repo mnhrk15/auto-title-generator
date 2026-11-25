@@ -2,10 +2,19 @@
 
 import { el } from './dom.js';
 
+/** 画面外にあるときだけ、最小限のスクロールで見える位置に出す */
+function revealIfOffscreen(element) {
+    const rect = element.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
 export function showLoading() {
     el.loading.classList.remove('hidden');
     el.loading.setAttribute('aria-busy', 'true');
-    el.loading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 結果欄の下の「再生成」から押されたときに、待ち表示が見えないままにならないようにする
+    revealIfOffscreen(el.loading);
 }
 
 export function hideLoading() {
@@ -32,6 +41,22 @@ export function showResults() {
     el.results.classList.remove('hidden');
 }
 
-export function hideResults() {
-    el.results.classList.add('hidden');
+/**
+ * 生成中は前回の結果を薄く残し、操作できないようにする。
+ * 失敗・中止したら元に戻すので、隠さずに inert で止める。
+ */
+export function setResultsBusy(isBusy) {
+    el.results.classList.toggle('is-busy', isBusy);
+    el.results.inert = isBusy;
+}
+
+/**
+ * 読み上げ用のお知らせ（画面には出さない）。秒数のような頻繁に変わる値は流さない。
+ * 同じ文言を続けて入れても変化と見なされず読み上げられないので、一度空にしてから入れる。
+ */
+export function announce(message) {
+    el.srStatus.textContent = '';
+    requestAnimationFrame(() => {
+        el.srStatus.textContent = message;
+    });
 }

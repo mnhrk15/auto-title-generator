@@ -1,7 +1,9 @@
 // トーストと通知の生成。
 //
-// ユーザーに何かを知らせる面はアプリ全体で 5 つある。同じものが 5 つあるのではなく
+// ユーザーに何かを知らせる面はアプリ全体で 4 つある。同じものが 4 つあるのではなく
 // 役割が違うので、統合せず使い分ける。新しい通知を足すときは下の表から選ぶこと。
+// 操作の結果が画面を見れば分かるもの（生成の成功、選択の解除、再読み込みの成功）には
+// 通知を出さない。
 //
 //   (i) 文書フローに入る「その場のエラー状態」
 //     - status.js showError() … .error-message。生成フローの失敗。
@@ -10,25 +12,19 @@
 //       通知ではなく「その領域の状態」。空状態の表示と同じ層。
 //
 //   (ii) 一過性の通知（放っておくと消える）
-//     - showToast()     … 画面右下の .toast。排他（同時に 1 つだけ）。
-//     - showCopyToast() … 画面下中央のピル #copied-toast。コピー操作の確認専用。
+//     - showToast() … 画面右下の .toast。排他（同時に 1 つだけ）。
 //
 //   (iii) 操作を伴う持続的な通知
 //     - showNotification() … アクションボタンと閉じるボタンを持つバナー。
 //       showToast ではボタンを置けないのでこちらを使う。
 //
-// 以前は右下トーストの生成コードが8箇所にコピペされ、クラス名も8種類に散っていた。
-// それは .toast + modifier に統合済み。#copied-toast は見た目も役割も別なので残している。
+// コピーの成功は、押したボタンの表示（clipboard.js の flashCopyFeedback）だけで知らせる。
+// 以前あった画面下中央のピル（showCopyToast）はボタンの表示と二重だったので廃止した。
 
-import { el } from './dom.js';
 import { icon } from './icons.js';
 
 const SHOW_DELAY_MS = 10;      // 付与→トランジション開始のための1フレーム待ち
 const REMOVE_DELAY_MS = 300;   // フェードアウト完了を待つ時間（CSS の transition と対応）
-const COPY_TOAST_DURATION_MS = 2000;
-
-// 表示中のピルを消すタイマー。連続コピー時に前のタイマーを取り消す。
-let copyToastTimer = null;
 
 /**
  * 画面右下にトーストを表示する。
@@ -73,20 +69,6 @@ export function showToast({ message, title = '', variant = 'info', duration = 30
     }, duration);
 
     return toast;
-}
-
-/** コピー操作の確認（画面下中央のピル） */
-export function showCopyToast(fieldName = '') {
-    const toastEl = el.copiedToast;
-    if (!toastEl) return;
-
-    toastEl.textContent = fieldName
-        ? `${fieldName}をクリップボードにコピーしました`
-        : 'クリップボードにコピーしました';
-    toastEl.classList.add('show');
-
-    clearTimeout(copyToastTimer);
-    copyToastTimer = setTimeout(() => toastEl.classList.remove('show'), COPY_TOAST_DURATION_MS);
 }
 
 /**

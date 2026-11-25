@@ -108,12 +108,8 @@ async function retry() {
     // 押した手応えを出すために少し待つ
     await new Promise((resolve) => { setTimeout(resolve, RETRY_FEEDBACK_DELAY_MS); });
 
-    if (await loadAndRender(null, RETRY_ERROR_MESSAGES)) {
-        showToast({
-            message: '特集キーワードを正常に読み込みました',
-            variant: 'success',
-        });
-    }
+    // 成功したことはキーワードが並ぶことで分かるので、通知は出さない
+    await loadAndRender(null, RETRY_ERROR_MESSAGES);
 }
 
 // ---------------------------------------------------------------- 描画
@@ -239,14 +235,6 @@ function selectFeaturedKeyword(keyword) {
 }
 
 function deselectFeaturedKeyword() {
-    if (state.selectedKeyword) {
-        showToast({
-            message: `特集キーワード「${state.selectedKeyword.name}」の選択を解除しました`,
-            variant: 'info',
-            duration: 2000,
-        });
-    }
-
     el.keywordInput.value = '';
     el.keywordInput.focus();
     el.keywordInput.dispatchEvent(new Event('input', { bubbles: true }));

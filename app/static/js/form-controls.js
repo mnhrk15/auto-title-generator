@@ -1,6 +1,6 @@
 // 性別・季節カラーの選択状態に応じた表示制御。
 //
-// 選択中の見た目は CSS の :has(input:checked) で付けるので、ここではクラスを付け外ししない。
+// 選択中の見た目は CSS の input:checked + .radio-label で付けるので、ここではクラスを付け外ししない。
 
 import { el, getSelectedGender } from './dom.js';
 
